@@ -434,6 +434,11 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
               unidade_id: pack.unidade_id,
               agendamento_id: appt.id,
               servico_id: item.servico_id,
+              descricao: item.servicos?.nome || null,
+              tipo: 'principal',
+              eh_extra: false,
+              valor: 0,
+              valor_extra: 0,
               valor_cobrado: 0
             });
           });

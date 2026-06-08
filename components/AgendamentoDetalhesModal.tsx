@@ -55,13 +55,39 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
 
   if (!appt) return null;
 
-  const totalGeral = parseFloat(appt.valor_total) || 0;
-  const totalExtra = parseFloat(appt.valor_extra_total) || 0;
-  const isSomaValida = !isDividirPagamento || (Math.abs((valor1 + valor2) - totalGeral) < 0.01);
-
   const services = appt.agendamento_itens || [];
+  const isExtraItem = (item: any) => item?.eh_extra === true || item?.tipo === 'adicional' || item?.tipo === 'extra';
+  const getItemValue = (item: any) => Number(item?.valor_extra ?? item?.valor ?? item?.valor_cobrado ?? item?.servicos?.preco_base ?? 0);
+  const mainItems = services.filter((it: any) => !isExtraItem(it));
+  const extraItems = services.filter(isExtraItem);
+  const valorTransporte = Number(appt.valor_transporte || 0);
+  const valorDesconto = Number(appt.valor_desconto || appt.desconto || 0);
+  const valorServicos = Number(appt.valor_servicos ?? Math.max(0, Number(appt.valor_total || 0) - valorTransporte));
+  const totalExtraItens = extraItems.reduce((acc: number, item: any) => acc + getItemValue(item), 0);
+  const totalExtra = totalExtraItens || Number(appt.valor_extra_total || 0);
+  const totalBaseAgendamento = Number(appt.valor_total || 0);
+  const totalGeral = appt.pacote_id ? totalBaseAgendamento : Math.max(0, valorServicos + valorTransporte + totalExtra - valorDesconto);
+  const isSomaValida = !isDividirPagamento || (Math.abs((valor1 + valor2) - totalGeral) < 0.01);
   const client = appt.pets?.clientes;
   const pet = appt.pets;
+  const showToast = (mensagem: string, tipo: 'sucesso' | 'erro' | 'carregando' = 'sucesso') => {
+    setToast({ visivel: true, mensagem, tipo });
+    setTimeout(() => setToast(prev => ({ ...prev, visivel: false })), 3000);
+  };
+
+  const normalizeFormaPagamento = (method: string) => {
+    const normalized = method
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+    if (normalized.includes('pix')) return 'pix';
+    if (normalized.includes('dinheiro')) return 'dinheiro';
+    if (normalized.includes('debito')) return 'debito';
+    if (normalized.includes('credito')) return 'credito';
+    if (normalized.includes('transfer')) return 'transferencia';
+    return 'outro';
+  };
 
   const fetchExtraServices = async () => {
     if (extraServices.length > 0) return;
@@ -70,23 +96,34 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   };
 
   const handleAddExtra = async (srv: any) => {
+    const alreadyAdded = extraItems.some((item: any) => Number(item.servico_id) === Number(srv.id));
+    if (alreadyAdded && !window.confirm(`${srv.nome} já está nos adicionais. Deseja adicionar outra unidade mesmo assim?`)) {
+      return;
+    }
+
     setLoadingExtra(true);
     try {
+      const extraValue = Number(srv.preco_base || 0);
       const { error: itemErr } = await supabaseClient.from('agendamento_itens').insert([{
         unidade_id: appt.unidade_id,
         agendamento_id: appt.id,
         servico_id: srv.id,
-        valor_cobrado: 0,
+        descricao: srv.nome,
+        tipo: 'adicional',
         eh_extra: true,
-        valor_extra: srv.preco_base
+        valor: extraValue,
+        valor_extra: extraValue,
+        valor_cobrado: extraValue
       }]);
 
       if (itemErr) throw itemErr;
 
-      const newExtraTotal = totalExtra + srv.preco_base;
+      const newExtraTotal = totalExtra + extraValue;
       const { error: apptErr } = await supabaseClient.from('agendamentos').update({
         valor_extra_total: newExtraTotal,
-        status_pagamento_extra: appt.status_pagamento_extra === 'PAGO' ? 'PAGO' : 'PENDENTE'
+        status_pagamento_extra: 'PENDENTE',
+        forma_pagamento_extra: null,
+        data_pagamento_extra: null
       }).eq('id', appt.id);
 
       if (apptErr) throw apptErr;
@@ -101,8 +138,9 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
       );
 
       setIsAddingExtra(false);
+      showToast("Serviço adicional incluído.");
       onRefresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao adicionar serviço extra:", err);
     } finally {
       setLoadingExtra(false);
@@ -110,15 +148,54 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   };
 
   const handleReceiveExtra = async () => {
+    if (totalExtra <= 0 || appt.status_pagamento_extra === 'PAGO') return;
+
     setLoadingExtra(true);
     try {
+      const paymentDate = new Date().toISOString().split('T')[0];
       const { error } = await supabaseClient.from('agendamentos').update({
         status_pagamento_extra: 'PAGO',
         forma_pagamento_extra: extraPaymentMethod,
-        data_pagamento_extra: new Date().toISOString().split('T')[0]
+        data_pagamento_extra: paymentDate,
+        valor_extra_total: totalExtra
       }).eq('id', appt.id);
 
       if (error) throw error;
+
+      const { data: movimento, error: movimentoErr } = await supabaseClient
+        .from('financeiro_movimentos')
+        .insert([{
+          unidade_id: appt.unidade_id,
+          cliente_id: client?.id || appt.cliente_id || null,
+          pet_id: pet?.id || appt.pet_id || null,
+          pacote_id: appt.pacote_id || null,
+          agendamento_id: appt.id,
+          tipo: 'receita',
+          categoria: 'extras',
+          descricao: `Extras do agendamento ${appt.id} - ${pet?.nome || 'Pet'}`,
+          valor_total: totalExtra,
+          data_competencia: paymentDate,
+          data_vencimento: paymentDate,
+          status: 'pago',
+          origem: 'extras_agendamento',
+          origem_id: String(appt.id)
+        }])
+        .select()
+        .single();
+
+      if (movimentoErr) throw movimentoErr;
+
+      const { error: pagamentoErr } = await supabaseClient
+        .from('financeiro_pagamentos')
+        .insert([{
+          unidade_id: appt.unidade_id,
+          movimento_id: movimento.id,
+          forma_pagamento: normalizeFormaPagamento(extraPaymentMethod),
+          valor: totalExtra,
+          observacao: `Pagamento de extras do agendamento ${appt.id}`
+        }]);
+
+      if (pagamentoErr) throw pagamentoErr;
 
       registrarAtividade(
         appt.unidade_id,
@@ -130,9 +207,11 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
       );
 
       setShowExtraPayment(false);
+      showToast("Pagamento dos extras registrado.");
       onRefresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao receber pagamento de extras:", err);
+      showToast(err.message || "Erro ao registrar pagamento dos extras.", "erro");
     } finally {
       setLoadingExtra(false);
     }
@@ -147,8 +226,8 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
       const { error: delErr } = await supabaseClient.from('agendamento_itens').delete().eq('id', itemId);
       if (delErr) throw delErr;
 
-      const remainingExtras = services.filter((it: any) => it.eh_extra && it.id !== itemId);
-      const newExtraTotal = remainingExtras.reduce((acc: number, cur: any) => acc + (parseFloat(cur.valor_extra) || 0), 0);
+      const remainingExtras = extraItems.filter((it: any) => it.id !== itemId);
+      const newExtraTotal = remainingExtras.reduce((acc: number, cur: any) => acc + getItemValue(cur), 0);
 
       const updateData: any = {
         valor_extra_total: newExtraTotal
@@ -157,6 +236,12 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
       if (newExtraTotal === 0) {
         updateData.status_pagamento_extra = 'NÃO POSSUI';
       }
+
+      if (newExtraTotal > 0) {
+        updateData.status_pagamento_extra = 'PENDENTE';
+      }
+      updateData.forma_pagamento_extra = null;
+      updateData.data_pagamento_extra = null;
 
       const { error: apptErr } = await supabaseClient.from('agendamentos').update(updateData).eq('id', appt.id);
       if (apptErr) throw apptErr;
@@ -197,6 +282,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
           status_pagamento_extra: 'NÃO POSSUI',
           valor_extra_total: 0,
           forma_pagamento_extra: null,
+          data_pagamento_extra: null,
           valor_pagamento_extra: 0
         })
         .eq('id', appt.id);
@@ -379,11 +465,11 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
 
               {services.length > 0 ? (
                 <div className="space-y-2">
-                  {services.map((it: any, idx: number) => (
+                  {[...mainItems, ...extraItems].map((it: any, idx: number) => (
                     <div key={it.id || idx} className="bg-white p-4 rounded-xl border border-slate-100 flex justify-between items-center shadow-sm relative overflow-hidden">
                        <div className="flex items-center space-x-3">
-                         <span className="font-bold text-slate-700">{it.servicos?.nome}</span>
-                         {it.eh_extra && (
+                         <span className="font-bold text-slate-700">{it.descricao || it.servicos?.nome}</span>
+                         {isExtraItem(it) && (
                            <div className="flex items-center gap-2">
                              <span className="bg-amber-100 text-amber-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter border border-amber-200">EXTRA</span>
                              {!isReadOnly && (
@@ -399,7 +485,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                            </div>
                          )}
                        </div>
-                       <span className="font-black text-slate-900">R$ {Number(it.eh_extra ? it.valor_extra : (it.servicos?.preco_base || 0)).toFixed(2)}</span>
+                       <span className="font-black text-slate-900">R$ {Number(isExtraItem(it) ? getItemValue(it) : (it.valor_cobrado || it.valor || it.servicos?.preco_base || 0)).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -435,7 +521,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Serviços</p>
-                     <p className="font-black text-slate-800">R$ {( (parseFloat(appt.valor_total) || 0) - (parseFloat(appt.valor_transporte) || 0) ).toFixed(2)}</p>
+                     <p className="font-black text-slate-800">R$ {valorServicos.toFixed(2)}</p>
                   </div>
                   <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Extras</p>
@@ -443,16 +529,16 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                   </div>
                   <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Pet Táxi</p>
-                     <p className="font-black text-slate-800">R$ {(parseFloat(appt.valor_transporte) || 0).toFixed(2)}</p>
+                     <p className="font-black text-slate-800">R$ {valorTransporte.toFixed(2)}</p>
                   </div>
                   <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                      <p className="text-[9px] font-black text-orange-500 uppercase mb-1">Desconto</p>
-                     <p className="font-black text-orange-500">R$ 0,00</p>
+                     <p className="font-black text-orange-500">R$ {valorDesconto.toFixed(2)}</p>
                   </div>
                </div>
 
                <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-100 shadow-sm border-l-4 border-l-orange-500">
-                  <span className="text-sm font-black text-slate-400 uppercase">Total {appt.pacote_id ? '(Pacote)' : ''}</span>
+                  <span className="text-sm font-black text-slate-400 uppercase">Total {appt.pacote_id ? '(Pacote)' : 'Geral'}</span>
                   <div className="text-right">
                     <p className="text-2xl font-black text-slate-900 tracking-tighter">R$ {totalGeral.toFixed(2)}</p>
                   </div>

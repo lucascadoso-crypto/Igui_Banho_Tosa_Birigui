@@ -139,6 +139,11 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
           ),
           agendamento_itens (
             id,
+            descricao,
+            tipo,
+            eh_extra,
+            valor,
+            valor_extra,
             valor_cobrado,
             servico_id,
             servicos (nome, preco_base)
@@ -224,7 +229,9 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     setAppointmentDate(target.data_agendamento);
     setAppointmentTime(String(target.horario_inicio || '09:00').substring(0, 5));
     
-    const initialServiceIds = target.agendamento_itens.map((it: any) => it.servico_id);
+    const initialServiceIds = target.agendamento_itens
+      .filter((it: any) => !it.eh_extra && it.tipo !== 'adicional')
+      .map((it: any) => it.servico_id);
     setSelectedServiceIds(initialServiceIds);
     setManualTotalValue(Number(target.valor_total));
     
@@ -585,6 +592,11 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                     unidade_id: pacoteAtual.unidade_id || unit.id,
                     agendamento_id: appt.id,
                     servico_id: item.servico_id,
+                    descricao: item.servicos?.nome || null,
+                    tipo: 'principal',
+                    eh_extra: false,
+                    valor: 0,
+                    valor_extra: 0,
                     valor_cobrado: 0 
                 });
             });
@@ -706,7 +718,11 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
           userProfile?.cargo
         );
 
-        await supabaseClient.from('agendamento_itens').delete().eq('agendamento_id', apptId);
+        await supabaseClient
+          .from('agendamento_itens')
+          .delete()
+          .eq('agendamento_id', apptId)
+          .eq('eh_extra', false);
       } else {
         const { data, error: insertError } = await supabaseClient.from('agendamentos').insert([apptPayload]).select().single();
         if (insertError) throw insertError;
@@ -724,12 +740,20 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
         );
       }
 
-      const itemsPayload = selectedServiceIds.map(srvId => ({
-        unidade_id: unit.id,
-        agendamento_id: apptId,
-        servico_id: srvId,
-        valor_cobrado: 0 
-      }));
+      const itemsPayload = selectedServiceIds.map(srvId => {
+        const service = services.find(s => s.id === srvId);
+        return {
+          unidade_id: unit.id,
+          agendamento_id: apptId,
+          servico_id: srvId,
+          descricao: service?.nome || null,
+          tipo: 'principal',
+          eh_extra: false,
+          valor: 0,
+          valor_extra: 0,
+          valor_cobrado: 0
+        };
+      });
 
       const { error: itemsError } = await supabaseClient.from('agendamento_itens').insert(itemsPayload);
       if (itemsError) throw itemsError;

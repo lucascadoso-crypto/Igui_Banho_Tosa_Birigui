@@ -369,7 +369,8 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
             const itemsPayload: any[] = [];
             appts.forEach(appt => {
               selectedServiceIds.forEach(srvId => {
-                itemsPayload.push({ unidade_id: unit.id, agendamento_id: appt.id, servico_id: srvId, valor_cobrado: 0 });
+                const service = services.find(s => s.id === srvId);
+                itemsPayload.push({ unidade_id: unit.id, agendamento_id: appt.id, servico_id: srvId, descricao: service?.nome || null, tipo: 'principal', eh_extra: false, valor: 0, valor_extra: 0, valor_cobrado: 0 });
               });
             });
             if (itemsPayload.length > 0) {
@@ -413,7 +414,8 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
             const { error: dErr } = await supabaseClient
               .from('agendamento_itens')
               .delete()
-              .in('agendamento_id', futureIds);
+              .in('agendamento_id', futureIds)
+              .eq('eh_extra', false);
             
             if (dErr) throw dErr;
 
@@ -421,7 +423,8 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
             const newItems: any[] = [];
             futureIds.forEach((apptId: number | string) => {
               selectedServiceIds.forEach(srvId => {
-                newItems.push({ unidade_id: unit.id, agendamento_id: apptId, servico_id: srvId, valor_cobrado: 0 });
+                const service = services.find(s => s.id === srvId);
+                newItems.push({ unidade_id: unit.id, agendamento_id: apptId, servico_id: srvId, descricao: service?.nome || null, tipo: 'principal', eh_extra: false, valor: 0, valor_extra: 0, valor_cobrado: 0 });
               });
             });
 
@@ -496,7 +499,8 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
         const itemsPayload: any[] = [];
         appts.forEach(appt => {
           selectedServiceIds.forEach(srvId => {
-            itemsPayload.push({ unidade_id: unit.id, agendamento_id: appt.id, servico_id: srvId, valor_cobrado: 0 });
+            const service = services.find(s => s.id === srvId);
+            itemsPayload.push({ unidade_id: unit.id, agendamento_id: appt.id, servico_id: srvId, descricao: service?.nome || null, tipo: 'principal', eh_extra: false, valor: 0, valor_extra: 0, valor_cobrado: 0 });
           });
         });
         await supabaseClient.from('agendamento_itens').insert(itemsPayload);
@@ -586,7 +590,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
         .eq('agendamento_id', p.agendamentos[0].id);
       
       if (items) {
-        setSelectedServiceIds(items.map((it: any) => it.servico_id));
+        setSelectedServiceIds(items.filter((it: any) => !it.eh_extra && it.tipo !== 'adicional').map((it: any) => it.servico_id));
       }
       
       setStartTime(p.agendamentos[0].horario_inicio?.substring(0, 5) || '09:00');
