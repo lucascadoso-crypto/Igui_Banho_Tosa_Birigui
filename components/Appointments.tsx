@@ -634,7 +634,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     if (petData?.length) setSelectedPetId(petData[0].id);
   };
 
-  const toggleServiceId = (id: string) => {
+  const toggleServiceId = (id: number | string) => {
     setSelectedServiceIds(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
   };
 

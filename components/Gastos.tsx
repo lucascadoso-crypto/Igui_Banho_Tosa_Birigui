@@ -22,7 +22,7 @@ const Gastos: React.FC<GastosProps> = ({ unit, supabaseClient, userProfile }) =>
   const [loading, setLoading] = useState(false);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [confirmacao, setConfirmacao] = useState<{ visivel: boolean, id: string | null }>({ visivel: false, id: null });
+  const [confirmacao, setConfirmacao] = useState<{ visivel: boolean, id: number | string | null }>({ visivel: false, id: null });
 
   useEffect(() => {
     fetchExpenses();

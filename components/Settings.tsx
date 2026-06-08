@@ -363,7 +363,7 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
     setLoading(false);
   };
 
-  const deleteService = async (id: string, nome: string) => {
+  const deleteService = async (id: number | string, nome: string) => {
     if (!window.confirm(`Tem certeza que deseja excluir o serviço "${nome}"? Esta ação não pode ser desfeita.`)) return;
     
     setLoading(true);

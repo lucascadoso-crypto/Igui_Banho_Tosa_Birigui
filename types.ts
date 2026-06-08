@@ -1,6 +1,9 @@
 
+export type BusinessId = number;
+export type UiId = BusinessId | string;
+
 export interface Unit {
-  id: string;
+  id: BusinessId;
   name: string;
   endereco_completo?: string;
   phone?: string;
@@ -17,7 +20,7 @@ export interface SystemConfig {
 }
 
 export interface Service {
-  id: string;
+  id: BusinessId;
   nome: string;
   preco_base: number;
 }
@@ -25,11 +28,11 @@ export interface Service {
 export type UserRole = 'master' | 'admin_unidade' | 'gerente' | 'financeiro' | 'atendente' | 'tosador' | 'somente_leitura' | 'comum' | 'administrador';
 
 export interface Package {
-  id: string;
-  cliente_id: string;
-  pet_id: string;
-  unidade_id: string;
-  servico_id: string;
+  id: BusinessId;
+  cliente_id: BusinessId;
+  pet_id: BusinessId;
+  unidade_id: BusinessId;
+  servico_id: BusinessId;
   qtd_sessoes: number;
   valor_total: number;
   status: string;
@@ -40,7 +43,7 @@ export interface Package {
   pets?: Pet;
   clientes?: Client;
   servicos?: Service;
-  pacote_anterior_id?: string;
+  pacote_anterior_id?: BusinessId;
   ciclo_renovacao?: number;
 }
 
@@ -50,12 +53,12 @@ export type GlobalView = 'Painel Geral' | 'Financeiro Geral' | 'Configurações'
 export interface NavigationState {
   mode: 'global' | 'unit';
   view: GlobalView | SubView;
-  unitId?: string;
+  unitId?: UiId;
   unitName?: string;
 }
 
 export interface Client { 
-  id: string; 
+  id: BusinessId; 
   nome: string; 
   telefone: string; 
   telefone_adicional?: string;
@@ -74,15 +77,15 @@ export interface Client {
   complemento?: string;
   cidade?: string;
   estado?: string;
-  unidade_preferencial_id: string; 
-  unidade_id?: string;
+  unidade_preferencial_id: BusinessId; 
+  unidade_id?: BusinessId;
   created_at?: string;
 }
 
 export interface Pet { 
-  id: string; 
-  cliente_id: string; 
-  unidade_id?: string;
+  id: BusinessId; 
+  cliente_id: BusinessId; 
+  unidade_id?: BusinessId;
   nome: string; 
   data_nascimento?: string;
   genero?: string;
@@ -95,15 +98,15 @@ export interface Pet {
   created_at?: string;
 }
 
-export interface Employee { id: string; name: string; role: string; unitId: string; }
+export interface Employee { id: BusinessId; name: string; role: string; unitId: BusinessId; }
 export interface Appointment { 
-  id: string; 
-  pet_id: string; 
-  cliente_id?: string;
-  unidade_id: string;
-  pacote_id?: string;
+  id: BusinessId; 
+  pet_id: BusinessId; 
+  cliente_id?: BusinessId;
+  unidade_id: BusinessId;
+  pacote_id?: BusinessId;
   numero_sessao?: number;
-  funcionario_id?: string; 
+  funcionario_id?: BusinessId; 
   data_agendamento: string; 
   horario_inicio: string; 
   horario_fim?: string;
@@ -120,4 +123,4 @@ export interface Appointment {
   data_inicio_real?: string;
   data_fim_real?: string;
 }
-export interface Transaction { id: string; type: 'Income' | 'Expense'; amount: number; date: string; description: string; unitId: string; }
+export interface Transaction { id: BusinessId; type: 'Income' | 'Expense'; amount: number; date: string; description: string; unitId: BusinessId; }

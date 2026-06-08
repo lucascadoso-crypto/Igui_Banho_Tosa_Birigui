@@ -1,10 +1,10 @@
 
 import { supabase } from './supabaseClient';
 
-const isUuid = (val: any): boolean => {
-  if (typeof val !== 'string') return false;
-  const generalUuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-  return generalUuidRegex.test(val);
+const toBusinessId = (val: unknown): number | null => {
+  if (typeof val === 'number' && Number.isInteger(val) && val > 0) return val;
+  if (typeof val === 'string' && /^\d+$/.test(val)) return Number(val);
+  return null;
 };
 
 /**
@@ -15,7 +15,7 @@ const isUuid = (val: any): boolean => {
  * @param descricao Descrição detalhada da ação.
  */
 export const registrarAtividade = async (
-  unidade_id: string | null | undefined,
+  unidade_id: number | string | null | undefined,
   usuario_email: string,
   acao: string,
   descricao: string,
@@ -23,7 +23,7 @@ export const registrarAtividade = async (
   role?: string
 ) => {
   try {
-    const validUnidadeId = isUuid(unidade_id) ? unidade_id : null;
+    const validUnidadeId = toBusinessId(unidade_id);
 
     const { error } = await supabase
       .from('auditoria_logs')

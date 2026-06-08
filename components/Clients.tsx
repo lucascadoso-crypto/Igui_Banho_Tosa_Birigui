@@ -25,7 +25,7 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
 
   const [selectedClientDetails, setSelectedClientDetails] = useState<Client | null>(null);
   const [isPetModalOpen, setIsPetModalOpen] = useState(false);
-  const [newPetClientData, setNewPetClientData] = useState<{id: string, nome: string} | null>(null);
+  const [newPetClientData, setNewPetClientData] = useState<{id: number | string, nome: string} | null>(null);
 
   useEffect(() => {
     fetchClients();
@@ -180,7 +180,7 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
     setActiveMenuId(null);
   };
 
-  const handleDelete = async (id: string, nome: string) => {
+  const handleDelete = async (id: number | string, nome: string) => {
     if (!window.confirm(`Deseja realmente excluir o cliente ${nome}?`)) return;
     
     try {

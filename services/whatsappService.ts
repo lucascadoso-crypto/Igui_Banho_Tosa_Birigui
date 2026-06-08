@@ -18,9 +18,9 @@ export async function enviarNotificacaoWhatsApp({
 }: { 
   telefone?: string; 
   mensagem?: string; 
-  unidadeId?: string; 
+  unidadeId?: number | string; 
   supabaseClient: any;
-  agendamentoId?: string;
+  agendamentoId?: number | string;
   tipo?: string;
   whatsapp_nome_instancia?: string;
   whatsapp_token?: string;

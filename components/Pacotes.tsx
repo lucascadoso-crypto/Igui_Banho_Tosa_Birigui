@@ -419,7 +419,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
 
             // Inserir novos itens
             const newItems: any[] = [];
-            futureIds.forEach((apptId: string) => {
+            futureIds.forEach((apptId: number | string) => {
               selectedServiceIds.forEach(srvId => {
                 newItems.push({ agendamento_id: apptId, servico_id: srvId, valor_cobrado: 0 });
               });
@@ -527,7 +527,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
     setQuickAddData({ nome: '', telefone: '', petNome: '' });
   };
 
-  const toggleService = (id: string) => {
+  const toggleService = (id: number | string) => {
     setSelectedServiceIds(prev => {
       if (prev.includes(id)) {
         return prev.filter(sid => sid !== id);
