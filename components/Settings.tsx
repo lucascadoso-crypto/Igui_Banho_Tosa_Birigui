@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Service, SystemConfig, Unit } from '../types';
-import { uploadToImgBB } from '../services/imgbbService';
+import { getLastImgBBUploadError, uploadToImgBB } from '../services/imgbbService';
 import { registrarAtividade } from '../services/logger';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatarErroWhatsApp } from '../lib/errorParser';
@@ -173,7 +173,7 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
         window.dispatchEvent(new Event('dadosGlobaisAtualizados'));
         showMsg("Logomarca carregada e salva com sucesso!");
       } else {
-        showMsg("Falha no upload da imagem", "error");
+        showMsg(getLastImgBBUploadError() || "Falha no upload da imagem", "error");
       }
     } catch (err: any) {
       console.error("Erro ao fazer upload/salvar logo:", err);
@@ -467,7 +467,7 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
                 ref={logoInputRef} 
                 onChange={handleLogoUpload} 
                 className="hidden" 
-                accept="image/*" 
+                accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp" 
               />
 
               <div className="flex flex-col sm:flex-row items-center gap-6">

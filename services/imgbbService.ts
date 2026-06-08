@@ -1,5 +1,6 @@
-
 const IMGBB_API_KEY = (import.meta as any).env.VITE_IMGBB_API_KEY || '';
+
+let lastImgBBUploadError = '';
 
 export interface ImgBBResponse {
   data: {
@@ -13,14 +14,34 @@ export interface ImgBBResponse {
   status: number;
 }
 
-/**
- * Faz o upload de um arquivo para o ImgBB e retorna a URL pública.
- * @param file O arquivo de imagem (File object)
- * @returns A URL da imagem hospedada ou null em caso de erro.
- */
+const allowedMimeTypes = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/svg+xml',
+  'image/webp',
+]);
+
+export const getLastImgBBUploadError = () => lastImgBBUploadError;
+
 export const uploadToImgBB = async (file: File): Promise<string | null> => {
+  lastImgBBUploadError = '';
+
   if (!IMGBB_API_KEY) {
-    console.error('VITE_IMGBB_API_KEY nao configurada. Upload de imagem desabilitado.');
+    lastImgBBUploadError = 'Chave do ImgBB nao configurada. Defina VITE_IMGBB_API_KEY na Vercel.';
+    console.error(lastImgBBUploadError);
+    return null;
+  }
+
+  if (!allowedMimeTypes.has(file.type)) {
+    lastImgBBUploadError = 'Formato invalido. Envie PNG, JPG, JPEG, SVG ou WEBP.';
+    console.error(lastImgBBUploadError, file.type);
+    return null;
+  }
+
+  if (file.size > 10 * 1024 * 1024) {
+    lastImgBBUploadError = 'Imagem muito grande. Envie um arquivo com ate 10 MB.';
+    console.error(lastImgBBUploadError);
     return null;
   }
 
@@ -35,23 +56,26 @@ export const uploadToImgBB = async (file: File): Promise<string | null> => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      lastImgBBUploadError = errorData?.error?.message || 'ImgBB recusou o upload. Verifique a chave e o formato da imagem.';
       console.error('Erro na resposta do ImgBB:', response.status, errorData);
       return null;
     }
 
     const result: ImgBBResponse = await response.json();
-    if (result.success) {
+    if (result.success && result.data?.url) {
       return result.data.url;
-    } else {
-      console.error('Erro no processamento do ImgBB:', result);
-      return null;
     }
+
+    lastImgBBUploadError = 'ImgBB nao retornou uma URL publica para a imagem.';
+    console.error('Erro no processamento do ImgBB:', result);
+    return null;
   } catch (error: any) {
     if (error.message === 'Failed to fetch') {
-      console.error('Erro de Rede: Não foi possível alcançar o servidor do ImgBB. Verifique bloqueadores de anúncios ou conexão.');
+      lastImgBBUploadError = 'Nao foi possivel conectar ao ImgBB. Verifique a internet, bloqueadores ou CORS.';
     } else {
-      console.error('Erro de rede ao subir imagem:', error);
+      lastImgBBUploadError = error.message || 'Erro inesperado ao enviar imagem para o ImgBB.';
     }
+    console.error('Erro de rede ao subir imagem:', error);
     return null;
   }
 };
