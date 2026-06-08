@@ -54,11 +54,11 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
   const handleOpenModal = (employee: any = null) => {
     setEditingEmployee(employee ? {
       ...employee,
-      status: employee.ativa ? 'Ativo' : 'Inativo'
+      status: employee.ativo ? 'Ativo' : 'Inativo'
     } : {
       nome: '',
       email: '',
-      cargo: 'comum',
+      cargo: 'atendente',
       unidade_id: units[0]?.id,
       status: 'Inativo', // Pendente por padrão
       foto_url: ''
@@ -82,14 +82,14 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
     e.preventDefault();
     setLoading(true);
     try {
-      // Sincroniza o status da UI com o booleano 'ativa' do banco
+      // Sincroniza o status da UI com o booleano 'ativo' do banco
       const payload = { 
         nome: editingEmployee.nome,
         email: editingEmployee.email,
         cargo: editingEmployee.cargo,
         unidade_id: editingEmployee.unidade_id,
         foto_url: editingEmployee.foto_url,
-        ativa: editingEmployee.status === 'Ativo'
+        ativo: editingEmployee.status === 'Ativo'
       };
 
       if (editingEmployee.id) {
@@ -142,7 +142,7 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
       // Realiza o update no Supabase (Transformando Excluir em Inativar para manter histórico)
       const { error } = await supabaseClient
         .from('funcionarios')
-        .update({ ativa: false })
+        .update({ ativo: false })
         .eq('id', emp.id);
 
       if (error) throw error;
@@ -170,9 +170,12 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
   const getRoleInfo = (role: string) => {
     switch(role) {
       case 'master': return { label: 'MASTER', icon: 'fa-shield-halved', color: 'text-slate-900' };
+      case 'admin_unidade': return { label: 'ADMIN UNIDADE', icon: 'fa-building-user', color: 'text-indigo-600' };
       case 'gerente': return { label: 'GERENTE', icon: 'fa-gear', color: 'text-slate-600' };
       case 'financeiro': return { label: 'FINANCEIRO', icon: 'fa-sack-dollar', color: 'text-amber-600' };
-      case 'pendente': return { label: 'AGUARDANDO', icon: 'fa-hourglass', color: 'text-rose-400' };
+      case 'atendente': return { label: 'ATENDENTE', icon: 'fa-headset', color: 'text-sky-600' };
+      case 'tosador': return { label: 'TOSADOR', icon: 'fa-scissors', color: 'text-emerald-600' };
+      case 'somente_leitura': return { label: 'LEITURA', icon: 'fa-eye', color: 'text-slate-400' };
       default: return { label: 'COLABORADOR', icon: 'fa-user-nurse', color: 'text-slate-400' };
     }
   };
@@ -250,11 +253,11 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
                   <div className="flex items-center justify-between md:block mb-4 md:mb-0">
                     <span className="md:hidden text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</span>
                     <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                      !emp.ativa 
+                      !emp.ativo 
                         ? 'bg-rose-50 text-rose-600' 
                         : 'bg-emerald-50 text-emerald-600'
                     }`}>
-                      {emp.ativa ? 'Ativo' : 'Inativo'}
+                      {emp.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </div>
 
@@ -339,10 +342,12 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
                            onChange={(e) => setEditingEmployee({...editingEmployee, cargo: e.target.value})}
                            className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-slate-900 transition-all"
                          >
-                            <option value="pendente">Aguardando Análise</option>
-                            <option value="comum">Colaborador</option>
-                            <option value="financeiro">Financeiro</option>
+                            <option value="atendente">Atendente</option>
+                            <option value="tosador">Tosador/Banhista</option>
                             <option value="gerente">Gerente</option>
+                            <option value="admin_unidade">Admin Unidade</option>
+                            <option value="financeiro">Financeiro</option>
+                            <option value="somente_leitura">Somente Leitura</option>
                             <option value="master">Master (Total)</option>
                          </select>
                       </div>

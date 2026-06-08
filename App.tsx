@@ -115,7 +115,7 @@ const { data, error: profileError } = await supabase
       if (profileError) throw profileError;
       
       if (data) {
-        const normalizedProfile = { ...data, ativa: data.ativo ?? data.ativa ?? false };
+        const normalizedProfile = { ...data, ativo: data.ativo ?? false };
         const normalizedRole = normalizeRole(data.cargo);
         setUserProfile(normalizedProfile);
         setUserRole(normalizedRole);
@@ -133,7 +133,7 @@ const { data, error: profileError } = await supabase
       } else {
         // ROLLBACK: Temporariamente permitindo acesso básico se o perfil não for encontrado para evitar loops
         console.warn("Usuário não encontrado na tabela de funcionários. Usando perfil padrão.");
-        setUserProfile({ cargo: 'comum', ativa: true });
+        setUserProfile({ cargo: 'comum', ativo: true });
         setUserRole('comum');
       }
     } catch (err) {
@@ -267,7 +267,7 @@ const { data, error: profileError } = await supabase
   const effectiveUserRole = userRole;
   const effectiveUserProfile = userProfile;
 
-  if (effectiveUserProfile && (!effectiveUserProfile.ativa || effectiveUserProfile.cargo === 'pendente')) {
+  if (effectiveUserProfile && (!effectiveUserProfile.ativo || effectiveUserProfile.cargo === 'pendente')) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-center">
         <div className="bg-white w-full max-w-md rounded-[2.5rem] p-12 shadow-2xl animate-in zoom-in duration-300">
