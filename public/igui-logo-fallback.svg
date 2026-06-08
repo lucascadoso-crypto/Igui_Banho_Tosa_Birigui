@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 260" role="img" aria-labelledby="title desc">
+  <title id="title">IGUI Banho e Tosa Birigui</title>
+  <desc id="desc">Logo textual local de fallback para a tela de login.</desc>
+  <rect width="640" height="260" rx="48" fill="#0f172a"/>
+  <rect x="28" y="28" width="584" height="204" rx="36" fill="#ffffff"/>
+  <text x="320" y="116" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="900" letter-spacing="3" fill="#0f172a">IGUI</text>
+  <text x="320" y="164" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="800" letter-spacing="2" fill="#ef4444">BANHO E TOSA</text>
+  <text x="320" y="202" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="800" letter-spacing="4" fill="#64748b">BIRIGUI</text>
+</svg>

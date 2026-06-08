@@ -7,14 +7,15 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ supabaseClient, onLoginSuccess }) => {
+  const fallbackLogo = '/igui-logo-fallback.svg';
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [showPassword, setShowPassword] = useState(false);
   
   // Estado para Identidade Visual Dinâmica
   const [sistema, setSistema] = useState({
-    nome: 'iG Banho e Tosa',
-    logo: ''
+    nome: 'IGUI BANHO E TOSA BIRIGUI',
+    logo: fallbackLogo
   });
 
   // Form states
@@ -31,12 +32,12 @@ const Login: React.FC<LoginProps> = ({ supabaseClient, onLoginSuccess }) => {
           .from('config_sistema')
           .select('nome_fantasia, logo_url')
           .eq('id', 1)
-          .single();
+          .maybeSingle();
         
         if (!error && data) {
           setSistema({
-            nome: data.nome_fantasia || 'iG Banho e Tosa',
-            logo: data.logo_url || ''
+            nome: (data.nome_fantasia || 'IGUI BANHO E TOSA BIRIGUI').toUpperCase(),
+            logo: data.logo_url || fallbackLogo
           });
         }
       } catch (err: any) {
@@ -96,13 +97,14 @@ const Login: React.FC<LoginProps> = ({ supabaseClient, onLoginSuccess }) => {
         {/* Logo Container Dinâmico */}
         <div className="flex justify-center mb-8">
           <div className="w-full max-w-[280px] h-32 md:h-40 flex items-center justify-center">
-            {sistema.logo ? (
-              <img src={sistema.logo} className="w-full h-full object-contain" alt="Logo do Sistema" />
-            ) : (
-              <div className="w-24 h-24 md:w-32 md:h-32 bg-yellow-400 rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-yellow-400/20">
-                <i className="fa-solid fa-paw text-slate-900 text-5xl md:text-6xl"></i>
-              </div>
-            )}
+            <img
+              src={sistema.logo || fallbackLogo}
+              onError={(e) => {
+                e.currentTarget.src = fallbackLogo;
+              }}
+              className="w-full h-full object-contain"
+              alt={sistema.nome}
+            />
           </div>
         </div>
 
