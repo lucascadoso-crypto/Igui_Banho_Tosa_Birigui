@@ -20,7 +20,7 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Partial<Client> | null>(null);
   const [toast, setToast] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<number | string | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const [selectedClientDetails, setSelectedClientDetails] = useState<Client | null>(null);
@@ -41,11 +41,11 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
     if (!supabaseClient) return;
     setLoading(true);
     try {
-      // Isolamento por Unidade: busca clientes da unidade atual ou legados (null)
+      // Isolamento por Unidade: V2 usa unidade_id como vínculo obrigatório de negócio.
       const { data, error } = await supabaseClient
         .from('clientes')
         .select('*')
-        .or(`unidade_preferencial_id.eq.${unit.id},unidade_preferencial_id.is.null`)
+        .eq('unidade_id', unit.id)
         .order('nome', { ascending: true });
 
       if (error) throw error;
@@ -66,7 +66,7 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
       const { data, error } = await supabaseClient
         .from('clientes')
         .select('*')
-        .or(`unidade_preferencial_id.eq.${unit.id},unidade_preferencial_id.is.null`)
+        .eq('unidade_id', unit.id)
         .order('nome', { ascending: true });
 
       if (error) throw error;

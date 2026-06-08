@@ -36,6 +36,7 @@ const Reception: React.FC<ReceptionProps> = ({ unit, supabaseClient }) => {
       const { data: clientData, error: clientError } = await supabaseClient
         .from('clientes')
         .insert([{ 
+          unidade_id: unit.id,
           nome: clientName, 
           telefone: clientPhone, 
           unidade_preferencial_id: unit.id 
@@ -49,6 +50,7 @@ const Reception: React.FC<ReceptionProps> = ({ unit, supabaseClient }) => {
       const { error: petError } = await supabaseClient
         .from('pets')
         .insert([{
+          unidade_id: unit.id,
           cliente_id: clientData.id,
           nome: petName,
           raca: petBreed,

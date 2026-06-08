@@ -73,6 +73,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
     setLoadingExtra(true);
     try {
       const { error: itemErr } = await supabaseClient.from('agendamento_itens').insert([{
+        unidade_id: appt.unidade_id,
         agendamento_id: appt.id,
         servico_id: srv.id,
         valor_cobrado: 0,
@@ -137,7 +138,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
     }
   };
 
-  const handleRemoverExtra = async (itemId: string) => {
+  const handleRemoverExtra = async (itemId: number | string) => {
     const removedItem = services.find((it: any) => it.id === itemId);
     const extraName = removedItem?.servicos?.nome || 'Serviço Extra';
 

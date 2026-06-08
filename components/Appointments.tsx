@@ -19,13 +19,13 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [currentAppointmentId, setCurrentAppointmentId] = useState<string | null>(null);
+  const [currentAppointmentId, setCurrentAppointmentId] = useState<number | string | null>(null);
   
   const [appointments, setAppointments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [viewingAppt, setViewingAppt] = useState<any>(null);
-  const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
+  const [activeCardMenuId, setActiveCardMenuId] = useState<number | string | null>(null);
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
 
   // Novo modal de cadastro rápido
@@ -65,11 +65,11 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const [clientResults, setClientResults] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [availablePets, setAvailablePets] = useState<Pet[]>([]);
-  const [selectedPetId, setSelectedPetId] = useState('');
+  const [selectedPetId, setSelectedPetId] = useState<number | string | ''>('');
   const [appointmentDate, setAppointmentDate] = useState(selectedDate);
   const [appointmentTime, setAppointmentTime] = useState('09:00');
   
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<Array<number | string>>([]);
   const [manualTotalValue, setManualTotalValue] = useState<number>(0);
   
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -582,6 +582,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
         createdAppts.forEach(appt => {
             oldItems.forEach(item => {
                 itemsToInsert.push({
+                    unidade_id: pacoteAtual.unidade_id || unit.id,
                     agendamento_id: appt.id,
                     servico_id: item.servico_id,
                     valor_cobrado: 0 
@@ -614,12 +615,12 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       setClientResults([]);
       return;
     }
-    // Implementação do Isolamento por Unidade
+    // Isolamento por Unidade: V2 usa unidade_id como vínculo obrigatório de negócio.
     const { data } = await supabaseClient
       .from('clientes')
       .select('*')
       .ilike('nome', `%${val}%`)
-      .or(`unidade_preferencial_id.eq.${unit.id},unidade_preferencial_id.is.null`)
+      .eq('unidade_id', unit.id)
       .limit(5);
     setClientResults(data || []);
   };
@@ -724,6 +725,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       }
 
       const itemsPayload = selectedServiceIds.map(srvId => ({
+        unidade_id: unit.id,
         agendamento_id: apptId,
         servico_id: srvId,
         valor_cobrado: 0 

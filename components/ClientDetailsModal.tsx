@@ -1,15 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
-import { Client, Pet } from '../types';
+import { Client, Pet, UiId } from '../types';
 import ClienteModal from './ClienteModal';
 import { registrarAtividade } from '../services/logger';
 
 interface ClientDetailsModalProps {
   client: Client;
   supabaseClient: any;
-  unitId: string;
+  unitId: UiId;
   onClose: () => void;
-  onOpenNewPet: (clientId: string, clientName: string) => void;
+  onOpenNewPet: (clientId: UiId, clientName: string) => void;
   userProfile?: any;
 }
 
@@ -183,7 +183,14 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
 
     setSavingPet(true);
     try {
+      const activeUnitId = Number(unitId || currentClient.unidade_id);
+      if (!Number.isFinite(activeUnitId) || activeUnitId <= 0) {
+        showToast("Selecione uma unidade antes de cadastrar pets.", "error");
+        return;
+      }
+
       const petData = {
+        unidade_id: activeUnitId,
         cliente_id: currentClient.id,
         nome: newPet.nome,
         raca: newPet.raca,

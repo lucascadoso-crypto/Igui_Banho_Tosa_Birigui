@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Client, Pet } from '../types';
+import { Client, Pet, UiId } from '../types';
 import { uploadToImgBB } from '../services/imgbbService';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
@@ -8,7 +8,7 @@ import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 interface ClienteModalProps {
   modo?: 'completo' | 'rapido';
   client?: Partial<Client> | null;
-  unitId: string;
+  unitId: UiId;
   supabaseClient: any;
   userProfile?: any;
   onClose: () => void;
@@ -51,7 +51,8 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
     complemento: '',
     cidade: '',
     estado: '',
-    unidade_preferencial_id: unitId,
+    unidade_preferencial_id: Number(unitId),
+    unidade_id: Number(unitId),
     foto_url: ''
   });
 
@@ -132,10 +133,17 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
 
     setLoading(true);
     try {
+      const activeUnitId = Number(unitId);
+      if (!Number.isFinite(activeUnitId) || activeUnitId <= 0) {
+        showToast("Selecione uma unidade antes de cadastrar clientes e pets.", "error");
+        return;
+      }
+
       // 1. Salvar Dados do Tutor
       const clientPayload: any = { 
         ...formData,
-        unidade_preferencial_id: formData.unidade_preferencial_id || unitId
+        unidade_id: activeUnitId,
+        unidade_preferencial_id: formData.unidade_preferencial_id || activeUnitId
       };
       
       const optionalFields = [
@@ -163,7 +171,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
 
         // Log de Auditoria
         registrarAtividade(
-          unitId, 
+          activeUnitId, 
           userProfile?.email || 'sistema', 
           'EDICAO_CLIENTE', 
           `Editou o cliente ${finalClient.nome}`,
@@ -181,7 +189,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
 
         // Log de Auditoria
         registrarAtividade(
-          unitId, 
+          activeUnitId, 
           userProfile?.email || 'sistema', 
           'NOVO_CLIENTE', 
           `Cadastrou o cliente ${finalClient.nome}`,
@@ -198,6 +206,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
         const { data: petData, error: petError } = await supabaseClient
           .from('pets')
           .insert([{
+            unidade_id: activeUnitId,
             cliente_id: finalClient.id,
             nome: petFormData.nome,
             especie: petFormData.especie,
@@ -217,6 +226,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
         const { data: petData, error: petError } = await supabaseClient
           .from('pets')
           .insert([{
+            unidade_id: activeUnitId,
             cliente_id: finalClient.id,
             nome: petNomeRapido,
             especie: 'Cachorro'

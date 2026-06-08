@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Unit, Client, Pet, Service, Package } from '../types';
+import { Unit, Client, Pet, Service, Package, UiId } from '../types';
 import PacoteDetalhesModal from './PacoteDetalhesModal';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
@@ -28,9 +28,9 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
   const [clientResults, setClientResults] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [availablePets, setAvailablePets] = useState<Pet[]>([]);
-  const [selectedPetId, setSelectedPetId] = useState('');
+  const [selectedPetId, setSelectedPetId] = useState<UiId | ''>('');
   
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<UiId[]>([]);
   const [packageTotalValue, setPackageTotalValue] = useState<number>(0);
   const getTodayBR = () => {
     const dataLocalBR = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -43,7 +43,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
   const [sessionCount, setSessionCount] = useState(4);
   const [interval, setInterval] = useState<'Weekly' | 'Bi-weekly'>('Weekly');
   const [generatedDates, setGeneratedDates] = useState<string[]>([]);
-  const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
+  const [editingPackageId, setEditingPackageId] = useState<UiId | null>(null);
   const [originalStructuralValues, setOriginalStructuralValues] = useState({
     sessionCount: 4,
     interval: 'Weekly',
@@ -210,12 +210,12 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
       setClientResults([]);
       return;
     }
-    // Implementação do Isolamento por Unidade: busca clientes da unidade atual ou legados (null)
+    // Isolamento por Unidade: V2 usa unidade_id como vínculo obrigatório de negócio.
     const { data } = await supabaseClient
       .from('clientes')
       .select('*')
       .ilike('nome', `%${val}%`)
-      .or(`unidade_preferencial_id.eq.${unit.id},unidade_preferencial_id.is.null`)
+      .eq('unidade_id', unit.id)
       .limit(5);
     setClientResults(data || []);
   };
@@ -239,12 +239,12 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
     try {
       const { data: newClient, error: cErr } = await supabaseClient
         .from('clientes')
-        .insert([{ nome: quickAddData.nome, telefone: quickAddData.telefone, unidade_preferencial_id: unit.id }])
+        .insert([{ nome: quickAddData.nome, telefone: quickAddData.telefone, unidade_id: unit.id, unidade_preferencial_id: unit.id }])
         .select().single();
       if (cErr) throw cErr;
       const { data: newPet, error: pErr } = await supabaseClient
         .from('pets')
-        .insert([{ cliente_id: newClient.id, nome: quickAddData.petNome, especie: 'Cachorro' }])
+        .insert([{ unidade_id: unit.id, cliente_id: newClient.id, nome: quickAddData.petNome, especie: 'Cachorro' }])
         .select().single();
       if (pErr) throw pErr;
       setSelectedClient(newClient);
@@ -369,7 +369,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
             const itemsPayload: any[] = [];
             appts.forEach(appt => {
               selectedServiceIds.forEach(srvId => {
-                itemsPayload.push({ agendamento_id: appt.id, servico_id: srvId, valor_cobrado: 0 });
+                itemsPayload.push({ unidade_id: unit.id, agendamento_id: appt.id, servico_id: srvId, valor_cobrado: 0 });
               });
             });
             if (itemsPayload.length > 0) {
@@ -421,7 +421,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
             const newItems: any[] = [];
             futureIds.forEach((apptId: number | string) => {
               selectedServiceIds.forEach(srvId => {
-                newItems.push({ agendamento_id: apptId, servico_id: srvId, valor_cobrado: 0 });
+                newItems.push({ unidade_id: unit.id, agendamento_id: apptId, servico_id: srvId, valor_cobrado: 0 });
               });
             });
 
@@ -496,7 +496,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
         const itemsPayload: any[] = [];
         appts.forEach(appt => {
           selectedServiceIds.forEach(srvId => {
-            itemsPayload.push({ agendamento_id: appt.id, servico_id: srvId, valor_cobrado: 0 });
+            itemsPayload.push({ unidade_id: unit.id, agendamento_id: appt.id, servico_id: srvId, valor_cobrado: 0 });
           });
         });
         await supabaseClient.from('agendamento_itens').insert(itemsPayload);

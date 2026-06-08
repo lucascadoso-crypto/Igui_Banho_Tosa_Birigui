@@ -1,14 +1,14 @@
 
 import React, { useState, useRef } from 'react';
-import { Pet } from '../types';
+import { Pet, UiId } from '../types';
 import { uploadToImgBB } from '../services/imgbbService';
 import { registrarAtividade } from '../services/logger';
 
 interface CadastroPetProps {
-  clientId: string;
+  clientId: UiId;
   clientName: string;
   supabaseClient: any;
-  unitId?: string;
+  unitId?: UiId;
   userProfile?: any;
   onClose: () => void;
   onSave?: (pet: Pet) => void;
@@ -30,7 +30,8 @@ const CadastroPet: React.FC<CadastroPetProps> = ({
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [petData, setPetData] = useState<Partial<Pet>>({
-    cliente_id: clientId,
+    cliente_id: Number(clientId),
+    unidade_id: unitId ? Number(unitId) : undefined,
     nome: '',
     especie: 'Cachorro',
     porte: 'Médio',
@@ -64,11 +65,18 @@ const CadastroPet: React.FC<CadastroPetProps> = ({
 
     setLoading(true);
     try {
+      const activeUnitId = Number(unitId);
+      if (!Number.isFinite(activeUnitId) || activeUnitId <= 0) {
+        showToast("Selecione uma unidade antes de cadastrar pets.", "error");
+        return;
+      }
+
       const { data, error } = await supabaseClient
         .from('pets')
         .insert([{
           ...petData,
-          cliente_id: clientId
+          cliente_id: Number(clientId),
+          unidade_id: activeUnitId
         }])
         .select()
         .single();

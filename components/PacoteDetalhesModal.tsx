@@ -277,7 +277,7 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
     }
   };
 
-  const handleUpdateSessionDate = async (sessionId: string, newDate: string) => {
+  const handleUpdateSessionDate = async (sessionId: number | string, newDate: string) => {
     try {
       const { error } = await supabaseClient
         .from('agendamentos')
@@ -431,6 +431,7 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
         createdAppts.forEach(appt => {
           oldItems.forEach(item => {
             itemsToInsert.push({
+              unidade_id: pack.unidade_id,
               agendamento_id: appt.id,
               servico_id: item.servico_id,
               valor_cobrado: 0
