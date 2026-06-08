@@ -1,0 +1,32 @@
+{
+  "name": "ig-banho-e-tosa---erp-multi-unidade",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --configLoader native && vite preview --configLoader native --host 0.0.0.0 --port 3000",
+    "build": "vite build --configLoader native",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "^1.52.0",
+    "@supabase/supabase-js": "^2.105.3",
+    "framer-motion": "^12.38.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "motion": "^12.38.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "recharts": "^3.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  },
+  "overrides": {
+    "node-domexception": "1.0.0"
+  }
+}

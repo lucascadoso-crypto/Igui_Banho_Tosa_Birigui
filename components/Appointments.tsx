@@ -1,0 +1,1481 @@
+
+import React, { useState, useEffect, useRef } from 'react';
+import { Unit, Client, Pet, Employee, Service, Appointment } from '../types';
+import ClienteModal from './ClienteModal';
+import AgendamentoDetalhesModal from './AgendamentoDetalhesModal'; // TEST
+import CadastroPet from './CadastroPet';
+import { registrarAtividade } from '../services/logger';
+import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
+
+interface AppointmentsProps {
+  unit: Unit;
+  supabaseClient: any;
+  userProfile?: any;
+}
+
+const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userProfile }) => {
+  const isReadOnly = userProfile?.cargo === 'financeiro';
+  const [loading, setLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentAppointmentId, setCurrentAppointmentId] = useState<string | null>(null);
+  
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [viewingAppt, setViewingAppt] = useState<any>(null);
+  const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
+  const [showPaymentSelector, setShowPaymentSelector] = useState(false);
+
+  // Novo modal de cadastro rápido
+  const [isQuickClientModalOpen, setIsQuickClientModalOpen] = useState(false);
+  const [isQuickPetModalOpen, setIsQuickPetModalOpen] = useState(false);
+
+  const [confirmacao, setConfirmacao] = useState<{
+    visivel: boolean, 
+    acao: 'cancelar' | 'finalizar' | 'erro' | 'info' | null, 
+    mensagem: string,
+    callback?: () => void
+  }>({ visivel: false, acao: null, mensagem: '' });
+
+  const [toast, setToast] = useState<{ visivel: boolean; mensagem: string; tipo: 'sucesso' | 'erro' | 'info' }>({ 
+    visivel: false, 
+    mensagem: '', 
+    tipo: 'info' 
+  });
+
+  const showToast = (mensagem: string, tipo: 'sucesso' | 'erro' | 'info' = 'info') => {
+    setToast({ visivel: true, mensagem, tipo });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visivel: false }));
+    }, 4000);
+  };
+
+  const getTodayBR = () => {
+    const dataLocalBR = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const [dia, mes, ano] = dataLocalBR.split('/');
+    return `${ano}-${mes}-${dia}`;
+  };
+
+  const [selectedDate, setSelectedDate] = useState(getTodayBR());
+  const [viewMonth, setViewMonth] = useState<Date>(new Date()); 
+  
+  const [clientSearch, setClientSearch] = useState('');
+  const [clientResults, setClientResults] = useState<Client[]>([]);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [availablePets, setAvailablePets] = useState<Pet[]>([]);
+  const [selectedPetId, setSelectedPetId] = useState('');
+  const [appointmentDate, setAppointmentDate] = useState(selectedDate);
+  const [appointmentTime, setAppointmentTime] = useState('09:00');
+  
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [manualTotalValue, setManualTotalValue] = useState<number>(0);
+  
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [isPaidModal, setIsPaidModal] = useState(false);
+  const [isPetTaxi, setIsPetTaxi] = useState(false);
+  const [petTaxiEndereco, setPetTaxiEndereco] = useState('');
+  const [valorTransporte, setValorTransporte] = useState<number>(0);
+
+  // Estados para Busca e Filtros (Client-side)
+  const [termoBusca, setTermoBusca] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState<'Todos' | 'Finalizado' | 'A Realizar' | 'Em Andamento'>('Todos');
+  const [filtroTipo, setFiltroTipo] = useState<'Todos' | 'Pacote' | 'Avulso'>('Todos');
+  const [filtroPagamento, setFiltroPagamento] = useState<'Todos' | 'Pago' | 'Pendente'>('Todos');
+  const [filtroTransporte, setFiltroTransporte] = useState<'Todos' | 'Com Táxi' | 'Sem Táxi'>('Todos');
+
+  useEffect(() => {
+    fetchData();
+  }, [unit.id, selectedDate]);
+
+  useEffect(() => {
+    const handleClickOutside = () => setActiveCardMenuId(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // Lógica Inteligente de Preenchimento de Endereço
+  useEffect(() => {
+    if (selectedClient) {
+      // Tenta montar o endereço juntando as peças possíveis (logradouro ou endereco legado)
+      const rua = selectedClient.logradouro || (selectedClient as any).endereco || '';
+      const num = selectedClient.numero || '';
+      const bairro = selectedClient.bairro || '';
+
+      if (rua) {
+        const enderecoCompleto = `${rua}${num ? ', ' + num : ''}${bairro ? ' - ' + bairro : ''}`;
+        setPetTaxiEndereco(enderecoCompleto);
+      } else {
+        setPetTaxiEndereco(''); // Cadastro Expresso ou incompleto não tem endereço
+      }
+    } else {
+      setPetTaxiEndereco('');
+    }
+  }, [selectedClient]);
+
+  const fetchData = async () => {
+    if (!supabaseClient) return;
+    setLoading(true);
+    try {
+      const { data: empData } = await supabaseClient.from('funcionarios').select('*').eq('unidade_id', unit.id);
+      setEmployees(empData || []);
+
+      const { data: srvData } = await supabaseClient.from('servicos').select('*');
+      setServices(srvData || []);
+
+      const { data: apptData } = await supabaseClient
+        .from('agendamentos')
+        .select(`
+          *,
+          pets (
+            *,
+            clientes (*)
+          ),
+          funcionarios (nome),
+          pacotes (
+            *,
+            agendamentos (id, data_agendamento, horario_inicio)
+          ),
+          agendamento_itens (
+            id,
+            valor_cobrado,
+            servico_id,
+            servicos (nome, preco_base)
+          )
+        `)
+        .eq('unidade_id', unit.id)
+        .eq('data_agendamento', selectedDate)
+        .order('horario_inicio', { ascending: true });
+        
+      if (apptData) {
+        const processedAppts = apptData.map((appt: any) => {
+          if (appt.pacote_id && appt.pacotes?.agendamentos) {
+            const sortedPackageAppts = [...appt.pacotes.agendamentos].sort((a, b) => {
+              const dateCompare = a.data_agendamento.localeCompare(b.data_agendamento);
+              if (dateCompare !== 0) return dateCompare;
+              return (a.horario_inicio || '').localeCompare(b.horario_inicio || '');
+            });
+            const index = sortedPackageAppts.findIndex(a => a.id === appt.id);
+            if (index !== -1) {
+              return { ...appt, numero_sessao: index + 1 };
+            }
+          }
+          return appt;
+        });
+        setAppointments(processedAppts);
+        
+        if (viewingAppt) {
+          const updated = processedAppts.find(a => a.id === viewingAppt.id);
+          if (updated) setViewingAppt(updated);
+        }
+      } else {
+        setAppointments([]);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar dados de agendamento:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenNew = () => {
+    setIsEditing(false);
+    setCurrentAppointmentId(null);
+    setSelectedClient(null);
+    setClientSearch('');
+    setSelectedPetId('');
+    setAppointmentDate(selectedDate);
+    setAppointmentTime('09:00');
+    setSelectedServiceIds([]);
+    setManualTotalValue(0);
+    setPaymentMethod('');
+    setIsPaidModal(false);
+    setIsPetTaxi(false);
+    setPetTaxiEndereco('');
+    setValorTransporte(0);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenDetail = (appt: any) => {
+    setViewingAppt(appt);
+    setShowPaymentSelector(false);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleStartEdit = (appt?: any) => {
+    const target = appt || viewingAppt;
+    if (!target) return;
+    
+    setIsEditing(true);
+    setCurrentAppointmentId(target.id);
+    setSelectedClient(target.pets?.clientes || null);
+    setClientSearch(target.pets?.clientes?.nome || '');
+    
+    if (target.pets?.clientes?.id) {
+       supabaseClient
+        .from('pets')
+        .select('*')
+        .eq('cliente_id', target.pets.clientes.id)
+        .then(({data}: any) => setAvailablePets(data || []));
+    }
+
+    setSelectedPetId(target.pet_id);
+    setAppointmentDate(target.data_agendamento);
+    setAppointmentTime(String(target.horario_inicio || '09:00').substring(0, 5));
+    
+    const initialServiceIds = target.agendamento_itens.map((it: any) => it.servico_id);
+    setSelectedServiceIds(initialServiceIds);
+    setManualTotalValue(Number(target.valor_total));
+    
+    setPaymentMethod(target.forma_pagamento || '');
+    setIsPaidModal(target.pago || false);
+    setIsPetTaxi(target.tem_taxi || target.pet_taxi || false);
+    setPetTaxiEndereco(target.endereco_busca || target.pet_taxi_endereco || '');
+    
+    const taxiVal = Number(target.valor_transporte || 0);
+    setValorTransporte(taxiVal);
+    setManualTotalValue(Number(target.valor_total) - taxiVal);
+    
+    setIsDetailModalOpen(false);
+    setIsModalOpen(true);
+  };
+
+  const handleQuickReceive = async (data: { method1: string, val1: number, method2?: string, val2?: number }) => {
+    if (!viewingAppt || loading) return;
+    setLoading(true);
+    try {
+      const payload: any = { 
+        pago: true, 
+        forma_pagamento: data.method1,
+        valor_total: data.val1 // Salva o valor 1 na coluna principal se for dividido
+      };
+
+      if (data.method2) {
+        payload.forma_pagamento_2 = data.method2;
+        payload.valor_pagamento_2 = data.val2;
+      } else {
+        payload.forma_pagamento_2 = null;
+        payload.valor_pagamento_2 = 0;
+      }
+
+      const { error } = await supabaseClient
+        .from('agendamentos')
+        .update(payload)
+        .eq('id', viewingAppt.id);
+
+      if (error) throw error;
+      setShowPaymentSelector(false);
+      
+      // Log de Auditoria
+      const petName = viewingAppt.pets?.nome || 'Pet';
+      const logMsg = data.method2 
+        ? `Pet: ${petName} - Pagamento DIVIDIDO para agendamento ${viewingAppt.id}. V1: R$ ${data.val1} (${data.method1}), V2: R$ ${data.val2} (${data.method2})`
+        : `Pet: ${petName} - Recebeu pagamento de R$ ${data.val1} via ${data.method1} para agendamento ${viewingAppt.id}`;
+
+      registrarAtividade(
+        unit.id, 
+        userProfile?.email || 'sistema', 
+        'Alteração de Pagamento', 
+        logMsg,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+
+      await fetchData();
+    } catch (err) {
+      console.error("Erro ao receber pagamento:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const performCancelAppointment = async (appt: any) => {
+    setLoading(true);
+    try {
+      const { error } = await supabaseClient.from('agendamentos').update({ status: 'Cancelado' }).eq('id', appt.id);
+      if (error) throw error;
+      
+      // Log de Auditoria
+      registrarAtividade(
+        unit.id, 
+        userProfile?.email || 'sistema', 
+        'Cancelamento de Banho', 
+        `Pet: ${appt.pets?.nome} - Cancelou agendamento ${appt.id}`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+
+      setIsDetailModalOpen(false);
+      await fetchData();
+    } catch (err) {
+      console.error("Erro ao cancelar agendamento:", err);
+    } finally {
+      setLoading(false);
+      setConfirmacao({ visivel: false, acao: null, mensagem: '' });
+    }
+  };
+
+  const performReactivateAppointment = async (appt: any) => {
+    setLoading(true);
+    try {
+      const { error } = await supabaseClient.from('agendamentos').update({ status: 'Agendado' }).eq('id', appt.id);
+      if (error) throw error;
+      
+      // Log de Auditoria
+      registrarAtividade(
+        unit.id, 
+        userProfile?.email || 'sistema', 
+        'Reativação de Agendamento', 
+        `Pet: ${appt.pets?.nome} - Reativou agendamento ${appt.id}`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+
+      setIsDetailModalOpen(false);
+      await fetchData();
+    } catch (err) {
+      console.error("Erro ao reativar agendamento:", err);
+      showToast("Falha ao reativar agendamento.", "erro");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const performStartAtendimento = async (appt: any) => {
+    setLoading(true);
+    try {
+      const { error } = await supabaseClient.from('agendamentos').update({ 
+        status: 'Em Andamento',
+        data_inicio_real: new Date().toISOString()
+      }).eq('id', appt.id);
+      if (error) throw error;
+      
+      // Log de Auditoria
+      registrarAtividade(
+        unit.id, 
+        userProfile?.email || 'sistema', 
+        'Início de Atendimento', 
+        `Pet: ${appt.pets?.nome} - Iniciou atendimento (Em Andamento) ${appt.id}`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+
+      await fetchData();
+    } catch (err) {
+      console.error("Erro ao iniciar atendimento:", err);
+      showToast("Falha ao iniciar atendimento.", "erro");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const performFinalizeAppointment = async (appt: any, notifyClient: boolean = true) => {
+    setLoading(true);
+    try {
+      const { error } = await supabaseClient.from('agendamentos').update({ 
+        status: 'Finalizado',
+        notificar_ao_finalizar: notifyClient,
+        data_fim_real: new Date().toISOString()
+      }).eq('id', appt.id);
+      if (error) throw error;
+      
+      // Log de Auditoria
+      registrarAtividade(
+        unit.id, 
+        userProfile?.email || 'sistema', 
+        'Finalização de Atendimento', 
+        `Pet: ${appt.pets?.nome} - Finalizou atendimento ${appt.id}${!notifyClient ? ' (SEM AVISO)' : ''}`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+
+      // --- LÓGICA DE RENOVAÇÃO AUTOMÁTICA DE PACOTE ---
+      if (appt.pacote_id && appt.pacotes) {
+        const isLastSession = appt.numero_sessao === appt.pacotes.qtd_sessoes;
+        
+        if (isLastSession) {
+          if (appt.pacotes.renovacao_automatica) {
+            try {
+              await renovarPacote(appt.pacotes);
+              // Mensagem de Feedback
+              setConfirmacao({ 
+                visivel: true, 
+                acao: 'info', 
+                mensagem: 'Pacote renovado automaticamente! Um novo ciclo foi gerado com status pendente.' 
+              });
+            } catch (renovError) {
+              console.error("Erro na renovação automática:", renovError);
+            }
+          } else {
+            // Se for a última sessão e NÃO tiver renovação automática, marca como FINALIZADO
+            await supabaseClient.from('pacotes').update({ status: 'FINALIZADO' }).eq('id', appt.pacote_id);
+          }
+        }
+      }
+
+      const petName = appt.pets?.nome;
+      const clientName = appt.pets?.clientes?.nome;
+      const clientPhone = appt.pets?.clientes?.telefone?.replace(/\D/g, '');
+      
+      // Lógica de WhatsApp Inteligente (Táxi ou não)
+      const hasTaxi = appt.tem_taxi || appt.pet_taxi || appt.agendamento_itens?.some((it: any) => 
+        it.servicos?.nome?.toLowerCase().includes('táxi') || 
+        it.servicos?.nome?.toLowerCase().includes('taxi')
+      );
+
+      let msg = `Olá! 🐾 O banho do(a) ${petName} terminou e ele(a) já está pronto(a) para ser buscado(a)! 🛁`;
+
+      if (clientPhone && notifyClient) {
+        // --- GATILHO WHATSAPP (NÃO-BLOQUEANTE mas monitorado) ---
+        enviarNotificacaoWhatsApp({
+          telefone: clientPhone,
+          mensagem: msg,
+          unidadeId: unit.id,
+          supabaseClient,
+          agendamentoId: appt.id,
+          tipo: 'manual'
+        }).then(result => {
+          if (result && !result.ok) {
+            console.error('Falha no WhatsApp ao finalizar:', result.error);
+            showToast(`Finalizado. (${result.error || 'Aviso WhatsApp não enviado'})`, 'info');
+          } else {
+            setConfirmacao({
+              visivel: true,
+              acao: 'info',
+              mensagem: 'Serviço concluído e cliente avisado!'
+            });
+          }
+        }).catch(err => {
+          console.error('Erro crítico no WhatsApp ao finalizar:', err);
+          showToast('Agendamento finalizado. (Erro no WhatsApp)', 'info');
+        });
+      }
+      setIsDetailModalOpen(false);
+      await fetchData();
+    } catch (err) {
+      console.error("Erro ao finalizar agendamento:", err);
+    } finally {
+      setLoading(false);
+      // Limpa confirmação apenas se for a ação de finalizar para fechar o diálogo original, 
+      // mas preserva 'info' ou 'erro' (mensagens de feedback)
+      setConfirmacao(prev => (prev.acao === 'finalizar') ? { visivel: false, acao: null, mensagem: '' } : prev);
+    }
+  };
+
+  const renovarPacote = async (pacoteAtual: any) => {
+    // 1. Recuperar o cliente_id diretamente do cadastro do pet (Gatilho de Segurança)
+    let clientId = null;
+    if (pacoteAtual.pet_id) {
+      const { data: petData, error: petErr } = await supabaseClient
+        .from('pets')
+        .select('cliente_id, nome')
+        .eq('id', pacoteAtual.pet_id)
+        .single();
+      
+      if (petErr || !petData?.cliente_id) {
+        console.error("ERRO CRÍTICO: Pet sem dono vinculado interrompendo renovação.", { pet_id: pacoteAtual.pet_id });
+        registrarAtividade(
+          unit.id, 
+          'SISTEMA', 
+          'ALERTA_FALHA_RENOVACAO', 
+          `Falha Crítica: O sistema tentou renovar um pacote para o Pet ID ${pacoteAtual.pet_id} (${petData?.nome || 'Desconhecido'}), mas o mesmo não possui cliente/dono vinculado. Processo abortado.`,
+          'SISTEMA',
+          'master'
+        );
+        return;
+      }
+      clientId = petData.cliente_id;
+    }
+
+    if (!clientId) return;
+
+    // 2. Buscar sessões ordenadas para confirmar intervalo e última data
+    const { data: sessionData } = await supabaseClient
+      .from('agendamentos')
+      .select('id, data_agendamento, horario_inicio, tem_taxi, valor_transporte, valor_total')
+      .eq('pacote_id', pacoteAtual.id)
+      .order('data_agendamento', { ascending: true })
+      .order('horario_inicio', { ascending: true });
+
+    if (!sessionData || sessionData.length < 1) return;
+
+    const lastSession = sessionData[sessionData.length - 1];
+    
+    // Calcular intervalo dinâmico entre sessões (se houver pelo menos 2)
+    let intervalDays = 7; // Padrão semanal
+    if (sessionData.length >= 2) {
+      try {
+        const d1 = new Date(sessionData[0].data_agendamento + 'T12:00:00');
+        const d2 = new Date(sessionData[1].data_agendamento + 'T12:00:00');
+        const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+        if (diff > 0) intervalDays = diff;
+      } catch (e) {
+        console.error("Erro ao calcular intervalo:", e);
+      }
+    }
+
+    // 3. Clonar Pacote
+    const newCiclo = (Number(pacoteAtual.ciclo_renovacao) || 1) + 1;
+    const newPackData = {
+      cliente_id: clientId,
+      pet_id: pacoteAtual.pet_id,
+      unidade_id: pacoteAtual.unidade_id,
+      qtd_sessoes: pacoteAtual.qtd_sessoes,
+      valor_total: pacoteAtual.valor_total,
+      valor_transporte: pacoteAtual.valor_transporte,
+      nome_pacote: `${pacoteAtual.nome_pacote || pacoteAtual.nome} (RENOVAÇÃO CICLO ${newCiclo})`,
+      nome: `${pacoteAtual.nome_pacote || pacoteAtual.nome} (RENOVAÇÃO CICLO ${newCiclo})`,
+      pago: false, // PENDENTE
+      ativo: true,
+      renovacao_automatica: true,
+      status: 'ATIVO',
+      pacote_anterior_id: pacoteAtual.id,
+      ciclo_renovacao: newCiclo
+    };
+
+    const { data: newPack, error: pErr } = await supabaseClient
+      .from('pacotes')
+      .insert([newPackData])
+      .select().single();
+
+    if (pErr) throw pErr;
+
+    // 4. Gerar novos agendamentos baseado no intervalo
+    const newApptsPayload = [];
+    let nextDate = new Date(lastSession.data_agendamento + 'T12:00:00');
+    
+    for (let i = 1; i <= pacoteAtual.qtd_sessoes; i++) {
+        nextDate.setDate(nextDate.getDate() + intervalDays);
+        const dateStr = nextDate.toISOString().split('T')[0];
+        
+        newApptsPayload.push({
+            pet_id: pacoteAtual.pet_id,
+            cliente_id: clientId,
+            pacote_id: newPack.id,
+            unidade_id: pacoteAtual.unidade_id,
+            data_agendamento: dateStr,
+            horario_inicio: lastSession.horario_inicio,
+            valor_total: parseFloat(pacoteAtual.valor_total) / pacoteAtual.qtd_sessoes,
+            valor_transporte: parseFloat(pacoteAtual.valor_transporte) / pacoteAtual.qtd_sessoes,
+            status: 'Agendado',
+            numero_sessao: i,
+            tem_taxi: lastSession.tem_taxi
+        });
+    }
+
+    const { data: createdAppts, error: aErr } = await supabaseClient
+      .from('agendamentos')
+      .insert(newApptsPayload)
+      .select();
+
+    if (aErr) throw aErr;
+
+    // 5. Clonar itens (serviços) da primeira sessão do antigo
+    const { data: oldItems } = await supabaseClient
+      .from('agendamento_itens')
+      .select('servico_id')
+      .eq('agendamento_id', sessionData[0].id);
+
+    if (oldItems && oldItems.length > 0) {
+        const itemsToInsert: any[] = [];
+        createdAppts.forEach(appt => {
+            oldItems.forEach(item => {
+                itemsToInsert.push({
+                    agendamento_id: appt.id,
+                    servico_id: item.servico_id,
+                    valor_cobrado: 0 
+                });
+            });
+        });
+        await supabaseClient.from('agendamento_itens').insert(itemsToInsert);
+    }
+
+    // 6. Finalizar o pacote antigo e desativar sua renovação para não duplicar
+    await supabaseClient.from('pacotes').update({ status: 'FINALIZADO', renovacao_automatica: false }).eq('id', pacoteAtual.id);
+
+    // Log de Renovação
+    registrarAtividade(
+      unit.id,
+      userProfile?.email || 'sistema',
+      'RENOVAR_PACOTE_AUTO',
+      `Renovação automática processada para o pet_id: ${pacoteAtual.pet_id}. Novo pacote: ${newPack.id}`,
+      'SISTEMA',
+      'master'
+    );
+
+    // Recarregar dados para refletir mudanças
+    await fetchData();
+  };
+
+  const handleClientSearch = async (val: string) => {
+    setClientSearch(val);
+    if (val.length < 2) {
+      setClientResults([]);
+      return;
+    }
+    // Implementação do Isolamento por Unidade
+    const { data } = await supabaseClient
+      .from('clientes')
+      .select('*')
+      .ilike('nome', `%${val}%`)
+      .or(`unidade_preferencial_id.eq.${unit.id},unidade_preferencial_id.is.null`)
+      .limit(5);
+    setClientResults(data || []);
+  };
+
+  const selectClient = async (client: Client) => {
+    setSelectedClient(client);
+    setClientSearch(client.nome);
+    setClientResults([]);
+    
+    const { data: petData } = await supabaseClient.from('pets').select('*').eq('cliente_id', client.id);
+    setAvailablePets(petData || []);
+    if (petData?.length) setSelectedPetId(petData[0].id);
+  };
+
+  const toggleServiceId = (id: string) => {
+    setSelectedServiceIds(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
+  };
+
+  const saveAppointment = async () => {
+    if (!selectedClient || !selectedPetId || selectedServiceIds.length === 0) {
+      setConfirmacao({ visivel: true, acao: 'erro', mensagem: 'Selecione o Cliente, o Pet e ao menos 1 Serviço.' });
+      return;
+    }
+    setLoading(true);
+    try {
+      // Trava de Segurança: Verificar propriedade do Pet no Banco de Dados antes de salvar
+      const { data: petCheck, error: checkErr } = await supabaseClient
+        .from('pets')
+        .select('cliente_id, nome')
+        .eq('id', selectedPetId)
+        .single();
+
+      if (checkErr || petCheck?.cliente_id !== selectedClient.id) {
+        console.error("ERRO DE SEGURANÇA: Pet não pertence ao cliente informado.", { pet_id: selectedPetId, target_client: selectedClient.id });
+        registrarAtividade(
+          unit.id, 
+          userProfile?.email || 'sistema', 
+          'ALERTA_TRAVA_DONO', 
+          `Interrupção de Segurança: Tentativa de agendar pet "${petCheck?.nome || '?'}" para cliente diferente do registrado no sistema.`,
+          userProfile?.nome,
+          userProfile?.cargo
+        );
+        throw new Error("Ocorreu um erro de segurança: Este pet não está vinculado ao cliente selecionado. O administrador foi notificado.");
+      }
+
+      const finalTotal = manualTotalValue + (isPetTaxi ? valorTransporte : 0);
+      const taxiVal = isPetTaxi ? valorTransporte : 0;
+
+      // Ajuste de nomes das chaves para snake_case conforme esperado pelo Supabase
+      const apptPayload = {
+        pet_id: selectedPetId,
+        cliente_id: selectedClient?.id,
+        unidade_id: unit.id,
+        data_agendamento: appointmentDate,
+        horario_inicio: appointmentTime,
+        valor_total: finalTotal,
+        valor_transporte: taxiVal,
+        tem_taxi: isPetTaxi,
+        endereco_busca: isPetTaxi ? petTaxiEndereco : null,
+        forma_pagamento: paymentMethod,
+        pago: isPaidModal,
+        status: 'Agendado'
+      };
+
+      // Trava de Segurança Final: Garantir cliente_id no Payload
+      if (!apptPayload.cliente_id) {
+        throw new Error("Por favor, selecione um cliente cadastrado para garantir a integridade do agendamento.");
+      }
+
+      let apptId = currentAppointmentId;
+      if (isEditing && apptId) {
+        const { error: updateError } = await supabaseClient.from('agendamentos').update(apptPayload).eq('id', apptId);
+        if (updateError) throw updateError;
+        
+        // Log de Auditoria
+        const petName = availablePets.find(p => p.id === selectedPetId)?.nome || 'Pet';
+        registrarAtividade(
+          unit.id, 
+          userProfile?.email || 'sistema', 
+          'Edição de Agendamento', 
+          `Pet: ${petName} - Editou agendamento ${apptId}. Valor Total: R$ ${finalTotal.toFixed(2)} (Serviços: R$ ${manualTotalValue.toFixed(2)} + Táxi: R$ ${taxiVal.toFixed(2)})`,
+          userProfile?.nome,
+          userProfile?.cargo
+        );
+
+        await supabaseClient.from('agendamento_itens').delete().eq('agendamento_id', apptId);
+      } else {
+        const { data, error: insertError } = await supabaseClient.from('agendamentos').insert([apptPayload]).select().single();
+        if (insertError) throw insertError;
+        apptId = data.id;
+
+        // Log de Auditoria
+        const petName = availablePets.find(p => p.id === selectedPetId)?.nome || 'Pet';
+        registrarAtividade(
+          unit.id, 
+          userProfile?.email || 'sistema', 
+          'Novo Agendamento', 
+          `Pet: ${petName} - Criou novo agendamento ${apptId}. Valor Total: R$ ${finalTotal.toFixed(2)} (Serviços: R$ ${manualTotalValue.toFixed(2)} + Táxi: R$ ${taxiVal.toFixed(2)})`,
+          userProfile?.nome,
+          userProfile?.cargo
+        );
+      }
+
+      const itemsPayload = selectedServiceIds.map(srvId => ({
+        agendamento_id: apptId,
+        servico_id: srvId,
+        valor_cobrado: 0 
+      }));
+
+      const { error: itemsError } = await supabaseClient.from('agendamento_itens').insert(itemsPayload);
+      if (itemsError) throw itemsError;
+
+      // --- GATILHO WHATSAPP (NÃO-BLOQUEANTE) ---
+      if (!isEditing && selectedClient && selectedPetId) {
+        const pet = availablePets.find(p => p.id === selectedPetId);
+        if (pet && selectedClient.telefone) {
+          const [y, m, d] = appointmentDate.split('-');
+          const dataFormatada = `${d}/${m}`;
+          const horaFormatada = String(appointmentTime).substring(0, 5);
+          
+          const msg = isPetTaxi
+            ? `Olá ${selectedClient.nome}! Confirmamos o agendamento do(a) ${pet.nome} para o dia ${dataFormatada} às ${horaFormatada}. 🐾 Já anotamos aqui que o transporte está incluso e passaremos para buscar o(a) ${pet.nome}. Até logo!`
+            : `Olá ${selectedClient.nome}! Confirmamos o agendamento do(a) ${pet.nome} para o dia ${dataFormatada} às ${horaFormatada}. 🐾 Esperamos por vocês na nossa unidade no horário combinado. Até logo!`;
+          
+          enviarNotificacaoWhatsApp({
+            telefone: selectedClient.telefone,
+            mensagem: msg,
+            unidadeId: unit.id,
+            supabaseClient,
+            agendamentoId: apptId,
+            tipo: 'manual',
+            forceDirect: true,
+            whatsapp_nome_instancia: unit.whatsapp_nome_instancia,
+            whatsapp_token: unit.whatsapp_token,
+            whatsapp_url_servidor: unit.whatsapp_url_servidor,
+            whatsapp_ativo: unit.whatsapp_ativo
+          }).then(result => {
+            if (result && !result.ok) {
+              console.error('Falha no WhatsApp ao salvar:', result.error);
+              showToast(`Salvo. (${result.error || 'Aviso WhatsApp não enviado'})`, 'info');
+            }
+          }).catch(err => {
+            console.error('Erro crítico no WhatsApp ao salvar:', err);
+            showToast('Agendamento salvo. (Erro no WhatsApp)', 'info');
+          });
+        }
+      }
+
+      setIsModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error("Erro ao salvar agendamento:", err);
+      setConfirmacao({ 
+        visivel: true, 
+        acao: 'erro', 
+        mensagem: err.message || 'Erro desconhecido ao salvar agendamento.' 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemindWhatsApp = (appt: any) => {
+    const clientPhone = appt.pets?.clientes?.telefone?.replace(/\D/g, '');
+    if (!clientPhone) {
+      setConfirmacao({ visivel: true, acao: 'erro', mensagem: 'Cliente sem telefone cadastrado.' });
+      return;
+    }
+
+    const clientName = appt.pets?.clientes?.nome || 'Cliente';
+    const petName = appt.pets?.nome || 'seu Pet';
+    const [y, m, d] = appt.data_agendamento.split('-');
+    const dataFormatada = `${d}/${m}`;
+    const horaFormatada = String(appt.horario_inicio || '').substring(0, 5);
+    
+    // Mesma lógica de Táxi usada no sistema
+    const hasTaxi = appt.tem_taxi || appt.pet_taxi || appt.agendamento_itens?.some((it: any) => 
+      it.servicos?.nome?.toLowerCase().includes('táxi') || 
+      it.servicos?.nome?.toLowerCase().includes('taxi')
+    );
+
+    const message = `Olá! 🐾 Passando para confirmar o banho do(a) ${petName} amanhã às ${horaFormatada}. Confirmado?`;
+
+    showToast('Enviando lembrete...', 'info');
+    
+    enviarNotificacaoWhatsApp({
+      telefone: clientPhone,
+      mensagem: message,
+      unidadeId: unit.id,
+      supabaseClient,
+      agendamentoId: appt.id,
+      tipo: 'manual',
+      forceDirect: true
+    }).then(result => {
+      if (result?.ok) {
+        showToast('Lembrete enviado com sucesso!', 'sucesso');
+        registrarAtividade(
+          unit.id,
+          userProfile?.email || 'sistema',
+          'LEMBRETE_MANUAL_WA',
+          `Enviou lembrete manual via WhatsApp para ${clientName} (Pet: ${petName})`,
+          userProfile?.nome,
+          userProfile?.cargo
+        );
+      } else {
+        console.error('Falha ao enviar lembrete:', result?.error);
+        showToast(result?.error || 'Aviso de WhatsApp não enviado.', 'info');
+      }
+    }).catch(err => {
+      console.error('Erro ao enviar lembrete:', err);
+      showToast('Erro no WhatsApp.', 'info');
+    });
+  };
+
+  const generateCalendarDays = () => {
+    const year = viewMonth.getFullYear();
+    const month = viewMonth.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days = [];
+    for (let i = 0; i < firstDay; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(i);
+    return days;
+  };
+
+  // Lógica de cálculo para o Painel de Resumo
+  const statsResumo = {
+    total: appointments.length,
+    finalizados: appointments.filter(a => a.status === 'Finalizado').length,
+    emAndamento: appointments.filter(a => a.status === 'Em Andamento').length,
+    pendentes: appointments.filter(a => a.status === 'Agendado').length,
+    pacotes: appointments.filter(a => a.pacote_id !== null).length
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500 relative">
+      
+      {/* OVERLAY DE CONFIRMAÇÃO */}
+      {confirmacao.visivel && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in duration-300">
+             <div className="flex flex-col items-center text-center space-y-4">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl ${confirmacao.acao === 'erro' ? 'bg-rose-50 text-rose-500' : 'bg-blue-50 text-blue-500'}`}>
+                   <i className={`fa-solid ${confirmacao.acao === 'erro' ? 'fa-circle-xmark' : 'fa-circle-info'}`}></i>
+                </div>
+                <h3 className="text-xl font-black text-slate-800">Mensagem</h3>
+                <p className="text-sm font-bold text-slate-500 leading-relaxed">{confirmacao.mensagem}</p>
+                <button onClick={() => setConfirmacao({ visivel: false, acao: null, mensagem: '' })} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-xs uppercase shadow-lg">Entendi</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header Principal */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+        <div className="flex items-center space-x-4">
+           <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl"><i className="fa-solid fa-calendar-day text-2xl"></i></div>
+           <div>
+              <h2 className="text-xl font-black text-slate-800 tracking-tight">
+                {selectedDate.split('-').reverse().join('/')}
+              </h2>
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">iG {unit.name}</p>
+           </div>
+        </div>
+        {!isReadOnly && (
+          <button onClick={handleOpenNew} className="bg-[#F59E0B] hover:opacity-90 text-white px-8 py-3 rounded-2xl font-black flex items-center shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
+            <i className="fa-solid fa-plus mr-2"></i> NOVO BANHO
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Lado Esquerdo: Calendário */}
+        <div className="lg:col-span-1 space-y-6">
+           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm text-center">
+              <div className="flex items-center justify-between mb-6">
+                <button onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400"><i className="fa-solid fa-chevron-left text-xs"></i></button>
+                <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">{viewMonth.getMonth() + 1}/{viewMonth.getFullYear()}</span>
+                <button onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400"><i className="fa-solid fa-chevron-right text-xs"></i></button>
+              </div>
+              <div className="grid grid-cols-7 gap-2">
+                 {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(dw => (
+                    <div key={dw} className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-center pb-2">
+                       {dw}
+                    </div>
+                 ))}
+                 {generateCalendarDays().map((day, i) => (
+                    day === null ? <div key={i}></div> : (
+                      <button 
+                        key={i} 
+                        onClick={() => {
+                          const newD = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), day);
+                          // Forçamos o fuso de Brasília para garantir consistência
+                          const brDate = newD.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+                          const [d, m, y] = brDate.split('/');
+                          setSelectedDate(`${y}-${m}-${d}`);
+                        }}
+                        className={`w-8 h-8 rounded-xl text-xs font-bold flex items-center justify-center transition-all ${selectedDate.endsWith(`-${day.toString().padStart(2, '0')}`) ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'text-slate-500 hover:bg-slate-50'}`}
+                      >
+                        {day}
+                      </button>
+                    )
+                 ))}
+              </div>
+           </div>
+        </div>
+
+        {/* Lado Direito: Lista */}
+        <div className="lg:col-span-3 space-y-4">
+           
+           {/* PAINEL DE RESUMO DO DIA */}
+           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+              <div className="bg-[#009688] p-4 rounded-xl text-white text-center shadow-md">
+                 <p className="text-[10px] font-black uppercase opacity-60 tracking-widest mb-1">Total do Dia</p>
+                 <p className="text-xl font-black">{statsResumo.total}</p>
+              </div>
+              <div className="bg-[#009688] p-4 rounded-xl text-white text-center shadow-md">
+                 <p className="text-[10px] font-black uppercase opacity-60 tracking-widest mb-1">Finalizados</p>
+                 <p className="text-xl font-black">{statsResumo.finalizados}</p>
+              </div>
+              <div className="bg-amber-500 p-4 rounded-xl text-white text-center shadow-md border-2 border-white/20">
+                 <p className="text-[10px] font-black uppercase opacity-80 tracking-widest mb-1">Em Andamento</p>
+                 <p className="text-xl font-black">{statsResumo.emAndamento}</p>
+              </div>
+              <div className="bg-[#009688] p-4 rounded-xl text-white text-center shadow-md">
+                 <p className="text-[10px] font-black uppercase opacity-60 tracking-widest mb-1">A Realizar</p>
+                 <p className="text-xl font-black">{statsResumo.pendentes}</p>
+              </div>
+              <div className="bg-[#009688] p-4 rounded-xl text-white text-center shadow-md">
+                 <p className="text-[10px] font-black uppercase opacity-60 tracking-widest mb-1">Sessões de Pacote</p>
+                 <p className="text-xl font-black">{statsResumo.pacotes}</p>
+              </div>
+           </div>
+
+           {/* BARRA DE BUSCA E FILTROS */}
+           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4 mb-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                 {/* Busca por Texto */}
+                 <div className="flex-1 relative">
+                    <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input 
+                      type="text" 
+                      placeholder="Buscar por pet ou tutor..." 
+                      value={termoBusca}
+                      onChange={(e) => setTermoBusca(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                    />
+                 </div>
+
+                 {/* Filtro de Status */}
+                 <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+                    {(['Todos', 'Em Andamento', 'Finalizado', 'A Realizar'] as const).map((opt) => (
+                      <button 
+                        key={opt}
+                        onClick={() => setFiltroStatus(opt)}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${filtroStatus === opt ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                 </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-slate-50">
+                 {/* Filtro de Tipo */}
+                 <div className="flex items-center space-x-3">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipo:</span>
+                    <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
+                       {(['Todos', 'Pacote', 'Avulso'] as const).map((opt) => (
+                         <button 
+                           key={opt}
+                           onClick={() => setFiltroTipo(opt)}
+                           className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${filtroTipo === opt ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                         >
+                           {opt}
+                         </button>
+                       ))}
+                    </div>
+                 </div>
+
+                 {/* Filtro de Pagamento */}
+                 <div className="flex items-center space-x-3">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Pagamento:</span>
+                    <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
+                       {(['Todos', 'Pago', 'Pendente'] as const).map((opt) => (
+                         <button 
+                           key={opt}
+                           onClick={() => setFiltroPagamento(opt)}
+                           className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${filtroPagamento === opt ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                         >
+                           {opt}
+                         </button>
+                       ))}
+                    </div>
+                 </div>
+
+                 {/* Filtro de Transporte */}
+                 <div className="flex items-center space-x-3">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Transporte:</span>
+                    <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
+                       {(['Todos', 'Com Táxi', 'Sem Táxi'] as const).map((opt) => (
+                         <button 
+                           key={opt}
+                           onClick={() => setFiltroTransporte(opt)}
+                           className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${filtroTransporte === opt ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                         >
+                           {opt}
+                         </button>
+                       ))}
+                    </div>
+                 </div>
+
+                 {/* Botão Limpar */}
+                 {(termoBusca || filtroStatus !== 'Todos' || filtroTipo !== 'Todos' || filtroPagamento !== 'Todos' || filtroTransporte !== 'Todos') && (
+                   <button 
+                     onClick={() => {
+                       setTermoBusca('');
+                       setFiltroStatus('Todos');
+                       setFiltroTipo('Todos');
+                       setFiltroPagamento('Todos');
+                       setFiltroTransporte('Todos');
+                     }}
+                     className="text-[9px] font-black text-rose-500 uppercase tracking-widest hover:underline ml-auto"
+                   >
+                     Limpar Filtros
+                   </button>
+                 )}
+              </div>
+           </div>
+
+           {(() => {
+              const agendamentosFiltrados = appointments.filter(appt => {
+                // 1. Filtro de Busca
+                const searchMatch = !termoBusca || 
+                  appt.pets?.nome?.toLowerCase().includes(termoBusca.toLowerCase()) ||
+                  appt.pets?.clientes?.nome?.toLowerCase().includes(termoBusca.toLowerCase()) ||
+                  appt.agendamento_itens?.some((it: any) => it.servicos?.nome?.toLowerCase().includes(termoBusca.toLowerCase()));
+                
+                // 2. Filtro de Status
+                let statusMatch = true;
+                if (filtroStatus === 'Em Andamento') statusMatch = appt.status === 'Em Andamento';
+                if (filtroStatus === 'Finalizado') statusMatch = appt.status === 'Finalizado';
+                if (filtroStatus === 'A Realizar') statusMatch = appt.status === 'Agendado';
+
+                // 3. Filtro de Tipo
+                let tipoMatch = true;
+                if (filtroTipo === 'Pacote') tipoMatch = !!appt.pacote_id;
+                if (filtroTipo === 'Avulso') tipoMatch = !appt.pacote_id;
+
+                // 4. Filtro de Pagamento
+                let pagamentoMatch = true;
+                const estaPago = appt.pacote_id ? appt.pacotes?.pago : appt.pago;
+                if (filtroPagamento === 'Pago') pagamentoMatch = !!estaPago;
+                if (filtroPagamento === 'Pendente') pagamentoMatch = !estaPago;
+
+                // 5. Filtro de Transporte
+                let transporteMatch = true;
+                const temTransporte = appt.tem_taxi || appt.pet_taxi;
+                if (filtroTransporte === 'Com Táxi') transporteMatch = !!temTransporte;
+                if (filtroTransporte === 'Sem Táxi') transporteMatch = !temTransporte;
+
+                return searchMatch && statusMatch && tipoMatch && pagamentoMatch && transporteMatch;
+              });
+
+              return agendamentosFiltrados.length > 0 ? (
+                <div className="space-y-3">
+                  {agendamentosFiltrados.map(appt => (
+                     <div key={appt.id} className={`rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center relative p-6 group ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'} ${appt.status === 'Cancelado' ? 'bg-[#f3f4f6]' : 'bg-white'}`}>
+                       
+                       {/* Horário */}
+                       <div className="w-24 text-center border-r border-slate-100 mr-8 hidden md:block shrink-0">
+                          <p className="text-2xl font-black text-slate-800 tracking-tighter">{String(appt.horario_inicio).substring(0, 5)}</p>
+                          <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${
+                            appt.status === 'Em Andamento' ? 'text-amber-500' : 
+                            appt.status === 'Finalizado' ? 'text-emerald-500' : 
+                            appt.status === 'Cancelado' ? 'text-slate-500' : 'text-slate-400'
+                          }`}>
+                            {appt.status === 'Em Andamento' ? 'Andamento' : appt.status === 'Finalizado' ? 'Finalizado' : appt.status === 'Cancelado' ? 'Cancelado' : 'Início'}
+                          </p>
+                       </div>
+
+                       {/* Informações do Pet e Cliente */}
+                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenDetail(appt)}>
+                          <div className="flex items-center space-x-3 mb-1">
+                             <h4 className="font-black text-xl text-slate-800 truncate group-hover:text-amber-600 transition-colors">
+                                {appt.pets?.nome}
+                             </h4>
+                             {appt.pacote_id && (
+                                <span className="bg-indigo-50 text-indigo-500 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter border border-indigo-100">
+                                   Sessão {appt.numero_sessao || '?'}/{appt.pacotes?.qtd_sessoes || '?'}
+                                </span>
+                             )}
+                          </div>
+                          <p className="text-xs text-slate-400 font-bold truncate flex items-center">
+                             <i className="fa-solid fa-user-tag mr-2 opacity-50 text-[10px]"></i> {appt.pets?.clientes?.nome}
+                          </p>
+
+                          {(appt.tem_taxi || appt.pet_taxi || appt.agendamento_itens?.some((it: any) => it.servicos?.nome?.toUpperCase().includes('TÁXI'))) && (
+                             <p className="text-xs text-slate-400 font-bold truncate flex items-center mt-1">
+                                <i className="fa-solid fa-location-dot mr-2 opacity-50 text-[10px] text-amber-500"></i>
+                                <span className="mr-1">Endereço:</span>
+                                <span className="text-slate-500">
+                                   {appt.endereco_busca || (appt.pets?.clientes?.logradouro 
+                                      ? `${appt.pets.clientes.logradouro}, ${appt.pets.clientes.numero}${appt.pets.clientes.bairro ? ' - ' + appt.pets.clientes.bairro : ''}` 
+                                      : 'Rua das Flores, 123 - Centro, Araçatuba, SP')}
+                                </span>
+                             </p>
+                          )}
+                         
+                         {/* Lista de Micro-serviços */}
+                         <div className="flex flex-wrap gap-2 mt-3">
+                            {appt.agendamento_itens?.map((it: any) => (
+                               <span key={it.id} className="text-[9px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                  {it.servicos?.nome}
+                               </span>
+                            ))}
+                            {(appt.tem_taxi || appt.pet_taxi) && (
+                               <span className="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1">
+                                  🚕 TÁXI
+                               </span>
+                            )}
+                         </div>
+                      </div>
+
+                      {/* Financeiro e Status */}
+                      <div className="mt-4 md:mt-0 md:text-right flex items-center md:flex-col justify-between md:justify-center md:items-end gap-2 shrink-0 md:ml-8">
+                         <div className="flex items-center gap-3">
+                            <div className="text-right">
+                               <p className="font-black text-xl text-slate-800 tracking-tighter leading-none">R$ {(parseFloat(appt.valor_total) || 0).toFixed(2)}</p>
+                               <p className={`text-[9px] font-black uppercase tracking-widest mt-1.5 flex items-center justify-end ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                  <i className={`fa-solid ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'fa-circle-check' : 'fa-circle-exclamation'} mr-1 text-[8px]`}></i>
+                                  {(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'PAGO' : 'PENDENTE'}
+                               </p>
+                            </div>
+                         </div>
+                         <span className={`inline-block px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${
+                            appt.status === 'Finalizado' 
+                               ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                               : appt.status === 'Em Andamento'
+                               ? 'bg-amber-50 text-amber-600 border-amber-200'
+                               : appt.status === 'Cancelado'
+                               ? 'bg-slate-100 text-slate-400 border-slate-200'
+                               : 'bg-slate-50 text-slate-600 border-slate-100'
+                         }`}>
+                            {appt.status === 'Agendado' ? 'Pendente' : appt.status}
+                         </span>
+                      </div>
+
+                      {/* Botão de Ação (3 Pontinhos) */}
+                      <div className="absolute top-4 right-4 md:static md:ml-6 md:mt-0">
+                         <button 
+                            onClick={(e) => {
+                               e.stopPropagation();
+                               setActiveCardMenuId(activeCardMenuId === appt.id ? null : appt.id);
+                            }}
+                            className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 group-hover:text-slate-600 transition-all"
+                         >
+                            <i className="fa-solid fa-ellipsis-vertical text-lg"></i>
+                         </button>
+
+                         {/* Dropdown de Ações */}
+                         {activeCardMenuId === appt.id && (
+                            <div className="absolute right-6 mt-2 w-52 bg-white !opacity-100 rounded-2xl shadow-2xl border border-slate-100 z-[9999] py-3 animate-in fade-in zoom-in duration-200 ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>
+                               <div className="px-4 py-2 border-b border-slate-50 mb-1">
+                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ações do Agendamento</p>
+                               </div>
+
+                               {/* Opções de Ação */}
+                               {appt.status === 'Agendado' && !isReadOnly && (
+                                  <button onClick={() => { performStartAtendimento(appt); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-amber-600 hover:bg-amber-50 transition-colors border-b border-slate-50">
+                                     <i className="fa-solid fa-play mr-3 text-amber-500 text-sm"></i> Iniciar Atendimento
+                                  </button>
+                               )}
+
+                               {appt.status === 'Cancelado' && !isReadOnly && (
+                                  <button onClick={() => { performReactivateAppointment(appt); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors border-b border-slate-50">
+                                     <i className="fa-solid fa-rotate-left mr-3 text-blue-500 text-sm"></i> Reativar Agendamento
+                                  </button>
+                               )}
+
+                               {appt.status !== 'Finalizado' && appt.status !== 'Cancelado' && !isReadOnly && (
+                                  <>
+                                     <button onClick={() => { performFinalizeAppointment(appt); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-emerald-600 hover:bg-emerald-50 transition-colors border-b border-slate-50">
+                                        <i className="fa-solid fa-circle-check mr-3 text-emerald-500 text-sm"></i> Concluir e Avisar
+                                     </button>
+                                     <button onClick={() => { performFinalizeAppointment(appt, false); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-blue-500 hover:bg-blue-50 transition-colors border-b border-slate-50">
+                                        <i className="fa-solid fa-check mr-3 text-blue-500 text-sm"></i> Finalizar Sem Aviso
+                                     </button>
+                                  </>
+                               )}
+
+                               <button onClick={() => { handleOpenDetail(appt); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                                  <i className="fa-solid fa-eye mr-3 text-purple-500"></i> Ver Detalhes
+                               </button>
+                               
+                               {appt.status !== 'Finalizado' && appt.status !== 'Cancelado' && !isReadOnly && (
+                                  <button onClick={() => { handleStartEdit(appt); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                                     <i className="fa-solid fa-pen-to-square mr-3 text-amber-500"></i> Alterar Dados
+                                  </button>
+                               )}
+                               
+                               {!appt.pago && appt.status !== 'Cancelado' && !isReadOnly && (
+                                  <button onClick={() => { setViewingAppt(appt); setShowPaymentSelector(true); setIsDetailModalOpen(true); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-emerald-600 hover:bg-emerald-50 transition-colors">
+                                     <i className="fa-solid fa-dollar-sign mr-3 text-emerald-500"></i> Receber Agora
+                                  </button>
+                               )}
+                               
+                               {appt.status !== 'Cancelado' && !isReadOnly && (
+                                  <button onClick={() => { performCancelAppointment(appt); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-rose-500 hover:bg-rose-50 transition-colors border-t border-slate-50 mt-1">
+                                     <i className="fa-solid fa-ban mr-3 text-rose-500"></i> Cancelar Atendimento
+                                  </button>
+                               )}
+                            </div>
+                         )}
+                      </div>
+                   </div>
+                 ))}
+               </div>
+             ) : (
+                <div className="bg-white p-20 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center opacity-20">
+                  <i className="fa-solid fa-calendar-xmark text-6xl mb-4"></i>
+                  <p className="font-black uppercase tracking-widest">
+                    {appointments.length === 0 ? 'Nenhum banho agendado' : 'Nenhum agendamento encontrado para estes filtros'}
+                  </p>
+                </div>
+             );
+           })()}
+        </div>
+      </div>
+
+      {/* MODAL DE AGENDAMENTO (COM NOVO CADASTRO RÁPIDO) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white w-[95%] mx-auto max-w-md md:max-w-5xl md:w-full rounded-[2.5rem] shadow-2xl overflow-x-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+            <header className="bg-[#F59E0B] p-6 md:p-8 text-white flex justify-between items-center shrink-0">
+               <h3 className="text-xl md:text-2xl font-black">{isEditing ? 'Alterar Agendamento' : 'Novo Banho'}</h3>
+               <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center hover:bg-white/10 rounded-full text-xl md:text-2xl"><i className="fa-solid fa-xmark"></i></button>
+            </header>
+            <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 md:space-y-10 custom-scrollbar">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
+                  <div className="space-y-6">
+                     <div className="space-y-2 relative">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex justify-between">Tutor / Cliente *</label>
+                        {!selectedClient ? (
+                          <div className="relative">
+                            <i className="fa-solid fa-user absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" value={clientSearch} onChange={(e) => handleClientSearch(e.target.value)} className="w-full pl-14 pr-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 transition-all" placeholder="Buscar tutor..."/>
+                            {clientResults.length > 0 || (clientSearch.length >= 2) ? (
+                              <div className="absolute w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 py-2 overflow-hidden max-h-[300px] overflow-y-auto">
+                                {clientResults.map(c => (
+                                  <button key={c.id} onClick={() => selectClient(c)} className="w-full text-left px-5 py-3 hover:bg-slate-50 flex items-center space-x-4">
+                                     <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-xs shrink-0">{c.nome.charAt(0)}</div>
+                                     <span className="font-bold text-slate-800 text-sm truncate">{c.nome}</span>
+                                  </button>
+                                ))}
+                                <button onClick={() => setIsQuickClientModalOpen(true)} className="w-full text-left px-5 py-4 hover:bg-amber-50 flex items-center space-x-4 border-t border-slate-100 text-amber-600">
+                                   <i className="fa-solid fa-plus-circle"></i>
+                                   <span className="font-black text-xs uppercase">Cadastrar "{clientSearch}"</span>
+                                </button>
+                              </div>
+                            ) : null}
+                            <p className="text-[9px] text-rose-500 font-bold mt-2 flex items-start gap-1.5 leading-tight">
+                               <i className="fa-solid fa-triangle-exclamation mt-0.5"></i>
+                               Por favor, selecione um cliente cadastrado para garantir o envio dos lembretes de WhatsApp
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between p-4 bg-amber-50 border border-amber-100 rounded-2xl">
+                             <span className="font-black text-slate-800 truncate mr-2">{selectedClient.nome}</span>
+                             <button onClick={() => setSelectedClient(null)} className="text-xs text-amber-600 font-bold uppercase underline shrink-0">Trocar</button>
+                          </div>
+                        )}
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pet Selecionado *</label>
+                        <select 
+                          disabled={!selectedClient} 
+                          value={selectedPetId} 
+                          onChange={(e) => {
+                            if (e.target.value === 'novo') {
+                              setIsQuickPetModalOpen(true);
+                            } else {
+                              setSelectedPetId(e.target.value);
+                            }
+                          }} 
+                          className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 transition-all appearance-none"
+                        >
+                           <option value="">Selecione o pet...</option>
+                           {availablePets.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                           {selectedClient && <option value="novo" className="text-amber-600 font-black">+ NOVO PET</option>}
+                        </select>
+                     </div>
+
+                     {/* NOVO BLOCO: ADICIONAIS (PET TÁXI) */}
+                     <div className="pt-4 space-y-4 border-t border-slate-50">
+                        <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                           <div className="flex items-center space-x-3">
+                              <i className="fa-solid fa-taxi text-amber-500"></i>
+                              <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest">Incluir Pet Táxi (Leva e Traz)</span>
+                           </div>
+                           <label className="relative inline-flex items-center cursor-pointer">
+                              <input type="checkbox" className="sr-only peer" checked={isPetTaxi} onChange={(e) => setIsPetTaxi(e.target.checked)} />
+                              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                           </label>
+                        </div>
+                        
+                        {isPetTaxi && (
+                           <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                              {/* Campo: Valor do Transporte */}
+                              <div className="space-y-2">
+                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Valor do Transporte (R$):</label>
+                                 <div className="relative">
+                                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                    <input 
+                                       type="number" 
+                                       value={valorTransporte} 
+                                       onChange={(e) => setValorTransporte(Number(e.target.value))} 
+                                       className="w-full pl-14 pr-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 transition-all" 
+                                       placeholder="0.00"
+                                    />
+                                 </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Endereço de Busca/Entrega</label>
+                                 <div className="relative">
+                                    <i className="fa-solid fa-map-location-dot absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
+                                    <input 
+                                       type="text" 
+                                       value={petTaxiEndereco} 
+                                       onChange={(e) => setPetTaxiEndereco(e.target.value)} 
+                                       className="w-full pl-14 pr-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 transition-all" 
+                                       placeholder="Ex: Rua das Flores, 123 - Bairro"
+                                    />
+                                 </div>
+                                 <p className="text-[9px] text-slate-400 italic ml-1">* Endereço capturado automaticamente do tutor.</p>
+                              </div>
+                           </div>
+                        )}
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</label><input type="date" value={appointmentDate} onChange={(e) => setAppointmentDate(e.target.value)} className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 transition-all"/></div>
+                     <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hora</label><input type="time" value={appointmentTime} onChange={(e) => setAppointmentTime(e.target.value)} className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 transition-all"/></div>
+                  </div>
+               </div>
+
+               <div className="pt-8 border-t border-slate-100">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Serviços e Valores</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+                     {services.map(s => (
+                        <label key={s.id} className={`p-4 rounded-xl border flex items-center space-x-3 cursor-pointer transition-all ${selectedServiceIds.includes(s.id) ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
+                           <input type="checkbox" className="w-4 h-4 accent-amber-500" checked={selectedServiceIds.includes(s.id)} onChange={() => toggleServiceId(s.id)} />
+                           <span className="text-xs font-bold text-slate-700">{s.nome}</span>
+                        </label>
+                     ))}
+                  </div>
+                  <div className="mt-8 p-6 md:p-8 bg-amber-50 rounded-[2.5rem] border border-amber-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                     <div className="relative w-full md:max-w-xs">
+                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-amber-300">R$</span>
+                        <input type="number" value={manualTotalValue} onChange={(e) => setManualTotalValue(Number(e.target.value))} className="w-full pl-20 pr-6 py-5 bg-white border border-amber-200 rounded-[1.8rem] text-4xl font-black text-amber-600 outline-none" placeholder="0.00"/>
+                     </div>
+                     
+                     {isPetTaxi && (
+                        <div className="text-center md:text-right">
+                           <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Total dos Serviços + Transporte:</p>
+                           <p className="text-2xl font-black text-slate-800">R$ {(manualTotalValue + Number(valorTransporte)).toFixed(2)}</p>
+                        </div>
+                     )}
+
+                     <div className="flex flex-wrap md:flex-nowrap gap-2 w-full md:w-auto">
+                        {['Pix', 'Dinheiro', 'Cartão'].map(m => (
+                          <button key={m} onClick={() => setPaymentMethod(m)} className={`flex-1 md:flex-none px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${paymentMethod === m ? 'bg-amber-500 text-white' : 'bg-white text-slate-400 border border-slate-100'}`}>{m}</button>
+                        ))}
+                     </div>
+                  </div>
+               </div>
+            </div>
+            <footer className="p-4 md:p-8 bg-slate-50 border-t border-slate-100 flex flex-row justify-end gap-2 md:gap-4">
+               <button onClick={() => setIsModalOpen(false)} className="flex-1 md:flex-none px-4 py-3 md:px-8 md:py-4 bg-white text-slate-500 rounded-2xl font-black border border-slate-200 hover:bg-slate-100 text-[10px] md:text-xs uppercase tracking-widest">Cancelar</button>
+               <button onClick={saveAppointment} disabled={loading || !selectedClient} className={`flex-[2] md:flex-none px-4 py-3 md:px-12 md:py-4 bg-[#F59E0B] text-white rounded-2xl font-black shadow-xl active:scale-95 transition-all text-[10px] md:text-xs uppercase tracking-widest flex items-center justify-center ${(!selectedClient || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                 {loading ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : 'SALVAR'}
+               </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* NOVO CADASTRO RÁPIDO VIA MODAL HÍBRIDO */}
+      {isQuickClientModalOpen && (
+        <ClienteModal 
+          modo="rapido"
+          client={{ nome: clientSearch }}
+          unitId={unit.id}
+          supabaseClient={supabaseClient}
+          onClose={() => setIsQuickClientModalOpen(false)}
+          onSave={(data) => {
+            selectClient(data.cliente);
+            if (data.pet) setSelectedPetId(data.pet.id);
+            setIsQuickClientModalOpen(false);
+          }}
+          showToast={(txt, type) => setConfirmacao({ visivel: true, acao: type === 'error' ? 'erro' : 'info', mensagem: txt })}
+        />
+      )}
+
+      {isQuickPetModalOpen && selectedClient && (
+        <CadastroPet 
+          clientId={selectedClient.id}
+          clientName={selectedClient.nome}
+          unitId={unit.id}
+          supabaseClient={supabaseClient}
+          userProfile={userProfile}
+          onClose={() => setIsQuickPetModalOpen(false)}
+          onSave={(newPet) => {
+            setAvailablePets(prev => [...prev, newPet]);
+            setSelectedPetId(newPet.id);
+            setIsQuickPetModalOpen(false);
+          }}
+          showToast={(txt, type) => setConfirmacao({ visivel: true, acao: type === 'error' ? 'erro' : 'info', mensagem: txt })}
+        />
+      )}
+
+      {/* NOVO MODAL DE DETALHES RECONSTRUÍDO */}
+      {isDetailModalOpen && viewingAppt && (
+        <AgendamentoDetalhesModal 
+          appt={viewingAppt}
+          userProfile={userProfile}
+          onClose={() => setIsDetailModalOpen(false)}
+          onEdit={(appt) => handleStartEdit(appt)}
+          onStartAtendimento={(appt) => performStartAtendimento(appt)}
+          onReactivate={(appt) => performReactivateAppointment(appt)}
+          onFinalize={(appt) => performFinalizeAppointment(appt)}
+          onFinalizeNoNotice={(appt) => performFinalizeAppointment(appt, false)}
+          onCancel={(appt) => performCancelAppointment(appt)}
+          onQuickReceive={(data) => handleQuickReceive(data)}
+          supabaseClient={supabaseClient}
+          onRefresh={() => fetchData()}
+        />
+      )}
+
+      {toast.visivel && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-bottom-5 duration-300">
+          <div className={`${
+            toast.tipo === 'sucesso' ? 'bg-emerald-500' : 
+            toast.tipo === 'erro' ? 'bg-rose-500' : 'bg-slate-800'
+          } text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 font-bold text-xs uppercase tracking-widest`}>
+            {toast.tipo === 'sucesso' && <i className="fa-solid fa-circle-check"></i>}
+            {toast.tipo === 'erro' && <i className="fa-solid fa-circle-exclamation"></i>}
+            {toast.tipo === 'info' && <i className="fa-solid fa-circle-info"></i>}
+            <span>{toast.mensagem}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Appointments;
