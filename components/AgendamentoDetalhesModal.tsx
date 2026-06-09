@@ -64,7 +64,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   const valorDesconto = Number(appt.valor_desconto || appt.desconto || 0);
   const valorServicos = Number(appt.valor_servicos ?? Math.max(0, Number(appt.valor_total || 0) - valorTransporte));
   const totalExtraItens = extraItems.reduce((acc: number, item: any) => acc + getItemValue(item), 0);
-  const totalExtra = totalExtraItens || Number(appt.valor_extra_total || 0);
+  const totalExtra = extraItems.length > 0 ? totalExtraItens : 0;
   const totalBaseAgendamento = Number(appt.valor_total || 0);
   const totalGeral = appt.pacote_id ? totalBaseAgendamento : Math.max(0, valorServicos + valorTransporte + totalExtra - valorDesconto);
   const isSomaValida = !isDividirPagamento || (Math.abs((valor1 + valor2) - totalGeral) < 0.01);
@@ -219,6 +219,10 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
 
   const handleRemoverExtra = async (itemId: number | string) => {
     const removedItem = services.find((it: any) => it.id === itemId);
+    if (appt.status_pagamento_extra === 'PAGO') {
+      showToast("Este extra já foi recebido. Cancele o recebimento antes de remover.", "erro");
+      return;
+    }
     const extraName = removedItem?.servicos?.nome || 'Serviço Extra';
 
     setLoadingExtra(true);
@@ -263,7 +267,71 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
     }
   };
 
+  const handleExcluirExtra = async (item: any) => {
+    if (appt.status_pagamento_extra === 'PAGO') {
+      showToast("Este extra já foi recebido. Cancele o recebimento antes de remover.", "erro");
+      return;
+    }
+
+    if (!item || !isExtraItem(item)) {
+      showToast("Somente serviços adicionais podem ser removidos por aqui.", "erro");
+      return;
+    }
+
+    const extraName = item.descricao || item.servicos?.nome || 'Serviço Extra';
+    if (!window.confirm(`Remover o extra "${extraName}" deste agendamento?`)) {
+      return;
+    }
+
+    setLoadingExtra(true);
+    try {
+      const { error: delErr } = await supabaseClient
+        .from('agendamento_itens')
+        .delete()
+        .eq('agendamento_id', appt.id)
+        .eq('id', item.id)
+        .or('eh_extra.eq.true,tipo.eq.extra,tipo.eq.adicional');
+      if (delErr) throw delErr;
+
+      const remainingExtras = extraItems.filter((it: any) => it.id !== item.id);
+      const newExtraTotal = remainingExtras.reduce((acc: number, cur: any) => acc + getItemValue(cur), 0);
+
+      const { error: apptErr } = await supabaseClient
+        .from('agendamentos')
+        .update({
+          valor_extra_total: newExtraTotal,
+          status_pagamento_extra: newExtraTotal === 0 ? 'NÃO POSSUI' : 'PENDENTE',
+          forma_pagamento_extra: null,
+          data_pagamento_extra: null
+        })
+        .eq('id', appt.id);
+      if (apptErr) throw apptErr;
+
+      registrarAtividade(
+        appt.unidade_id,
+        userProfile?.email || 'sistema',
+        'REMOVER_EXTRA',
+        `Removeu o serviço extra "${extraName}" do agendamento de ${appt.pets?.clientes?.nome || 'Cliente'} (Pet: ${appt.pets?.nome || 'Pet'})`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+
+      showToast("Serviço adicional removido.");
+      onRefresh();
+    } catch (err: any) {
+      console.error("Erro ao remover serviço extra:", err);
+      showToast(err.message || "Erro ao remover serviço adicional.", "erro");
+    } finally {
+      setLoadingExtra(false);
+    }
+  };
+
   const handleCancelarTodosExtras = async () => {
+    if (appt.status_pagamento_extra === 'PAGO') {
+      showToast("Este extra já foi recebido. Cancele o recebimento antes de remover.", "erro");
+      return;
+    }
+
     setLoadingExtra(true);
     try {
       // 1. Deletar todos os itens extras do agendamento
@@ -271,7 +339,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
         .from('agendamento_itens')
         .delete()
         .eq('agendamento_id', appt.id)
-        .eq('eh_extra', true);
+        .or('eh_extra.eq.true,tipo.eq.extra,tipo.eq.adicional');
       
       if (delErr) throw delErr;
 
@@ -299,9 +367,11 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
       );
 
       setShowConfirmDeleteAll(false);
+      showToast("Extras removidos.");
       onRefresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao cancelar todos os extras:", err);
+      showToast(err.message || "Erro ao remover extras.", "erro");
     } finally {
       setLoadingExtra(false);
     }
@@ -474,7 +544,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                              <span className="bg-amber-100 text-amber-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter border border-amber-200">EXTRA</span>
                              {!isReadOnly && (
                                <button 
-                                 onClick={() => handleRemoverExtra(it.id)}
+                                 onClick={() => handleExcluirExtra(it)}
                                  disabled={loadingExtra}
                                  className="text-slate-400 hover:text-red-500 transition-colors"
                                  title="Remover Extra"
