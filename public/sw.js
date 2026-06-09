@@ -1,4 +1,4 @@
-const CACHE_NAME = 'igui-banho-tosa-birigui-v1';
+const CACHE_NAME = 'igui-banho-tosa-birigui-v2';
 const APP_SHELL = [
   '/',
   '/index.html',

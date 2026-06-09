@@ -4,7 +4,9 @@
   "description": "ERP mobile para gestao de banho e tosa da Igui Birigui.",
   "start_url": "/",
   "scope": "/",
+  "id": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "portrait-primary",
   "background_color": "#f8fafc",
   "theme_color": "#00BFA5",
@@ -21,6 +23,15 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Igui Banho Tosa Birigui"
     }
   ]
 }

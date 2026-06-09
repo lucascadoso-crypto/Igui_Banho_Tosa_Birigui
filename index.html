@@ -28,10 +28,37 @@
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
         @media (max-width: 767px) {
+            html,
+            body,
+            #root {
+                min-height: 100vh;
+                min-height: 100dvh;
+                overflow-x: hidden;
+                background: #f8fafc;
+            }
+
+            body {
+                overscroll-behavior-y: none;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            .app-mobile-header {
+                height: calc(76px + env(safe-area-inset-top)) !important;
+                padding-top: env(safe-area-inset-top) !important;
+                box-sizing: border-box !important;
+            }
+
+            .app-mobile-main {
+                padding-top: calc(76px + env(safe-area-inset-top)) !important;
+            }
+
             .app-modal-overlay {
                 align-items: flex-start !important;
                 justify-content: center !important;
-                padding: 12px 10px max(12px, env(safe-area-inset-bottom)) !important;
+                padding-top: max(12px, env(safe-area-inset-top)) !important;
+                padding-right: 10px !important;
+                padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+                padding-left: 10px !important;
                 overflow-y: auto !important;
                 overflow-x: hidden !important;
                 box-sizing: border-box !important;
@@ -41,13 +68,14 @@
                 width: calc(100vw - 20px) !important;
                 max-width: calc(100vw - 20px) !important;
                 height: auto !important;
-                max-height: calc(100vh - 24px) !important;
-                max-height: calc(100dvh - 24px) !important;
+                max-height: 90vh !important;
+                max-height: min(90vh, calc(100dvh - 24px)) !important;
                 margin: 0 auto !important;
                 overflow-y: auto !important;
                 overflow-x: hidden !important;
                 box-sizing: border-box !important;
                 transform: none !important;
+                border-radius: 1.75rem !important;
             }
 
             .app-modal-header {
@@ -70,6 +98,44 @@
                 z-index: 30 !important;
                 padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
                 box-sizing: border-box !important;
+            }
+
+            .app-modal-footer,
+            .app-modal-footer > div {
+                flex-direction: column !important;
+                align-items: stretch !important;
+            }
+
+            .app-modal-footer button,
+            .app-modal-body button,
+            .app-modal-body input,
+            .app-modal-body select,
+            .app-modal-body textarea,
+            .app-modal-panel input,
+            .app-modal-panel select,
+            .app-modal-panel textarea {
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            .app-modal-footer button {
+                width: 100% !important;
+                min-height: 44px !important;
+                white-space: normal !important;
+            }
+
+            .app-modal-body input,
+            .app-modal-body select,
+            .app-modal-body textarea,
+            .app-modal-panel form input,
+            .app-modal-panel form select,
+            .app-modal-panel form textarea {
+                width: 100% !important;
+                font-size: 16px !important;
+            }
+
+            .app-modal-panel table {
+                max-width: 100% !important;
             }
         }
     </style>

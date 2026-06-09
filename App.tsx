@@ -32,6 +32,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [toast, setToast] = useState<{ message: string, type: 'error' | 'success' } | null>(null);
+  const [mobileBrand, setMobileBrand] = useState({ nome: 'IGUI BANHO E TOSA BIRIGUI', logo_url: '' });
   const lastEmailRef = useRef<string | null>(null);
 
   // --- LOGOUT BLINDADO (HARD REFRESH) ---
@@ -245,6 +246,38 @@ const { data, error: profileError } = await supabase
     };
   }, [initializeApp]);
 
+  useEffect(() => {
+    if (!session) return;
+
+    let mounted = true;
+    const fetchMobileBrand = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('config_sistema')
+          .select('nome_fantasia, logo_url')
+          .eq('id', 1)
+          .maybeSingle();
+
+        if (!mounted || error || !data) return;
+
+        setMobileBrand({
+          nome: (data.nome_fantasia || 'IGUI BANHO E TOSA BIRIGUI').toUpperCase(),
+          logo_url: data.logo_url || ''
+        });
+      } catch (err) {
+        console.error("Erro ao carregar identidade mobile:", err);
+      }
+    };
+
+    fetchMobileBrand();
+    const handleUpdate = () => fetchMobileBrand();
+    window.addEventListener('dadosGlobaisAtualizados', handleUpdate);
+    return () => {
+      mounted = false;
+      window.removeEventListener('dadosGlobaisAtualizados', handleUpdate);
+    };
+  }, [session]);
+
   if (!session && !loading) {
     return <Login supabaseClient={supabase} onLoginSuccess={() => {}} />;
   }
@@ -329,6 +362,11 @@ const { data, error: profileError } = await supabase
     }
   };
 
+  const activeMobileUnit = units.find(u => u.id === navState.unitId);
+  const mobileUnitName = activeMobileUnit?.name || navState.unitName || mobileBrand.nome || units[0]?.name || 'Igui Banho e Tosa Birigui';
+  const mobileUserName = effectiveUserProfile?.nome || session?.user?.user_metadata?.name || session?.user?.email || 'Usuario logado';
+  const mobileLogo = mobileBrand.logo_url || '/igui-logo-fallback.svg';
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
       {/* Toast Notification */}
@@ -340,16 +378,25 @@ const { data, error: profileError } = await supabase
       )}
 
       {/* Topbar Mobile */}
-      <header className="md:hidden bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-30 shadow-lg">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-yellow-400 rounded-xl flex items-center justify-center">
-            <i className="fa-solid fa-paw text-slate-900 text-xl"></i>
+      <header className="app-mobile-header md:hidden fixed top-0 left-0 right-0 z-30 h-[76px] bg-slate-950 text-white px-4 flex items-center justify-between shadow-xl shadow-slate-900/20">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-white/10 shadow-lg shrink-0">
+            <img
+              src={mobileLogo}
+              alt="Logo da unidade"
+              className="w-full h-full object-cover"
+            />
           </div>
-          <span className="font-black text-sm uppercase tracking-tighter">IGUI ERP</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-black leading-tight tracking-tight">Sistema Pet</p>
+            <p className="text-[11px] font-bold text-white/75 leading-tight truncate">{mobileUnitName}</p>
+            <p className="text-[10px] font-semibold text-white/45 leading-tight truncate">{mobileUserName}</p>
+          </div>
         </div>
         <button 
           onClick={() => setIsMobileMenuOpen(true)}
-          className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400"
+          className="w-11 h-11 bg-white/10 rounded-2xl flex items-center justify-center text-white hover:bg-white/15 active:scale-95 transition-all shrink-0 ml-3"
+          aria-label="Abrir menu"
         >
           <i className="fa-solid fa-bars"></i>
         </button>
@@ -367,7 +414,7 @@ const { data, error: profileError } = await supabase
         onClose={() => setIsMobileMenuOpen(false)}
       />
       
-      <main className="flex-1 min-h-screen md:ml-72 overflow-y-auto relative hide-scrollbar">
+      <main className="app-mobile-main flex-1 min-h-screen md:ml-72 pt-[76px] md:pt-0 overflow-y-auto relative hide-scrollbar">
         {hasError && (
           <div className="bg-rose-50 border-b border-rose-100 px-10 py-3 flex items-center justify-between">
             <div className="flex items-center space-x-3 text-rose-600 font-bold text-sm">
