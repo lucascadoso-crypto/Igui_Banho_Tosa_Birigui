@@ -85,6 +85,16 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const [filtroPagamento, setFiltroPagamento] = useState<'Todos' | 'Pago' | 'Pendente'>('Todos');
   const [filtroTransporte, setFiltroTransporte] = useState<'Todos' | 'Com Táxi' | 'Sem Táxi'>('Todos');
 
+  const mobileTimeOptions = React.useMemo(() => {
+    const options: string[] = [];
+    for (let hour = 7; hour <= 20; hour++) {
+      for (const minute of [0, 15, 30, 45]) {
+        options.push(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+      }
+    }
+    return options;
+  }, []);
+
   useEffect(() => {
     fetchData();
   }, [unit.id, selectedDate]);
@@ -1390,7 +1400,14 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</label><input type="date" value={appointmentDate} onChange={(e) => setAppointmentDate(e.target.value)} className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 transition-all"/></div>
-                     <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hora</label><input type="time" value={appointmentTime} onChange={(e) => setAppointmentTime(e.target.value)} className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 transition-all"/></div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hora</label>
+                        <input type="time" value={appointmentTime} onChange={(e) => setAppointmentTime(e.target.value)} className="hidden md:block w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 transition-all"/>
+                        <select value={appointmentTime} onChange={(e) => setAppointmentTime(e.target.value)} className="md:hidden w-full max-w-[calc(100vw-24px)] px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 transition-all overflow-y-auto">
+                           {!mobileTimeOptions.includes(appointmentTime) && <option value={appointmentTime}>{appointmentTime}</option>}
+                           {mobileTimeOptions.map(time => <option key={time} value={time}>{time}</option>)}
+                        </select>
+                     </div>
                   </div>
                </div>
 
