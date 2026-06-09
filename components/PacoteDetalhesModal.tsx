@@ -506,7 +506,7 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 md:p-4 overflow-y-auto overflow-x-hidden">
       
       {/* OVERLAY DE CONFIRMAÇÃO UI */}
       {confirmacao.visivel && (
@@ -544,32 +544,32 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
         </div>
       )}
 
-      <div className="bg-gray-50 w-[95%] mx-auto md:max-w-7xl md:w-full rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
-        <header className="bg-[#8E44AD] px-6 md:px-12 py-6 md:py-10 text-white shrink-0 relative overflow-hidden">
-          <div className="relative z-10 text-left">
+      <div className="bg-gray-50 w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] mx-auto md:max-w-7xl md:w-full rounded-[2rem] shadow-2xl overflow-y-auto overflow-x-hidden md:overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100vh-24px)] md:max-h-[90vh]">
+        <header className="bg-[#8E44AD] px-5 md:px-12 py-5 md:py-10 pr-16 md:pr-12 text-white shrink-0 relative overflow-hidden">
+          <div className="relative z-10 text-left min-w-0">
             <span className="block text-[8px] md:text-[10px] font-black opacity-60 uppercase tracking-[0.3em] mb-1 md:mb-2">Venda: #{String(pack.id).substring(0, 8).toUpperCase()}</span>
-            <h3 className="text-2xl md:text-4xl font-black tracking-tighter">Prontuário de Fidelidade</h3>
+            <h3 className="text-xl md:text-4xl font-black tracking-tighter leading-tight break-words">Prontuário de Fidelidade</h3>
           </div>
           <button 
             onClick={onClose} 
-            className="absolute right-6 md:right-10 top-6 md:top-10 z-50 p-2 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center hover:bg-white/10 rounded-full text-xl md:text-2xl cursor-pointer transition-all active:scale-95"
+            className="absolute right-4 md:right-10 top-4 md:top-10 z-50 p-2 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center hover:bg-white/10 rounded-full text-xl md:text-2xl cursor-pointer transition-all active:scale-95"
           >
             <i className="fa-solid fa-xmark pointer-events-none"></i>
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-12 grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12 custom-scrollbar">
-          <div className="lg:col-span-5 space-y-10">
-            <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-12 grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-12 custom-scrollbar">
+          <div className="lg:col-span-5 space-y-6 md:space-y-10 min-w-0">
+            <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Serviços do Pacote</h4>
-              {services.map((s, idx) => (<div key={idx} className="flex items-center space-x-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 mb-2"><i className="fa-solid fa-scissors text-[#8E44AD]"></i><span className="font-bold text-slate-700">{s.nome}</span></div>))}
+              {services.map((s, idx) => (<div key={idx} className="flex items-center space-x-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 mb-2 min-w-0"><i className="fa-solid fa-scissors text-[#8E44AD] shrink-0"></i><span className="font-bold text-slate-700 min-w-0 break-words">{s.nome}</span></div>))}
             </div>
 
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <div className="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Consolidado</p>
-              <p className="text-5xl font-black text-[#8E44AD] tracking-tighter mb-8">R$ {(parseFloat(pack.valor_total) || 0).toFixed(2)}</p>
+              <p className="text-[clamp(42px,13vw,72px)] md:text-5xl font-black text-[#8E44AD] tracking-tighter mb-6 md:mb-8 leading-none max-w-full break-words">R$ {(parseFloat(pack.valor_total) || 0).toFixed(2)}</p>
               
-              <div className="border-t border-slate-50 pt-8">
+              <div className="border-t border-slate-50 pt-6 md:pt-8">
                 {pack.pago ? (
                   <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl flex items-center space-x-4 text-emerald-800 animate-in fade-in duration-300">
                      <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20">
@@ -581,11 +581,11 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
                      </div>
                   </div>
                 ) : isPaying ? (
-                  <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-200 space-y-5 animate-in slide-in-from-top-4 duration-300">
+                   <div className="bg-slate-50 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border border-slate-200 space-y-5 animate-in slide-in-from-top-4 duration-300 overflow-hidden">
                      <h5 className="text-xs font-black text-slate-800 uppercase tracking-widest text-center">
                        {isRetroactiveMode ? 'Registrar Recebimento Retroativo' : 'Registrar Recebimento (Hoje)'}
                      </h5>
-                     <div className={`grid ${isRetroactiveMode ? 'grid-cols-2' : 'grid-cols-1'} gap-4`}>
+                     <div className={`grid ${isRetroactiveMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'} gap-4`}>
                         {isRetroactiveMode && (
                           <div className="space-y-1.5">
                              <label className="text-[9px] font-black text-slate-400 uppercase ml-2">Data Real</label>
@@ -612,7 +612,7 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
                              </select>
                            ) : (
                              <div className="space-y-4 pt-2">
-                                <div className="grid grid-cols-2 gap-3">
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                    <div className="space-y-1">
                                       <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Valor 1</label>
                                       <input type="number" value={valor1} onChange={(e) => {
@@ -631,7 +631,7 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
                                       </select>
                                    </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                    <div className="space-y-1">
                                       <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Valor 2</label>
                                       <input type="number" value={valor2} onChange={(e) => {
@@ -675,15 +675,15 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
                            )}
                         </div>
                      </div>
-                     <div className="flex gap-2">
+                     <div className="flex flex-col-reverse md:flex-row gap-2">
                         <button 
                           onClick={() => setIsPaying(false)}
-                          className="flex-1 py-3 bg-white text-slate-400 font-bold text-xs uppercase rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors"
+                          className="w-full md:flex-1 py-3 bg-white text-slate-400 font-bold text-xs uppercase rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors"
                         >Cancelar</button>
                         <button 
                           disabled={!isSomaValida || loading}
                           onClick={() => handleRegisterPayment()}
-                          className={`flex-[2] py-3 text-white font-black text-xs uppercase rounded-xl shadow-lg transition-all flex items-center justify-center ${isSomaValida ? 'bg-emerald-600 shadow-emerald-500/20 hover:bg-emerald-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}`}
+                          className={`w-full md:flex-[2] py-3 text-white font-black text-xs uppercase rounded-xl shadow-lg transition-all flex items-center justify-center ${isSomaValida ? 'bg-emerald-600 shadow-emerald-500/20 hover:bg-emerald-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}`}
                         >
                            {loading ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : <i className="fa-solid fa-check-circle mr-2"></i>}
                            {!isSomaValida ? 'Valor Incorreto' : (isRetroactiveMode ? 'Confirmar Retroativo' : 'Confirmar Pagamento')}
@@ -727,8 +727,8 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
             </div>
           </div>
 
-          <div className="lg:col-span-7 space-y-10">
-            <div className="flex items-center space-x-4">
+          <div className="lg:col-span-7 space-y-6 md:space-y-10 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 md:gap-4">
               <span className="bg-[#8E44AD]/10 text-[#8E44AD] px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase shadow-sm">
                 {concludedCount} de {totalCount} Concluídos
               </span>
@@ -745,7 +745,7 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
               {concludedCount === totalCount && (pack.status === 'ATIVO' || pack.status === 'Em Execução' || !pack.status) && (
                 <button 
                   onClick={handleRenovacaoManual}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase shadow-xl animate-bounce flex items-center space-x-2"
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 md:px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase shadow-xl animate-bounce flex items-center space-x-2"
                 >
                   <i className="fa-solid fa-arrows-rotate"></i>
                   <span>Finalizar e Renovar</span>
@@ -759,37 +759,37 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
                  Cronograma de Sessões
                </h4>
                {sessions.map((s, idx) => (
-                 <div key={s.id} className="bg-white p-6 rounded-[1.5rem] border border-slate-100 shadow-sm flex items-center group">
-                    <div className="w-20 text-center border-r border-slate-50 mr-8">
+                 <div key={s.id} className="bg-white p-4 md:p-6 rounded-[1.5rem] border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center gap-4 md:gap-0 group overflow-hidden">
+                    <div className="w-full md:w-20 text-left md:text-center border-b md:border-b-0 md:border-r border-slate-50 pb-3 md:pb-0 md:mr-8">
                        <p className="text-2xl font-black text-slate-800">{idx + 1}</p>
                     </div>
-                    <div className="flex-1 flex items-center justify-between">
-                       <div className="space-y-1">
+                    <div className="w-full min-w-0 flex-1 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                       <div className="space-y-2 min-w-0">
                           <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase ${s.status === 'Finalizado' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
                              {s.status}
                           </span>
-                          <div className="flex items-center space-x-3">
+                          <div className="flex items-center w-full">
                              <input 
                                type="date" 
                                value={s.data_agendamento} 
                                onChange={(e) => handleUpdateSessionDate(s.id, e.target.value)} 
-                               className="bg-transparent text-sm font-bold text-slate-700 outline-none border-b border-transparent hover:border-slate-200 transition-all"
+                               className="w-full md:w-auto bg-transparent text-sm font-bold text-slate-700 outline-none border-b border-transparent hover:border-slate-200 transition-all"
                              />
                           </div>
                        </div>
                        
-                       <div className="flex items-center space-x-6">
+                       <div className="w-full md:w-auto flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
                           {s.status === 'Agendado' && (
                             <button 
                               onClick={() => handleSendReminder(s, idx)}
-                              className="flex items-center space-x-2 px-3 py-2 border border-emerald-100 rounded-xl text-emerald-500 hover:bg-emerald-50 transition-all group/btn"
+                              className="w-full md:w-auto flex items-center justify-center space-x-2 px-3 py-3 md:py-2 border border-emerald-100 rounded-xl text-emerald-500 hover:bg-emerald-50 transition-all group/btn"
                               title="Enviar lembrete via WhatsApp"
                             >
                                <i className="fa-brands fa-whatsapp text-lg"></i>
                                <span className="text-[10px] font-black uppercase tracking-widest">Lembrar</span>
                             </button>
                           )}
-                          <div className="text-right">
+                          <div className="text-left md:text-right">
                              <p className="text-[10px] font-black text-slate-300 uppercase">Horário Previsto</p>
                              <p className="font-bold text-slate-600">{String(s.horario_inicio || '').substring(0, 5)}</p>
                           </div>
@@ -801,17 +801,17 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
           </div>
         </div>
 
-        <footer className="p-4 md:p-10 bg-white border-t border-slate-100 flex flex-row justify-between items-center shrink-0 gap-2">
-           <div className="flex gap-2">
-            <button onClick={triggerCancelPack} className="px-4 py-3 md:px-10 md:py-4 bg-white text-rose-500 rounded-2xl font-black text-[10px] md:text-xs uppercase border-2 border-rose-100 hover:bg-rose-50 transition-all flex items-center justify-center">
+        <footer className="p-4 md:p-10 bg-white border-t border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center shrink-0 gap-3 md:gap-2">
+           <div className="w-full md:w-auto grid grid-cols-1 md:flex gap-2">
+            <button onClick={triggerCancelPack} className="w-full md:w-auto px-4 py-3 md:px-10 md:py-4 bg-white text-rose-500 rounded-2xl font-black text-[10px] md:text-xs uppercase border-2 border-rose-100 hover:bg-rose-50 transition-all flex items-center justify-center">
                 <i className="fa-solid fa-ban mr-2 md:mr-3"></i> CANCELAR
             </button>
-            <button onClick={() => onEdit(pack)} className="px-4 py-3 md:px-10 md:py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] md:text-xs uppercase border-2 border-slate-200 hover:bg-slate-200 transition-all flex items-center justify-center">
+            <button onClick={() => onEdit(pack)} className="w-full md:w-auto px-4 py-3 md:px-10 md:py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] md:text-xs uppercase border-2 border-slate-200 hover:bg-slate-200 transition-all flex items-center justify-center">
                 <i className="fa-solid fa-pencil mr-2 md:mr-3"></i> EDITAR PACOTE
             </button>
            </div>
 
-           <div className="flex items-center space-x-4 bg-slate-50 px-6 py-3 rounded-2xl border border-slate-100">
+           <div className="w-full md:w-auto flex items-center justify-between md:justify-start md:space-x-4 bg-slate-50 px-4 md:px-6 py-3 rounded-2xl border border-slate-100">
               <div className="flex flex-col">
                 <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Renovação Automática</span>
                 <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">Gera novo pacote ao finalizar</span>
