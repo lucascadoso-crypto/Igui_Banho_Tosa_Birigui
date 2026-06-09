@@ -303,7 +303,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 md:p-4 overflow-y-auto overflow-x-hidden">
       
       {/* Toast Local para Feedback */}
       {localToast && (
@@ -313,41 +313,41 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
         </div>
       )}
 
-      <div className="bg-gray-50 w-[95%] mx-auto md:max-w-6xl md:w-full rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+      <div className="bg-gray-50 w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] mx-auto md:max-w-6xl md:w-full rounded-[2rem] md:rounded-[3rem] shadow-2xl overflow-y-auto overflow-x-hidden md:overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100vh-24px)] md:max-h-[90vh]">
         
         {/* Top Header / Tabs */}
-        <header className="bg-white px-6 md:px-10 pt-6 md:pt-10 border-b border-slate-100 shrink-0">
-          <div className="flex justify-between items-start mb-6 md:mb-8">
-            <div>
-              <h2 className="text-xl md:text-3xl font-black text-slate-800 tracking-tight">Prontuário do Cliente</h2>
-              <p className="text-slate-400 text-[10px] md:text-sm font-bold uppercase tracking-widest mt-1">Gestão Centralizada de Cadastro</p>
+        <header className="bg-white px-4 md:px-10 pt-4 md:pt-10 border-b border-slate-100 shrink-0">
+          <div className="flex justify-between items-start gap-3 mb-4 md:mb-8">
+            <div className="min-w-0 pr-1">
+              <h2 className="text-[clamp(18px,5.5vw,22px)] md:text-3xl font-black text-slate-800 tracking-tight leading-tight break-words">Prontuário do Cliente</h2>
+              <p className="text-slate-400 text-[9px] md:text-sm font-bold uppercase tracking-widest mt-1 leading-tight">Gestão Centralizada de Cadastro</p>
             </div>
             <button 
               onClick={onClose} 
-              className="relative z-50 p-2 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center hover:bg-slate-100 rounded-2xl transition-colors text-xl md:text-2xl text-slate-400 cursor-pointer"
+              className="relative z-50 p-2 w-9 h-9 md:w-12 md:h-12 flex items-center justify-center hover:bg-slate-100 rounded-2xl transition-colors text-xl md:text-2xl text-slate-400 cursor-pointer shrink-0"
             >
               <i className="fa-solid fa-xmark pointer-events-none"></i>
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-4 md:gap-8 border-b border-slate-100">
+          <div className="flex gap-3 md:gap-8 border-b border-slate-100 overflow-x-auto overflow-y-hidden custom-scrollbar -mx-1 px-1">
             <button 
               onClick={() => setActiveTab('details')}
-              className={`pb-4 text-[10px] md:text-sm font-black uppercase tracking-widest transition-all relative whitespace-nowrap ${activeTab === 'details' ? 'text-[#00BFA5]' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`pb-3 md:pb-4 text-[9px] md:text-sm font-black uppercase tracking-widest transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'details' ? 'text-[#00BFA5]' : 'text-slate-400 hover:text-slate-600'}`}
             >
               Detalhes
               {activeTab === 'details' && <div className="absolute bottom-0 left-0 w-full h-1 bg-[#00BFA5] rounded-t-full"></div>}
             </button>
             <button 
               onClick={() => setActiveTab('payments')}
-              className={`pb-4 text-[10px] md:text-sm font-black uppercase tracking-widest transition-all relative whitespace-nowrap ${activeTab === 'payments' ? 'text-[#00BFA5]' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`pb-3 md:pb-4 text-[9px] md:text-sm font-black uppercase tracking-widest transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'payments' ? 'text-[#00BFA5]' : 'text-slate-400 hover:text-slate-600'}`}
             >
               Pagamentos
               {activeTab === 'payments' && <div className="absolute bottom-0 left-0 w-full h-1 bg-[#00BFA5] rounded-t-full"></div>}
             </button>
             <button 
               onClick={() => setActiveTab('history')}
-              className={`pb-4 text-[10px] md:text-sm font-black uppercase tracking-widest transition-all relative whitespace-nowrap ${activeTab === 'history' ? 'text-[#00BFA5]' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`pb-3 md:pb-4 text-[9px] md:text-sm font-black uppercase tracking-widest transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'history' ? 'text-[#00BFA5]' : 'text-slate-400 hover:text-slate-600'}`}
             >
               Histórico
               {activeTab === 'history' && <div className="absolute bottom-0 left-0 w-full h-1 bg-[#00BFA5] rounded-t-full"></div>}
@@ -356,59 +356,59 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
         </header>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-10 custom-scrollbar">
           
           {activeTab === 'details' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
               
               {/* Coluna Esquerda: Info Pessoal */}
-              <div className="lg:col-span-5 space-y-8">
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center text-center relative group/client">
+              <div className="lg:col-span-5 space-y-6 md:space-y-8 min-w-0">
+                <div className="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center text-center relative group/client overflow-hidden">
                   <button 
                     onClick={() => setIsEditClientModalOpen(true)}
-                    className="absolute top-6 right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-[#00BFA5] hover:text-white transition-all opacity-0 group-hover/client:opacity-100 shadow-sm"
+                    className="absolute top-4 right-4 md:top-6 md:right-6 w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-[#00BFA5] hover:text-white transition-all opacity-100 md:opacity-0 md:group-hover/client:opacity-100 shadow-sm"
                     title="Editar Cliente"
                   >
                     <i className="fa-solid fa-pen-to-square"></i>
                   </button>
 
-                  <div className="w-32 h-32 bg-slate-100 rounded-full border-4 border-slate-50 flex items-center justify-center text-slate-300 mb-6 overflow-hidden">
+                  <div className="w-24 h-24 md:w-32 md:h-32 bg-slate-100 rounded-full border-4 border-slate-50 flex items-center justify-center text-slate-300 mb-5 md:mb-6 overflow-hidden">
                     <img 
                       src={`https://ui-avatars.com/api/?name=${encodeURIComponent(currentClient.nome)}&background=00BFA5&color=fff&size=256`} 
                       className="w-full h-full object-cover" 
                       alt={currentClient.nome}
                     />
                   </div>
-                  <h3 className="text-2xl font-black text-slate-800">{currentClient.nome}</h3>
+                  <h3 className="text-xl md:text-2xl font-black text-slate-800 break-words max-w-full">{currentClient.nome}</h3>
                   <p className="text-slate-500 font-bold text-sm mt-1">{currentClient.nacionalidade || 'Brasil'}</p>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-4">
                     Cliente criado em {formatDate(currentClient.created_at)}
                   </p>
 
-                  <div className="w-full border-t border-slate-50 my-8"></div>
+                  <div className="w-full border-t border-slate-50 my-6 md:my-8"></div>
 
                   <div className="w-full space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                      <div className="flex items-center">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                      <div className="flex items-center min-w-0">
                         <i className="fa-brands fa-whatsapp text-emerald-500 text-xl mr-3"></i>
-                        <span className="font-bold text-slate-700">{currentClient.telefone}</span>
+                        <span className="font-bold text-slate-700 break-all">{currentClient.telefone}</span>
                       </div>
-                      <button className="text-[10px] font-black uppercase tracking-tighter text-emerald-600 bg-white px-3 py-1.5 rounded-lg shadow-sm border border-emerald-100 hover:bg-emerald-500 hover:text-white transition-all">
+                      <button className="w-full md:w-auto text-[10px] font-black uppercase tracking-tighter text-emerald-600 bg-white px-3 py-2 md:py-1.5 rounded-lg shadow-sm border border-emerald-100 hover:bg-emerald-500 hover:text-white transition-all">
                         WhatsApp Logs
                       </button>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6">
+                <div className="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6 overflow-hidden">
                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Endereço de Cobrança</h4>
                    {currentClient.logradouro ? (
-                     <div className="flex items-start space-x-4">
+                     <div className="flex items-start gap-4">
                         <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-[#00BFA5] shrink-0">
                           <i className="fa-solid fa-map-location-dot"></i>
                         </div>
-                        <div className="text-sm font-medium text-slate-600">
-                          <p className="font-bold text-slate-800">{currentClient.logradouro}, {currentClient.numero}</p>
+                        <div className="text-sm font-medium text-slate-600 min-w-0">
+                          <p className="font-bold text-slate-800 break-words">{currentClient.logradouro}, {currentClient.numero}</p>
                           <p>{currentClient.bairro} - {currentClient.cidade}/{currentClient.estado}</p>
                           <p className="text-xs text-slate-400 mt-1">CEP: {currentClient.cep}</p>
                         </div>
@@ -420,10 +420,10 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
               </div>
 
               {/* Coluna Direita: Pets & Dependentes */}
-              <div className="lg:col-span-7 space-y-8">
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-                  <div className="flex justify-between items-center mb-8">
-                    <h4 className="text-lg font-black text-slate-800 flex items-center">
+              <div className="lg:col-span-7 space-y-6 md:space-y-8 min-w-0">
+                <div className="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-6 md:mb-8">
+                    <h4 className="text-base md:text-lg font-black text-slate-800 flex items-center">
                        <i className="fa-solid fa-paw mr-3 text-[#00BFA5]"></i>
                        Dependentes & Pets
                     </h4>
@@ -444,7 +444,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                           onClick={() => handleOpenEditPet(pet)}
                           className="group p-4 bg-slate-50 rounded-3xl border border-transparent hover:border-[#00BFA5]/20 hover:bg-white hover:shadow-xl hover:shadow-[#00BFA5]/5 transition-all cursor-pointer"
                         >
-                          <div className="flex items-center space-x-4">
+                          <div className="flex items-center gap-4">
                             <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-slate-300 shadow-sm border border-slate-100 overflow-hidden shrink-0">
                                {pet.foto_url ? (
                                  <img src={pet.foto_url} className="w-full h-full object-cover" />
@@ -461,7 +461,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                                 e.stopPropagation();
                                 setPetToDelete(pet);
                               }}
-                              className="w-10 h-10 flex items-center justify-center bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all shrink-0 opacity-0 group-hover:opacity-100"
+                              className="w-10 h-10 flex items-center justify-center bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100"
                               title="Excluir Pet"
                             >
                               <i className="fa-solid fa-trash-can"></i>
@@ -485,14 +485,14 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
 
                   <button 
                     onClick={() => setIsNewPetModalOpen(true)}
-                    className="w-full mt-8 py-5 rounded-[1.5rem] border-2 border-dashed border-[#00BFA5]/30 text-[#00BFA5] font-black uppercase tracking-widest text-xs hover:bg-[#00BFA5]/5 transition-all flex items-center justify-center group"
+                    className="w-full mt-6 md:mt-8 py-4 md:py-5 rounded-[1.5rem] border-2 border-dashed border-[#00BFA5]/30 text-[#00BFA5] font-black uppercase tracking-widest text-xs hover:bg-[#00BFA5]/5 transition-all flex items-center justify-center group"
                   >
                     <i className="fa-solid fa-plus-circle mr-3 group-hover:rotate-90 transition-transform"></i>
                     + NOVO PET
                   </button>
                 </div>
 
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+                <div className="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
                   <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Notas Internas & Restrições</h4>
                   <div className="p-5 bg-rose-50 rounded-2xl border border-rose-100">
                     <p className="text-sm font-bold text-rose-700">
@@ -513,8 +513,8 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                     <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-4">Carregando Pagamentos...</p>
                  </div>
                ) : payments.length > 0 ? (
-                 <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm">
-                    <table className="w-full text-left border-collapse">
+                 <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 overflow-x-auto overflow-y-hidden shadow-sm">
+                    <table className="w-full min-w-[640px] text-left border-collapse">
                        <thead>
                           <tr className="bg-slate-50/50">
                              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</th>
@@ -549,9 +549,9 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                     </table>
                  </div>
                ) : (
-                 <div className="flex flex-col items-center justify-center py-24 text-center">
-                    <div className="w-64 h-64 bg-slate-100 rounded-full flex items-center justify-center mb-8 border-8 border-white shadow-xl">
-                       <i className="fa-solid fa-dog text-8xl text-slate-200 animate-bounce duration-[3000ms]"></i>
+                 <div className="flex flex-col items-center justify-center py-16 md:py-24 text-center">
+                    <div className="w-40 h-40 md:w-64 md:h-64 bg-slate-100 rounded-full flex items-center justify-center mb-8 border-8 border-white shadow-xl">
+                       <i className="fa-solid fa-dog text-5xl md:text-8xl text-slate-200 animate-bounce duration-[3000ms]"></i>
                     </div>
                     <h3 className="text-2xl font-black text-slate-800">Tudo em dia por aqui!</h3>
                     <p className="text-slate-400 font-medium max-w-xs mx-auto mt-2">
@@ -572,14 +572,14 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                ) : history.length > 0 ? (
                  <div className="space-y-6">
                     {history.map((item) => (
-                       <div key={item.uniqueId} className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-all group">
+                       <div key={item.uniqueId} className="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-all group overflow-hidden">
                           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                             <div className="flex items-center space-x-5">
+                             <div className="flex items-center gap-4 md:gap-5 min-w-0">
                                 <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-[#00BFA5] text-xl shadow-inner border border-slate-100 group-hover:bg-[#00BFA5] group-hover:text-white transition-all">
                                    <i className="fa-solid fa-calendar-check"></i>
                                 </div>
-                                <div>
-                                   <div className="flex items-center space-x-3">
+                                <div className="min-w-0">
+                                   <div className="flex flex-wrap items-center gap-2 md:gap-3">
                                       <span className="text-sm font-black text-slate-800">{formatDate(item.data_agendamento)}</span>
                                       <span className="px-2 py-0.5 bg-[#00BFA5]/10 text-[#00BFA5] text-[9px] font-black uppercase tracking-widest rounded-md">
                                          {item.pets?.nome}
@@ -591,7 +591,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                                 </div>
                              </div>
                              
-                             <div className="flex flex-wrap gap-2">
+                             <div className="flex flex-wrap gap-2 min-w-0">
                                 {item.agendamento_itens?.map((it: any, idx: number) => (
                                    <span key={idx} className="px-3 py-1.5 bg-slate-50 text-slate-500 text-[9px] font-black uppercase tracking-widest rounded-xl border border-slate-100">
                                       {it.servicos?.nome}
@@ -603,9 +603,9 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                     ))}
                  </div>
                ) : (
-                 <div className="flex flex-col items-center justify-center py-24 text-center">
-                    <div className="w-64 h-64 bg-slate-100 rounded-full flex items-center justify-center mb-8 border-8 border-white shadow-xl">
-                       <i className="fa-solid fa-cat text-8xl text-slate-200"></i>
+                 <div className="flex flex-col items-center justify-center py-16 md:py-24 text-center">
+                    <div className="w-40 h-40 md:w-64 md:h-64 bg-slate-100 rounded-full flex items-center justify-center mb-8 border-8 border-white shadow-xl">
+                       <i className="fa-solid fa-cat text-5xl md:text-8xl text-slate-200"></i>
                     </div>
                     <h3 className="text-2xl font-black text-slate-800">Histórico Limpo</h3>
                     <p className="text-slate-400 font-medium max-w-xs mx-auto mt-2">
@@ -620,22 +620,22 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
 
       {/* NOVO MODAL: ADICIONAR/EDITAR PET (INTERNO) */}
       {isNewPetModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col">
-            <header className="bg-[#00BFA5] p-8 text-white flex justify-between items-center shrink-0">
-               <div>
-                  <h3 className="text-xl font-black uppercase tracking-tighter">{petSelecionado ? 'Detalhes do Pet' : 'Adicionar Novo Pet'}</h3>
-                  <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Tutor: {currentClient.nome}</p>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 md:p-4 overflow-y-auto overflow-x-hidden animate-in fade-in duration-200">
+          <div className="bg-white w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] md:max-w-lg rounded-[2rem] md:rounded-[2.5rem] shadow-2xl overflow-y-auto overflow-x-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100vh-24px)]">
+            <header className="bg-[#00BFA5] p-5 md:p-8 text-white flex justify-between items-center gap-3 shrink-0">
+               <div className="min-w-0">
+                  <h3 className="text-lg md:text-xl font-black uppercase tracking-tighter break-words leading-tight">{petSelecionado ? 'Detalhes do Pet' : 'Adicionar Novo Pet'}</h3>
+                  <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest break-words">Tutor: {currentClient.nome}</p>
                </div>
                <button 
                  onClick={() => { setIsNewPetModalOpen(false); setPetSelecionado(null); }} 
-                 className="relative z-50 p-2 w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-full text-2xl cursor-pointer"
+                 className="relative z-50 p-2 w-9 h-9 md:w-10 md:h-10 flex items-center justify-center hover:bg-white/10 rounded-full text-xl md:text-2xl cursor-pointer shrink-0"
                >
                  <i className="fa-solid fa-xmark pointer-events-none"></i>
                </button>
             </header>
 
-            <form onSubmit={handleSavePet} className="p-8 space-y-5">
+            <form onSubmit={handleSavePet} className="p-5 md:p-8 space-y-4 md:space-y-5">
                <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome do Pet *</label>
                   <input 
@@ -659,7 +659,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                   />
                </div>
 
-               <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Sexo</label>
                      <select 
@@ -707,16 +707,16 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                   />
                </div>
 
-               <div className="pt-4 flex gap-3">
+               <div className="pt-4 flex flex-col-reverse md:flex-row gap-3">
                   <button 
                     type="button" 
                     onClick={() => { setIsNewPetModalOpen(false); setPetSelecionado(null); }}
-                    className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all"
+                    className="w-full md:flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all"
                   >Cancelar</button>
                   <button 
                     type="submit" 
                     disabled={savingPet}
-                    className="flex-[2] py-4 bg-[#00BFA5] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[#00BFA5]/20 hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
+                    className="w-full md:flex-[2] py-4 bg-[#00BFA5] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[#00BFA5]/20 hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
                   >
                     {savingPet ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'SALVAR'}
                   </button>
