@@ -618,8 +618,8 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
       
       {/* MODAL DE CONFIRMAÇÃO UI - CANCELAMENTO PACOTE */}
       {pacoteParaCancelar && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-           <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-10 text-center animate-in zoom-in duration-300 border border-slate-100">
+        <div className="app-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className="app-modal-panel bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-10 text-center animate-in zoom-in duration-300 border border-slate-100">
               <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-6">
                  <i className="fa-solid fa-triangle-exclamation"></i>
               </div>
@@ -831,9 +831,9 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
 
       {/* Modal de Criação */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white w-[95%] mx-auto md:max-w-5xl md:w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
-            <header className="bg-[#00897B] p-6 md:p-8 text-white flex justify-between items-center relative overflow-hidden shrink-0">
+        <div className="app-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="app-modal-panel bg-white w-[95%] mx-auto md:max-w-5xl md:w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+            <header className="app-modal-header bg-[#00897B] p-6 md:p-8 text-white flex justify-between items-center relative overflow-hidden shrink-0">
                <div className="relative z-10">
                   <h3 className="text-xl md:text-2xl font-black">Novo Pacote de Fidelidade</h3>
                   <p className="text-teal-100 text-[10px] md:text-sm font-medium mt-1">Defina a recorrência e gere o cronograma.</p>
@@ -841,7 +841,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
                <button onClick={() => setIsModalOpen(false)} className="relative z-10 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center hover:bg-white/10 rounded-full text-xl md:text-2xl"><i className="fa-solid fa-xmark"></i></button>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 md:space-y-10 custom-scrollbar">
+            <div className="app-modal-body flex-1 overflow-y-auto p-6 md:p-10 space-y-8 md:space-y-10 custom-scrollbar">
                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-4">
                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Tutor e Pet *</label>
@@ -980,7 +980,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
                </div>
             </div>
 
-            <footer className="p-4 md:p-8 bg-slate-50 border-t border-slate-100 flex flex-row justify-end gap-2 md:gap-4">
+            <footer className="app-modal-footer p-4 md:p-8 bg-slate-50 border-t border-slate-100 flex flex-row justify-end gap-2 md:gap-4">
                <button onClick={() => setIsModalOpen(false)} className="flex-1 md:flex-none px-4 py-3 md:px-8 md:py-4 bg-white text-slate-500 rounded-2xl font-black border border-slate-200 hover:bg-slate-100 text-[10px] md:text-xs uppercase tracking-widest">Cancelar</button>
                <button onClick={handleSavePackage} disabled={loading} className="flex-[2] md:flex-none px-4 py-3 md:px-12 md:py-4 bg-[#00897B] text-white rounded-2xl font-black shadow-xl shadow-teal-500/20 active:scale-95 transition-all text-[10px] md:text-xs uppercase tracking-widest flex items-center justify-center">
                  {loading ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : <i className="fa-solid fa-check-circle mr-2"></i>} 

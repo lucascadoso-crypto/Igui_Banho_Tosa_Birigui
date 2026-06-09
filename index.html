@@ -18,6 +18,52 @@
         /* Esconder scrollbar mantendo o scroll funcional */
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @media (max-width: 767px) {
+            .app-modal-overlay {
+                align-items: flex-start !important;
+                justify-content: center !important;
+                padding: 12px 10px max(12px, env(safe-area-inset-bottom)) !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                box-sizing: border-box !important;
+            }
+
+            .app-modal-panel {
+                width: calc(100vw - 20px) !important;
+                max-width: calc(100vw - 20px) !important;
+                height: auto !important;
+                max-height: calc(100vh - 24px) !important;
+                max-height: calc(100dvh - 24px) !important;
+                margin: 0 auto !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                box-sizing: border-box !important;
+                transform: none !important;
+            }
+
+            .app-modal-header {
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 30 !important;
+                box-sizing: border-box !important;
+            }
+
+            .app-modal-body {
+                min-height: 0 !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                box-sizing: border-box !important;
+            }
+
+            .app-modal-footer {
+                position: sticky !important;
+                bottom: 0 !important;
+                z-index: 30 !important;
+                padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+                box-sizing: border-box !important;
+            }
+        }
     </style>
 <script type="importmap">
 {

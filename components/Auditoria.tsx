@@ -300,7 +300,7 @@ const Auditoria: React.FC<AuditoriaProps> = ({ unit, supabaseClient, userProfile
       {/* Modal de Detalhe do Erro */}
       <AnimatePresence>
         {selectedError && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="app-modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -312,9 +312,9 @@ const Auditoria: React.FC<AuditoriaProps> = ({ unit, supabaseClient, userProfile
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden"
+              className="app-modal-panel relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden"
             >
-              <div className="bg-rose-500 p-6 text-white flex items-center space-x-4">
+              <div className="app-modal-header bg-rose-500 p-6 text-white flex items-center space-x-4">
                 <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
                   <i className="fa-solid fa-circle-exclamation text-2xl"></i>
                 </div>
@@ -323,7 +323,7 @@ const Auditoria: React.FC<AuditoriaProps> = ({ unit, supabaseClient, userProfile
                   <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Detalhes técnicos do erro</p>
                 </div>
               </div>
-              <div className="p-8">
+              <div className="app-modal-body p-8">
                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mb-6">
                   <p className="text-slate-700 font-bold text-sm leading-relaxed">
                     {formatarErroWhatsApp(selectedError)}

@@ -357,9 +357,9 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
       
       {/* Modal de Ajuste Financeiro (Restrito ao Mestre) */}
       {editingTransaction && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-200">
-            <div className="bg-indigo-600 p-8 text-white">
+        <div className="app-modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="app-modal-panel bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-200">
+            <div className="app-modal-header bg-indigo-600 p-8 text-white">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
                   <i className="fa-solid fa-shield-halved text-xl"></i>
@@ -372,7 +372,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
               <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mt-1">Apenas nível Mestre</p>
             </div>
 
-            <div className="p-10 space-y-6">
+            <div className="app-modal-body p-10 space-y-6">
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 opacity-60">
                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Registro Original</p>
                  <p className="text-xs font-bold text-slate-700">{editingTransaction.descricao}</p>

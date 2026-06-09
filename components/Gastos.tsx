@@ -84,8 +84,8 @@ const Gastos: React.FC<GastosProps> = ({ unit, supabaseClient, userProfile }) =>
       
       {/* OVERLAY DE CONFIRMAÇÃO UI PARA EXCLUSÃO */}
       {confirmacao.visivel && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in duration-300">
+        <div className="app-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="app-modal-panel bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in duration-300">
              <div className="flex flex-col items-center text-center space-y-4">
                 <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl bg-rose-50 text-rose-500">
                    <i className="fa-solid fa-triangle-exclamation"></i>

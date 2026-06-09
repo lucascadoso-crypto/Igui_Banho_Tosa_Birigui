@@ -469,11 +469,11 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white w-[95%] mx-auto md:max-w-4xl md:w-full rounded-[1.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+    <div className="app-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="app-modal-panel bg-white w-[95%] mx-auto md:max-w-4xl md:w-full rounded-[1.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
         
         {/* Header Laranja */}
-        <header className="bg-orange-500 p-4 md:p-6 text-white shrink-0 relative">
+        <header className="app-modal-header bg-orange-500 p-4 md:p-6 text-white shrink-0 relative">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest opacity-80 mb-1">Banho e tosa &rarr; Detalhes</p>
@@ -493,7 +493,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
         </div>
 
         {/* Corpo do Modal */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 custom-scrollbar bg-slate-50/30">
+        <div className="app-modal-body flex-1 overflow-y-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 custom-scrollbar bg-slate-50/30">
           
           {/* Coluna Esquerda: Serviços e Financeiro */}
           <div className="lg:col-span-2 space-y-8">
@@ -900,7 +900,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
           </div>
         </div>
 
-        <footer className="p-4 md:p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center shrink-0 gap-2">
+        <footer className="app-modal-footer p-4 md:p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center shrink-0 gap-2">
           <div className="flex gap-2 flex-1 md:flex-none">
             {!isReadOnly && (
               <button 

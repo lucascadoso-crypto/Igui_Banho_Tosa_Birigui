@@ -844,7 +844,7 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
       {/* Modal de Detalhe do Erro (Compartilhado) */}
       <AnimatePresence>
         {selectedError && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="app-modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -856,9 +856,9 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden"
+              className="app-modal-panel relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden"
             >
-              <div className="bg-rose-500 p-6 text-white flex items-center space-x-4">
+              <div className="app-modal-header bg-rose-500 p-6 text-white flex items-center space-x-4">
                 <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
                   <i className="fa-solid fa-circle-exclamation text-2xl"></i>
                 </div>
@@ -867,7 +867,7 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
                   <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Detalhes técnicos do erro</p>
                 </div>
               </div>
-              <div className="p-8">
+              <div className="app-modal-body p-8">
                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mb-6">
                   <p className="text-slate-700 font-bold text-sm leading-relaxed">
                     {formatarErroWhatsApp(selectedError)}
@@ -887,16 +887,16 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
 
       {/* Modal Nova Unidade */}
       {isNewUnitModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-            <header className="bg-indigo-600 p-6 text-white flex justify-between items-center">
+        <div className="app-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="app-modal-panel bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+            <header className="app-modal-header bg-indigo-600 p-6 text-white flex justify-between items-center">
               <h3 className="text-xl font-bold flex items-center">
                 <i className="fa-solid fa-plus-circle mr-3"></i>
                 Expandir Rede: Nova Unidade
               </h3>
               <button onClick={() => setIsNewUnitModalOpen(false)} className="p-2 hover:bg-white/10 rounded-lg transition-colors"><i className="fa-solid fa-xmark"></i></button>
             </header>
-            <form onSubmit={createNewUnit} className="p-8 space-y-6">
+            <form onSubmit={createNewUnit} className="app-modal-body p-8 space-y-6">
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Nome da Unidade *</label>
                 <input 
@@ -999,16 +999,16 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
 
       {/* Modal Edição Unidade */}
       {editingUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-            <div className="p-6 bg-indigo-600 text-white flex justify-between items-center">
+        <div className="app-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="app-modal-panel bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+            <div className="app-modal-header p-6 bg-indigo-600 text-white flex justify-between items-center">
               <h3 className="text-xl font-bold flex items-center">
                 <i className="fa-solid fa-store mr-3"></i>
                 Editar {editingUnit.name}
               </h3>
               <button onClick={() => setEditingUnit(null)} className="p-2 hover:bg-white/10 rounded-lg transition-colors"><i className="fa-solid fa-xmark"></i></button>
             </div>
-            <form onSubmit={saveUnit} className="p-8 space-y-6">
+            <form onSubmit={saveUnit} className="app-modal-body p-8 space-y-6">
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Nome Fantasia</label>
                 <input 

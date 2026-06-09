@@ -265,10 +265,10 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
   const headerColor = modo === 'completo' ? 'bg-[#00BFA5]' : 'bg-indigo-600';
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className={`bg-white w-[95%] mx-auto ${modo === 'completo' ? 'md:max-w-5xl' : 'md:max-w-md'} md:w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]`}>
+    <div className="app-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className={`app-modal-panel bg-white w-[95%] mx-auto ${modo === 'completo' ? 'md:max-w-5xl' : 'md:max-w-md'} md:w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]`}>
         
-        <header className={`${headerColor} p-4 md:p-8 text-white flex justify-between items-center shrink-0`}>
+        <header className={`app-modal-header ${headerColor} p-4 md:p-8 text-white flex justify-between items-center shrink-0`}>
           <div>
             <h3 className="text-xl md:text-2xl font-black uppercase tracking-tighter">
               {modo === 'completo' ? (formData.id ? 'Editar Cadastro' : 'Novo Cliente') : 'Cadastro Expresso'}
@@ -301,7 +301,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
           </nav>
         )}
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-10 space-y-6 md:space-y-8 custom-scrollbar">
+        <form onSubmit={handleSubmit} className="app-modal-body flex-1 overflow-y-auto p-4 md:p-10 space-y-6 md:space-y-8 custom-scrollbar">
           
           {modo === 'completo' ? (
             <div className="animate-in fade-in duration-300">
@@ -476,7 +476,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
           )}
         </form>
 
-        <footer className="p-4 md:p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 md:gap-4 shrink-0">
+        <footer className="app-modal-footer p-4 md:p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 md:gap-4 shrink-0">
           <button onClick={onClose} className="flex-1 md:flex-none px-4 py-3 md:px-8 md:py-4 bg-white text-slate-500 rounded-2xl font-black border border-slate-200 hover:bg-slate-100 transition-colors text-[10px] md:text-xs uppercase tracking-widest">Cancelar</button>
           <button 
             onClick={handleSubmit} 

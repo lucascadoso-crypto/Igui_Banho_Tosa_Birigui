@@ -296,9 +296,9 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
       </div>
 
       {isModalOpen && editingEmployee && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white w-[95%] mx-auto md:max-w-lg md:w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
-             <header className="bg-slate-900 p-6 md:p-8 text-white flex justify-between items-center shrink-0">
+        <div className="app-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="app-modal-panel bg-white w-[95%] mx-auto md:max-w-lg md:w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+             <header className="app-modal-header bg-slate-900 p-6 md:p-8 text-white flex justify-between items-center shrink-0">
                 <div>
                    <h3 className="text-lg md:text-xl font-black uppercase tracking-tighter">
                      {editingEmployee.id ? 'Alterar Acesso' : 'Novo Colaborador'}
@@ -308,7 +308,7 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
                 <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center hover:bg-white/10 rounded-full text-xl md:text-2xl"><i className="fa-solid fa-xmark"></i></button>
              </header>
 
-             <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 md:p-10 space-y-6 custom-scrollbar">
+             <form onSubmit={handleSave} className="app-modal-body flex-1 overflow-y-auto p-6 md:p-10 space-y-6 custom-scrollbar">
                 <div className="space-y-4">
                    <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>

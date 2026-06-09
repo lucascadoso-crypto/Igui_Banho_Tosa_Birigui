@@ -303,7 +303,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 md:p-4 overflow-y-auto overflow-x-hidden">
+    <div className="app-modal-overlay fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 md:p-4 overflow-y-auto overflow-x-hidden">
       
       {/* Toast Local para Feedback */}
       {localToast && (
@@ -313,10 +313,10 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
         </div>
       )}
 
-      <div className="bg-gray-50 w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] mx-auto md:max-w-6xl md:w-full rounded-[2rem] md:rounded-[3rem] shadow-2xl overflow-y-auto overflow-x-hidden md:overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100vh-24px)] md:max-h-[90vh]">
+      <div className="app-modal-panel bg-gray-50 w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] mx-auto md:max-w-6xl md:w-full rounded-[2rem] md:rounded-[3rem] shadow-2xl overflow-y-auto overflow-x-hidden md:overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100vh-24px)] md:max-h-[90vh]">
         
         {/* Top Header / Tabs */}
-        <header className="bg-white px-4 md:px-10 pt-4 md:pt-10 border-b border-slate-100 shrink-0">
+        <header className="app-modal-header bg-white px-4 md:px-10 pt-4 md:pt-10 border-b border-slate-100 shrink-0">
           <div className="flex justify-between items-start gap-3 mb-4 md:mb-8">
             <div className="min-w-0 pr-1">
               <h2 className="text-[clamp(18px,5.5vw,22px)] md:text-3xl font-black text-slate-800 tracking-tight leading-tight break-words">Prontuário do Cliente</h2>
@@ -356,7 +356,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
         </header>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-10 custom-scrollbar">
+        <div className="app-modal-body flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-10 custom-scrollbar">
           
           {activeTab === 'details' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -620,9 +620,9 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
 
       {/* NOVO MODAL: ADICIONAR/EDITAR PET (INTERNO) */}
       {isNewPetModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 md:p-4 overflow-y-auto overflow-x-hidden animate-in fade-in duration-200">
-          <div className="bg-white w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] md:max-w-lg rounded-[2rem] md:rounded-[2.5rem] shadow-2xl overflow-y-auto overflow-x-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100vh-24px)]">
-            <header className="bg-[#00BFA5] p-5 md:p-8 text-white flex justify-between items-center gap-3 shrink-0">
+        <div className="app-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 md:p-4 overflow-y-auto overflow-x-hidden animate-in fade-in duration-200">
+          <div className="app-modal-panel bg-white w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] md:max-w-lg rounded-[2rem] md:rounded-[2.5rem] shadow-2xl overflow-y-auto overflow-x-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100vh-24px)]">
+            <header className="app-modal-header bg-[#00BFA5] p-5 md:p-8 text-white flex justify-between items-center gap-3 shrink-0">
                <div className="min-w-0">
                   <h3 className="text-lg md:text-xl font-black uppercase tracking-tighter break-words leading-tight">{petSelecionado ? 'Detalhes do Pet' : 'Adicionar Novo Pet'}</h3>
                   <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest break-words">Tutor: {currentClient.nome}</p>
@@ -635,7 +635,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                </button>
             </header>
 
-            <form onSubmit={handleSavePet} className="p-5 md:p-8 space-y-4 md:space-y-5">
+            <form onSubmit={handleSavePet} className="app-modal-body p-5 md:p-8 space-y-4 md:space-y-5">
                <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome do Pet *</label>
                   <input 
@@ -728,8 +728,8 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
 
       {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
       {petToDelete && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-sm rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 p-8 text-center">
+        <div className="app-modal-overlay fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="app-modal-panel bg-white w-full max-sm rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 p-8 text-center">
             <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-6">
               <i className="fa-solid fa-triangle-exclamation"></i>
             </div>

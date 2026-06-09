@@ -895,8 +895,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       
       {/* OVERLAY DE CONFIRMAÇÃO */}
       {confirmacao.visivel && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in duration-300">
+        <div className="app-modal-overlay fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="app-modal-panel bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in duration-300">
              <div className="flex flex-col items-center text-center space-y-4">
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl ${confirmacao.acao === 'erro' ? 'bg-rose-50 text-rose-500' : 'bg-blue-50 text-blue-500'}`}>
                    <i className={`fa-solid ${confirmacao.acao === 'erro' ? 'fa-circle-xmark' : 'fa-circle-info'}`}></i>
@@ -1288,13 +1288,13 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
       {/* MODAL DE AGENDAMENTO (COM NOVO CADASTRO RÁPIDO) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white w-[95%] mx-auto max-w-md md:max-w-5xl md:w-full rounded-[2.5rem] shadow-2xl overflow-x-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
-            <header className="bg-[#F59E0B] p-6 md:p-8 text-white flex justify-between items-center shrink-0">
+        <div className="app-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="app-modal-panel bg-white w-[95%] mx-auto max-w-md md:max-w-5xl md:w-full rounded-[2.5rem] shadow-2xl overflow-x-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+            <header className="app-modal-header bg-[#F59E0B] p-6 md:p-8 text-white flex justify-between items-center shrink-0">
                <h3 className="text-xl md:text-2xl font-black">{isEditing ? 'Alterar Agendamento' : 'Novo Banho'}</h3>
                <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center hover:bg-white/10 rounded-full text-xl md:text-2xl"><i className="fa-solid fa-xmark"></i></button>
             </header>
-            <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 md:space-y-10 custom-scrollbar">
+            <div className="app-modal-body flex-1 overflow-y-auto p-6 md:p-10 space-y-8 md:space-y-10 custom-scrollbar">
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
                   <div className="space-y-6">
                      <div className="space-y-2 relative">
@@ -1442,7 +1442,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                   </div>
                </div>
             </div>
-            <footer className="p-4 md:p-8 bg-slate-50 border-t border-slate-100 flex flex-row justify-end gap-2 md:gap-4">
+            <footer className="app-modal-footer p-4 md:p-8 bg-slate-50 border-t border-slate-100 flex flex-row justify-end gap-2 md:gap-4">
                <button onClick={() => setIsModalOpen(false)} className="flex-1 md:flex-none px-4 py-3 md:px-8 md:py-4 bg-white text-slate-500 rounded-2xl font-black border border-slate-200 hover:bg-slate-100 text-[10px] md:text-xs uppercase tracking-widest">Cancelar</button>
                <button onClick={saveAppointment} disabled={loading || !selectedClient} className={`flex-[2] md:flex-none px-4 py-3 md:px-12 md:py-4 bg-[#F59E0B] text-white rounded-2xl font-black shadow-xl active:scale-95 transition-all text-[10px] md:text-xs uppercase tracking-widest flex items-center justify-center ${(!selectedClient || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}>
                  {loading ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : 'SALVAR'}

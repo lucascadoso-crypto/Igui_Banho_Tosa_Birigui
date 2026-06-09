@@ -113,9 +113,9 @@ const CadastroPet: React.FC<CadastroPetProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white w-[95%] mx-auto md:max-w-5xl md:w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
-        <header className="bg-[#00BFA5] p-4 md:p-8 text-white flex justify-between items-center relative overflow-hidden">
+    <div className="app-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="app-modal-panel bg-white w-[95%] mx-auto md:max-w-5xl md:w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+        <header className="app-modal-header bg-[#00BFA5] p-4 md:p-8 text-white flex justify-between items-center relative overflow-hidden">
           <div className="relative z-10">
             <h3 className="text-xl md:text-2xl font-black">Pet iG <i className="fa-solid fa-arrow-right mx-2 text-sm opacity-50"></i> Novo Prontuário</h3>
           </div>
@@ -127,7 +127,7 @@ const CadastroPet: React.FC<CadastroPetProps> = ({
           </button>
         </header>
 
-        <form className="flex-1 overflow-y-auto p-4 md:p-10 space-y-6 md:space-y-8 custom-scrollbar">
+        <form className="app-modal-body flex-1 overflow-y-auto p-4 md:p-10 space-y-6 md:space-y-8 custom-scrollbar">
           <div className="flex flex-col lg:flex-row gap-10">
             <div className="flex flex-col items-center space-y-4">
                <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
@@ -207,7 +207,7 @@ const CadastroPet: React.FC<CadastroPetProps> = ({
           </div>
         </form>
 
-        <footer className="p-4 md:p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 md:gap-4">
+        <footer className="app-modal-footer p-4 md:p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 md:gap-4">
            <button onClick={onClose} className="flex-1 md:flex-none px-4 py-3 md:px-8 md:py-4 bg-white text-slate-500 rounded-2xl font-black border border-slate-200 hover:bg-slate-100 transition-colors text-[10px] md:text-xs uppercase tracking-widest">Cancelar</button>
            <button onClick={() => handleSave(false)} disabled={loading || uploadingImage} className="flex-[2] md:flex-none px-4 py-3 md:px-10 md:py-4 bg-[#00BFA5] text-white rounded-2xl font-black shadow-xl transition-all disabled:opacity-50 text-[10px] md:text-xs uppercase tracking-widest flex items-center justify-center">
              {loading ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : <i className="fa-solid fa-floppy-disk mr-2"></i>} Salvar Pet

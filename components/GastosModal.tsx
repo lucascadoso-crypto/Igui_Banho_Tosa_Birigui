@@ -80,9 +80,9 @@ const GastosModal: React.FC<GastosModalProps> = ({ unitId, supabaseClient, userP
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white w-[95%] mx-auto md:max-w-2xl md:w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
-        <header className="bg-[#1E1E1E] p-6 md:p-8 text-white flex justify-between items-center relative overflow-hidden">
+    <div className="app-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="app-modal-panel bg-white w-[95%] mx-auto md:max-w-2xl md:w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+        <header className="app-modal-header bg-[#1E1E1E] p-6 md:p-8 text-white flex justify-between items-center relative overflow-hidden">
           <div className="relative z-10">
             <h3 className="text-xl md:text-2xl font-black uppercase tracking-tighter">Lançamento de Despesa</h3>
             <p className="text-slate-400 text-[10px] md:text-sm font-medium mt-1">Registre gastos de insumos ou manutenção.</p>
@@ -92,7 +92,7 @@ const GastosModal: React.FC<GastosModalProps> = ({ unitId, supabaseClient, userP
           </button>
         </header>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 md:p-10 space-y-6 custom-scrollbar">
+        <form onSubmit={handleSubmit} className="app-modal-body flex-1 overflow-y-auto p-6 md:p-10 space-y-6 custom-scrollbar">
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">O que foi comprado?</label>
             <input required type="text" value={formData.nome_item} onChange={(e) => setFormData({...formData, nome_item: e.target.value})} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-700" placeholder="Ex: Shampoo 5L" />

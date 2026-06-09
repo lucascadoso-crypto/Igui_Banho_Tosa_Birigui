@@ -506,12 +506,12 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 md:p-4 overflow-y-auto overflow-x-hidden">
+    <div className="app-modal-overlay fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 md:p-4 overflow-y-auto overflow-x-hidden">
       
       {/* OVERLAY DE CONFIRMAÇÃO UI */}
       {confirmacao.visivel && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in duration-300">
+        <div className="app-modal-overlay fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="app-modal-panel bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in duration-300">
              <div className="flex flex-col items-center text-center space-y-4">
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl ${
                   confirmacao.acao === 'cancelar' ? 'bg-rose-50 text-rose-500' : 
@@ -544,8 +544,8 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
         </div>
       )}
 
-      <div className="bg-gray-50 w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] mx-auto md:max-w-7xl md:w-full rounded-[2rem] shadow-2xl overflow-y-auto overflow-x-hidden md:overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100vh-24px)] md:max-h-[90vh]">
-        <header className="bg-[#8E44AD] px-5 md:px-12 py-5 md:py-10 pr-16 md:pr-12 text-white shrink-0 relative overflow-hidden">
+      <div className="app-modal-panel bg-gray-50 w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] mx-auto md:max-w-7xl md:w-full rounded-[2rem] shadow-2xl overflow-y-auto overflow-x-hidden md:overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100vh-24px)] md:max-h-[90vh]">
+        <header className="app-modal-header bg-[#8E44AD] px-5 md:px-12 py-5 md:py-10 pr-16 md:pr-12 text-white shrink-0 relative overflow-hidden">
           <div className="relative z-10 text-left min-w-0">
             <span className="block text-[8px] md:text-[10px] font-black opacity-60 uppercase tracking-[0.3em] mb-1 md:mb-2">Venda: #{String(pack.id).substring(0, 8).toUpperCase()}</span>
             <h3 className="text-xl md:text-4xl font-black tracking-tighter leading-tight break-words">Prontuário de Fidelidade</h3>
@@ -558,7 +558,7 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-12 grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-12 custom-scrollbar">
+        <div className="app-modal-body flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-12 grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-12 custom-scrollbar">
           <div className="lg:col-span-5 space-y-6 md:space-y-10 min-w-0">
             <div className="bg-white p-5 md:p-8 rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Serviços do Pacote</h4>
@@ -801,7 +801,7 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
           </div>
         </div>
 
-        <footer className="p-4 md:p-10 bg-white border-t border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center shrink-0 gap-3 md:gap-2">
+        <footer className="app-modal-footer p-4 md:p-10 bg-white border-t border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center shrink-0 gap-3 md:gap-2">
            <div className="w-full md:w-auto grid grid-cols-1 md:flex gap-2">
             <button onClick={triggerCancelPack} className="w-full md:w-auto px-4 py-3 md:px-10 md:py-4 bg-white text-rose-500 rounded-2xl font-black text-[10px] md:text-xs uppercase border-2 border-rose-100 hover:bg-rose-50 transition-all flex items-center justify-center">
                 <i className="fa-solid fa-ban mr-2 md:mr-3"></i> CANCELAR
