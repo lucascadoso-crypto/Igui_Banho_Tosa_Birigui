@@ -73,6 +73,12 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
     return () => window.removeEventListener('dadosGlobaisAtualizados', handleUpdate);
   }, [supabaseClient, userRole, userProfile]);
 
+  useEffect(() => {
+    if (currentNav.mode === 'unit' && currentNav.unitId && !expandedUnit) {
+      setExpandedUnit(String(currentNav.unitId));
+    }
+  }, [currentNav.mode, currentNav.unitId, expandedUnit]);
+
   const getOrderedUnits = () => {
     const ordemPreferencial = ['Primavera', 'Birigui', 'Concórdia'];
     const getScore = (nome: string) => {
@@ -110,7 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
   const toggleUnit = (unitId: string) => {
     // Só permite expandir/trocar se for Master
     if (!isMaster) return;
-    setExpandedUnit(expandedUnit === unitId ? null : unitId);
+    setExpandedUnit(expandedUnit === String(unitId) ? null : String(unitId));
   };
 
   const getRoleBadgeLabel = (role: UserRole) => {
@@ -133,49 +139,62 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
     window.location.href = '/';
   };
 
+  const getSubMenuIcon = (label: SubView) => {
+    switch (label) {
+      case 'Agendamento': return 'fa-calendar-check';
+      case 'Clientes': return 'fa-address-book';
+      case 'Pacotes': return 'fa-layer-group';
+      case 'Financeiro': return 'fa-wallet';
+      case 'Gastos': return 'fa-cart-shopping';
+      case 'Auditoria': return 'fa-shield-halved';
+      default: return 'fa-circle';
+    }
+  };
+
   return (
     <>
       {/* Overlay para Mobile */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden animate-in fade-in duration-300"
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-30 md:hidden animate-in fade-in duration-300"
           onClick={onClose}
         />
       )}
 
-      <div className={`w-72 bg-slate-900 h-screen text-white flex flex-col fixed left-0 top-0 z-40 shadow-2xl border-r border-slate-800 transition-transform duration-300 ease-in-out md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`w-[82vw] max-w-[22rem] md:w-72 md:max-w-none bg-slate-950 h-screen text-white flex flex-col fixed left-0 top-0 z-40 shadow-2xl shadow-slate-950/50 border-r border-white/10 transition-transform duration-300 ease-in-out md:translate-x-0 overflow-hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
-        <div className="pt-6 pb-4 px-6 flex flex-col items-center border-b border-slate-800/50 shrink-0 relative">
+        <div className="pt-[max(1.5rem,env(safe-area-inset-top))] pb-5 px-5 flex flex-col items-center border-b border-white/10 shrink-0 relative bg-gradient-to-b from-slate-900 to-slate-950">
           {/* Botão fechar no mobile */}
           <button 
             onClick={onClose}
-            className="absolute right-4 top-4 text-slate-500 hover:text-white md:hidden"
+            className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] w-10 h-10 flex items-center justify-center rounded-2xl bg-white/10 text-white hover:bg-white/15 md:hidden"
+            aria-label="Fechar menu"
           >
             <i className="fa-solid fa-xmark text-xl"></i>
           </button>
 
-          <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center shadow-2xl border border-slate-700/50 overflow-hidden group transition-transform hover:scale-105">
+          <div className="w-20 h-20 bg-white rounded-[1.75rem] flex items-center justify-center shadow-2xl shadow-black/30 border border-white/10 overflow-hidden group transition-transform hover:scale-105">
           {empresa.logo_url ? (
             <img src={empresa.logo_url} className="w-full h-full object-cover" alt="Logo" />
           ) : (
-            <i className="fa-solid fa-paw text-yellow-400 text-3xl"></i>
+            <img src="/igui-logo-fallback.svg" className="w-full h-full object-cover" alt="Logo" />
           )}
         </div>
         
-        <h1 className="mt-4 text-lg font-black text-white uppercase tracking-tighter text-center leading-none">
+        <h1 className="mt-4 text-base font-black text-white uppercase tracking-tight text-center leading-tight line-clamp-2 max-w-full">
           {empresa.nome}
         </h1>
         
-        <div className="mt-2 bg-slate-800/80 px-4 py-1 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] border border-slate-700/50">
+        <div className="mt-3 bg-teal-400/10 px-4 py-1.5 rounded-full text-[9px] font-black text-teal-200 uppercase tracking-[0.15em] border border-teal-300/20 shadow-inner">
           {getRoleBadgeLabel(userRole)}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto sidebar-scroll py-6 px-4 space-y-8">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden sidebar-scroll py-5 px-4 space-y-7">
         
         {filteredGlobalMenus.length > 0 && (
-          <nav className="space-y-1">
-            <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 opacity-50">Menu Global</p>
+          <nav className="space-y-2">
+            <p className="px-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.22em] mb-3">Menu Global</p>
             {filteredGlobalMenus.map((menu) => {
               const isActive = currentNav.mode === 'global' && currentNav.view === menu.id;
               
@@ -186,14 +205,18 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
                     onNavigate({ mode: 'global', view: menu.id as any });
                     if (onClose) onClose();
                   }}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group border ${
                     isActive 
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
-                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                      ? 'bg-[#00BFA5] text-white shadow-xl shadow-teal-500/20 border-teal-300/30 translate-x-1' 
+                      : 'bg-white/[0.045] text-slate-300 border-white/5 shadow-lg shadow-black/10 hover:bg-white/[0.075] hover:text-white hover:border-white/10'
                   }`}
                 >
-                  <i className={`fa-solid ${menu.icon} text-lg ${isActive ? 'text-white' : 'group-hover:text-indigo-400'}`}></i>
-                  <span className="font-bold text-sm">{menu.label}</span>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-slate-900/80 text-teal-300 group-hover:bg-teal-400/10'
+                  }`}>
+                    <i className={`fa-solid ${menu.icon} text-sm`}></i>
+                  </div>
+                  <span className="font-black text-sm flex-1 text-left truncate">{menu.label}</span>
                 </button>
               );
             })}
@@ -201,30 +224,39 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
         )}
 
         <div className="space-y-2">
-          <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 opacity-50">Nossas Unidades</p>
+          <p className="px-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.22em] mb-3">Nossas Unidades</p>
           
           {getOrderedUnits().length > 0 ? getOrderedUnits().map((unit) => (
-            <div key={unit.id} className="space-y-1">
+            <div key={unit.id} className="space-y-2">
               <button
-                onClick={() => toggleUnit(unit.id)}
+                onClick={() => toggleUnit(String(unit.id))}
                 disabled={!isMaster}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 ${
-                  expandedUnit === unit.id || currentNav.unitId === unit.id || !isMaster
-                    ? 'bg-slate-800/50 text-white'
-                    : 'text-slate-400 hover:bg-slate-800/30'
+                className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 border group ${
+                  expandedUnit === String(unit.id) || currentNav.unitId === unit.id || !isMaster
+                    ? 'bg-white/[0.08] text-white border-white/10 shadow-xl shadow-black/15'
+                    : 'bg-white/[0.045] text-slate-300 border-white/5 shadow-lg shadow-black/10 hover:bg-white/[0.075] hover:text-white'
                 } ${!isMaster ? 'cursor-default' : ''}`}
               >
-                <div className="flex items-center space-x-3 min-w-0">
-                  <i className={`fa-solid fa-store text-sm shrink-0 ${currentNav.unitId === unit.id ? 'text-yellow-400' : ''}`}></i>
-                  <span className="font-bold text-sm truncate">{unit.name.replace(/^iG\s+/i, '')}</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    currentNav.unitId === unit.id ? 'bg-[#00BFA5] text-white shadow-lg shadow-teal-500/20' : 'bg-slate-900/80 text-teal-300'
+                  }`}>
+                    <i className="fa-solid fa-store text-sm"></i>
+                  </div>
+                  <div className="text-left min-w-0">
+                    <p className="font-black text-sm truncate leading-tight">{unit.name.replace(/^iG\s+/i, '')}</p>
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mt-0.5">Unidade</p>
+                  </div>
                 </div>
                 {isMaster && (
-                  <i className={`fa-solid fa-chevron-down text-[9px] transition-transform duration-300 shrink-0 ${expandedUnit === unit.id ? 'rotate-180' : ''}`}></i>
+                  <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
+                    <i className={`fa-solid fa-chevron-down text-[10px] transition-transform duration-300 ${expandedUnit === String(unit.id) ? 'rotate-180 text-teal-300' : 'text-slate-500'}`}></i>
+                  </div>
                 )}
               </button>
 
-              <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expandedUnit === unit.id || !isMaster ? 'max-h-80 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                <div className="pl-9 space-y-1 border-l border-slate-800 ml-6">
+              <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expandedUnit === String(unit.id) || !isMaster ? 'max-h-[32rem] opacity-100' : 'max-h-0 opacity-0'}`}>
+                <div className="space-y-2 pl-3 border-l border-teal-400/20 ml-5 pb-1">
                   {filteredUnitSubMenus.map((sub) => (
                     <button
                       key={sub.label}
@@ -232,13 +264,16 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
                         onNavigate({ mode: 'unit', view: sub.label, unitId: unit.id, unitName: unit.name });
                         if (onClose) onClose();
                       }}
-                      className={`w-full text-left px-4 py-2 text-xs rounded-lg transition-colors font-bold ${
+                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl transition-all duration-200 font-bold border ${
                         currentNav.unitId === unit.id && currentNav.view === sub.label
-                          ? 'text-indigo-400 bg-indigo-500/10'
-                          : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800'
+                          ? 'bg-[#00BFA5] text-white border-teal-300/30 shadow-xl shadow-teal-500/20 translate-x-1'
+                          : 'bg-slate-900/70 text-slate-400 border-white/5 hover:text-white hover:bg-white/[0.07]'
                       }`}
                     >
-                      {sub.label}
+                      <i className={`fa-solid ${getSubMenuIcon(sub.label)} w-4 text-center ${
+                        currentNav.unitId === unit.id && currentNav.view === sub.label ? 'text-white' : 'text-teal-300'
+                      }`}></i>
+                      <span className="text-xs uppercase tracking-wide truncate">{sub.label}</span>
                     </button>
                   ))}
                 </div>
@@ -250,20 +285,20 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
         </div>
       </div>
 
-      <div className="mt-auto p-4 bg-slate-900 border-t border-slate-800/50 space-y-2 shrink-0">
+      <div className="mt-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-slate-950 border-t border-white/10 space-y-3 shrink-0">
         <button
           onClick={() => {
             onNavigate({ mode: 'global', view: 'Meu Perfil' });
             if (onClose) onClose();
           }}
-          className={`w-full flex items-center space-x-3 px-3 py-2 rounded-xl transition-all duration-300 group ${
+          className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group border ${
             currentNav.view === 'Meu Perfil'
-              ? 'bg-orange-500 text-white shadow-xl shadow-orange-500/20 scale-[1.02]'
-              : 'bg-orange-600/10 text-orange-500 hover:bg-orange-500 hover:text-white border border-orange-500/20'
+              ? 'bg-[#00BFA5] text-white shadow-xl shadow-teal-500/20 border-teal-300/30'
+              : 'bg-white/[0.055] text-slate-200 hover:bg-white/[0.085] border-white/10 shadow-lg shadow-black/10'
           }`}
         >
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0 ${
-            currentNav.view === 'Meu Perfil' ? 'bg-white/20' : 'bg-orange-500 text-white'
+            currentNav.view === 'Meu Perfil' ? 'bg-white/20 text-white' : 'bg-teal-400/10 text-teal-300'
           }`}>
             <i className="fa-solid fa-user text-sm"></i>
           </div>
@@ -277,13 +312,13 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
 
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center space-x-2 px-4 py-1 text-slate-500 hover:text-rose-500 transition-colors group"
+          className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-slate-500 hover:text-rose-400 transition-colors group"
         >
           <i className="fa-solid fa-right-from-bracket text-xs group-hover:-translate-x-1 transition-transform"></i>
           <span className="text-[10px] font-black uppercase tracking-[0.2em]">Sair do Sistema</span>
         </button>
       </div>
-    </div>
+    </aside>
   </>
 );
 };
