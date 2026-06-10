@@ -169,40 +169,40 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
 
   const getRoleInfo = (role: string) => {
     switch(role) {
-      case 'master': return { label: 'MASTER', icon: 'fa-shield-halved', color: 'text-slate-900' };
-      case 'admin_unidade': return { label: 'ADMIN UNIDADE', icon: 'fa-building-user', color: 'text-indigo-600' };
-      case 'gerente': return { label: 'GERENTE', icon: 'fa-gear', color: 'text-slate-600' };
-      case 'financeiro': return { label: 'FINANCEIRO', icon: 'fa-sack-dollar', color: 'text-amber-600' };
-      case 'atendente': return { label: 'ATENDENTE', icon: 'fa-headset', color: 'text-sky-600' };
-      case 'tosador': return { label: 'TOSADOR', icon: 'fa-scissors', color: 'text-emerald-600' };
-      case 'somente_leitura': return { label: 'LEITURA', icon: 'fa-eye', color: 'text-slate-400' };
-      default: return { label: 'COLABORADOR', icon: 'fa-user-nurse', color: 'text-slate-400' };
+      case 'master': return { label: 'MASTER', icon: 'fa-shield-halved', color: 'text-slate-900', badge: 'bg-slate-100 text-slate-900' };
+      case 'admin_unidade': return { label: 'ADMIN UNIDADE', icon: 'fa-building-user', color: 'text-indigo-600', badge: 'bg-indigo-50 text-indigo-600' };
+      case 'gerente': return { label: 'GERENTE', icon: 'fa-gear', color: 'text-slate-600', badge: 'bg-slate-100 text-slate-600' };
+      case 'financeiro': return { label: 'FINANCEIRO', icon: 'fa-sack-dollar', color: 'text-amber-600', badge: 'bg-amber-50 text-amber-600' };
+      case 'atendente': return { label: 'ATENDENTE', icon: 'fa-headset', color: 'text-sky-600', badge: 'bg-sky-50 text-sky-600' };
+      case 'tosador': return { label: 'TOSADOR', icon: 'fa-scissors', color: 'text-emerald-600', badge: 'bg-emerald-50 text-emerald-600' };
+      case 'somente_leitura': return { label: 'LEITURA', icon: 'fa-eye', color: 'text-slate-400', badge: 'bg-slate-50 text-slate-500' };
+      default: return { label: 'COLABORADOR', icon: 'fa-user-nurse', color: 'text-slate-400', badge: 'bg-slate-50 text-slate-500' };
     }
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-5 md:space-y-8 pt-2 md:pt-0 animate-in fade-in duration-500">
       
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-center space-x-4">
-           <div className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-2xl shadow-xl">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
+        <div className="flex items-center space-x-3 md:space-x-4">
+           <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-xl md:text-2xl shadow-xl shrink-0">
               <i className="fa-solid fa-users-gear"></i>
            </div>
-           <div>
-              <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Equipe e Acessos</h2>
+           <div className="min-w-0">
+              <h2 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight uppercase leading-tight">Equipe e Acessos</h2>
               <p className="text-orange-500 text-[10px] font-black uppercase tracking-[0.2em]">Gestão de Funcionários</p>
            </div>
         </div>
         {isMaster && !isReadOnly && (
-          <button onClick={() => handleOpenModal()} className="bg-slate-900 hover:bg-black text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center">
+          <button onClick={() => handleOpenModal()} className="w-full md:w-auto justify-center bg-slate-900 hover:bg-black text-white px-6 md:px-8 py-3.5 md:py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center">
             <i className="fa-solid fa-plus mr-3"></i> NOVO MEMBRO
           </button>
         )}
       </header>
 
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-[1.75rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
         
-        <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
+        <div className="p-4 md:p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/30 gap-3">
            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Funcionários Cadastrados</h3>
            <div className="bg-slate-900 text-orange-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
              {employees.length} Membros
@@ -218,7 +218,7 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
             <div className="text-right">Ações</div>
           </div>
 
-          <div className="divide-y divide-slate-50 md:divide-y-0 space-y-4">
+          <div className="divide-y divide-slate-50 md:divide-y-0 space-y-3 md:space-y-4 p-3 md:p-0">
             {loading ? (
               <div className="py-20 text-center text-slate-400 font-bold"><i className="fa-solid fa-circle-notch fa-spin mr-2"></i>Sincronizando...</div>
             ) : employees.map(emp => {
@@ -226,33 +226,38 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
               const isSelf = emp.email === currentUserEmail;
               
               return (
-                <div key={emp.id} className="bg-white md:bg-transparent p-6 md:p-0 rounded-3xl md:rounded-none border border-slate-100 md:border-none shadow-sm md:shadow-none hover:bg-slate-50/50 transition-colors group md:grid md:grid-cols-4 md:items-center md:px-8 md:py-6">
-                  <div className="mb-4 md:mb-0">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white font-black text-sm shadow-md shrink-0">
+                <div key={emp.id} className="bg-white md:bg-transparent p-4 md:p-0 rounded-2xl md:rounded-none border border-slate-100 md:border-none shadow-sm md:shadow-none hover:bg-slate-50/50 transition-colors group md:grid md:grid-cols-4 md:items-center md:px-8 md:py-6">
+                  <div className="mb-3 md:mb-0">
+                    <div className="flex items-start md:items-center space-x-3 md:space-x-4">
+                      <div className="w-11 h-11 md:w-10 md:h-10 rounded-2xl md:rounded-full bg-slate-900 flex items-center justify-center text-white font-black text-sm shadow-md shrink-0">
                         {emp.nome.charAt(0).toUpperCase()}
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-black text-slate-800 text-sm truncate flex items-center">
+                      <div className="min-w-0 flex-1">
+                        <p className="md:hidden font-black text-slate-800 text-sm leading-tight truncate flex items-center">
+                          {emp.nome}
+                          {isSelf && <span className="ml-2 text-[8px] font-black text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded uppercase shrink-0">(Voce)</span>}
+                        </p>
+                        <p className="hidden md:flex font-black text-slate-800 text-sm truncate items-center">
                           {emp.email || 'sem-email@rede.com'}
                           {isSelf && <span className="ml-2 text-[9px] font-black text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded uppercase">(Você)</span>}
                         </p>
-                        <p className="text-[11px] text-slate-400 font-bold uppercase tracking-tighter">{emp.nome}</p>
+                        <p className="md:hidden text-[11px] text-slate-400 font-bold truncate mt-0.5">{emp.email || 'sem-email@rede.com'}</p>
+                        <p className="hidden md:block text-[11px] text-slate-400 font-bold uppercase tracking-tighter">{emp.nome}</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between md:block mb-4 md:mb-0">
+                  <div className="flex items-center justify-between md:block mb-2 md:mb-0">
                     <span className="md:hidden text-[10px] font-black text-slate-400 uppercase tracking-widest">Cargo</span>
-                    <div className={`flex items-center space-x-2.5 font-black text-[10px] uppercase tracking-widest ${role.color}`}>
+                    <div className={`inline-flex items-center space-x-2 font-black text-[10px] uppercase tracking-widest px-2.5 py-1.5 rounded-xl md:px-0 md:py-0 md:rounded-none md:bg-transparent ${role.badge} md:${role.color}`}>
                       <i className={`fa-solid ${role.icon} text-xs`}></i>
                       <span>{role.label}</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between md:block mb-4 md:mb-0">
+                  <div className="flex items-center justify-between md:block mb-3 md:mb-0">
                     <span className="md:hidden text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</span>
-                    <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                    <span className={`inline-flex items-center px-3 py-1.5 md:py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
                       !emp.ativo 
                         ? 'bg-rose-50 text-rose-600' 
                         : 'bg-emerald-50 text-emerald-600'
@@ -268,18 +273,20 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
                          <span>Protegido</span>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-end space-x-3">
+                      <div className="flex items-center justify-end gap-2 md:space-x-3">
                         {!isReadOnly && (
                           <>
                             <button 
                               onClick={() => handleOpenModal(emp)}
-                              className="w-10 h-10 md:w-9 md:h-9 bg-slate-900 text-white rounded-xl md:rounded-full flex items-center justify-center hover:bg-black transition-all shadow-md active:scale-90"
+                              className="w-11 h-11 md:w-9 md:h-9 bg-slate-900 text-white rounded-2xl md:rounded-full flex items-center justify-center hover:bg-black transition-all shadow-md active:scale-90"
+                              aria-label={`Editar ${emp.nome}`}
                             >
                               <i className="fa-solid fa-pen text-xs"></i>
                             </button>
                             <button 
                               onClick={() => handleInactivate(emp)}
-                              className="w-10 h-10 md:w-9 md:h-9 bg-rose-50 text-rose-500 rounded-xl md:rounded-full flex items-center justify-center hover:bg-rose-100 transition-all active:scale-90"
+                              className="w-11 h-11 md:w-9 md:h-9 bg-rose-50 text-rose-500 rounded-2xl md:rounded-full flex items-center justify-center hover:bg-rose-100 transition-all active:scale-90"
+                              aria-label={`Inativar ${emp.nome}`}
                             >
                               <i className="fa-solid fa-trash-can text-xs"></i>
                             </button>
