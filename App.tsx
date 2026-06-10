@@ -18,6 +18,7 @@ import ReciboView from './components/ReciboView';
 import Login from './components/Login';
 import Perfil from './components/Perfil';
 import Auditoria from './components/Auditoria';
+import Marketing from './components/Marketing';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -338,6 +339,8 @@ const { data, error: profileError } = await supabase
         return <PainelGeral units={units} supabaseClient={supabase} />;
       case 'Financeiro Geral':
         return <FinanceiroGlobal units={units} supabaseClient={supabase} />;
+      case 'Marketing':
+        return <Marketing />;
       case 'Equipe':
         return <Equipe units={units} supabaseClient={supabase} currentUserRole={effectiveUserRole} userProfile={effectiveUserProfile} />;
       case 'Meu Perfil':
