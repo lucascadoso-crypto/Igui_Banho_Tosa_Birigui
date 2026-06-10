@@ -122,6 +122,22 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
     }
   };
 
+  const getWhatsAppLogStatus = (status?: string) => {
+    const normalized = status?.toLowerCase();
+    if (normalized === 'success' || status?.toUpperCase() === 'SUCESSO' || status?.toUpperCase() === 'ENVIADO') {
+      return { label: 'ENVIADO', className: 'bg-emerald-100 text-emerald-700' };
+    }
+    if (normalized === 'pending' || status?.toUpperCase() === 'PENDENTE') {
+      return { label: 'PENDENTE', className: 'bg-amber-100 text-amber-700' };
+    }
+    return { label: 'ERRO', className: 'bg-rose-100 text-rose-700' };
+  };
+
+  const getWhatsAppLogDate = (value?: string) => ({
+    date: value ? new Date(value).toLocaleDateString('pt-BR') : '-',
+    time: value ? new Date(value).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'
+  });
+
   const fetchConfig = async () => {
     if (!supabaseClient) return;
     try {
@@ -743,10 +759,10 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
 
       {/* Conteúdo Aba 4: Logs do WhatsApp */}
       {activeTab === 'whatsapp_logs' && (
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 animate-in fade-in duration-500">
-          <header className="mb-8 flex justify-between items-center">
-            <div>
-              <h3 className="text-xl font-bold text-slate-800 flex items-center">
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5 md:p-8 animate-in fade-in duration-500 overflow-hidden">
+          <header className="mb-6 md:mb-8 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="text-lg md:text-xl font-black text-slate-800 flex items-center leading-tight">
                 <i className="fa-brands fa-whatsapp mr-3 text-emerald-500"></i>
                 Auditoria de Disparos (Robô)
               </h3>
@@ -755,14 +771,34 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
             <button 
               onClick={fetchWhatsAppLogs}
               disabled={loadingLogs}
-              className="p-3 bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-xl transition-all"
+              className="flex h-11 w-11 shrink-0 items-center justify-center bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-emerald-600 rounded-2xl transition-all active:scale-95 disabled:opacity-60"
               title="Atualizar Logs"
             >
               <i className={`fa-solid fa-arrows-rotate ${loadingLogs ? 'fa-spin' : ''}`}></i>
             </button>
           </header>
 
-          <div className="overflow-x-auto">
+          {loadingLogs && (
+            <div className="py-16 flex flex-col items-center justify-center text-slate-400">
+              <i className="fa-solid fa-circle-notch fa-spin text-2xl text-emerald-500 mb-3"></i>
+              <p className="text-xs font-black uppercase tracking-widest">Carregando logs...</p>
+            </div>
+          )}
+
+          {!loadingLogs && whatsappLogs.length === 0 && (
+            <div className="py-16 md:py-20 flex flex-col items-center justify-center text-center rounded-[1.5rem] bg-slate-50/70 border border-slate-100">
+              <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mb-4">
+                <i className="fa-solid fa-clipboard-list text-3xl text-slate-300"></i>
+              </div>
+              <p className="text-sm font-black text-slate-500 uppercase tracking-widest">Nenhum log encontrado</p>
+              <p className="mt-2 max-w-[260px] text-xs font-semibold leading-relaxed text-slate-400">
+                Assim que mensagens forem enviadas, elas aparecerão aqui.
+              </p>
+            </div>
+          )}
+
+          {!loadingLogs && whatsappLogs.length > 0 && (
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-50">
@@ -838,6 +874,65 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
               </tbody>
             </table>
           </div>
+          )}
+
+          {!loadingLogs && whatsappLogs.length > 0 && (
+            <div className="md:hidden space-y-3 overflow-x-hidden">
+              {whatsappLogs.map((log) => {
+                const created = getWhatsAppLogDate(log.criado_em);
+                const statusMeta = getWhatsAppLogStatus(log.status);
+                const hasError = (log.status?.toUpperCase() === 'ERRO' || log.status?.toLowerCase() === 'error') && log.detalhe_erro;
+
+                return (
+                  <article key={log.id} className="w-full rounded-[1.35rem] border border-slate-100 bg-white p-4 shadow-sm overflow-hidden">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-black text-slate-800">{created.date}</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-500">{created.time}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        title={hasError ? 'Ver erro' : undefined}
+                        onClick={() => hasError && setSelectedError(log.detalhe_erro)}
+                        className={`shrink-0 rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-widest ${statusMeta.className}`}
+                      >
+                        {statusMeta.label}
+                      </button>
+                    </div>
+
+                    <div className="mt-4 min-w-0">
+                      <p className="text-base font-black text-slate-800 break-words">
+                        {log.nome_cliente || 'Cliente nao informado'}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <span className="rounded-full bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-indigo-600">
+                          {log.nome_pet || 'Pet nao informado'}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                          {log.tipo_agendamento || 'Sem tipo'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2 text-xs font-bold text-slate-600">
+                      <div className="flex min-w-0 items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+                        <i className="fa-solid fa-store text-slate-400"></i>
+                        <span className="break-words">{log.unidades?.nome || 'Unidade nao informada'}</span>
+                      </div>
+                      {log.telefone && (
+                        <div className="flex min-w-0 items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+                          <i className="fa-brands fa-whatsapp text-emerald-500"></i>
+                          <span className="break-words">{log.telefone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
