@@ -183,9 +183,9 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
         />
       )}
 
-      <aside className={`w-[82vw] max-w-[22rem] md:w-72 md:max-w-none bg-[#071426] h-screen text-white flex flex-col fixed left-0 top-0 z-40 shadow-2xl shadow-slate-950/60 border-r border-white/10 transition-transform duration-300 ease-in-out md:translate-x-0 overflow-hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`w-[82vw] max-w-[22rem] md:w-72 md:max-w-none bg-[#071426] h-screen text-white flex flex-col fixed left-0 top-0 z-40 shadow-2xl shadow-slate-950/60 transition-transform duration-300 ease-in-out md:translate-x-0 overflow-hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
-        <div className="pt-[max(1.5rem,env(safe-area-inset-top))] pb-5 px-5 flex flex-col items-center border-b border-white/10 shrink-0 relative bg-gradient-to-b from-[#0b1d34] via-[#08182b] to-[#071426]">
+        <div className="pt-[max(1.5rem,env(safe-area-inset-top))] pb-5 px-5 flex flex-col items-center shrink-0 relative bg-gradient-to-b from-[#0b1d34] via-[#08182b] to-[#071426] shadow-[0_8px_18px_rgba(0,0,0,0.16)]">
           {/* Botão fechar no mobile */}
           <button 
             onClick={onClose}
@@ -195,7 +195,7 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
             <i className="fa-solid fa-xmark text-xl"></i>
           </button>
 
-          <div className="w-20 h-20 bg-white rounded-[1.35rem] flex items-center justify-center shadow-2xl shadow-black/30 ring-1 ring-white/20 overflow-hidden group transition-transform hover:scale-105">
+          <div className="w-20 h-20 bg-white rounded-[1.35rem] flex items-center justify-center shadow-2xl shadow-black/30 overflow-hidden group transition-transform hover:scale-105">
           {empresa.logo_url ? (
             <img src={empresa.logo_url} className="w-full h-full object-cover" alt="Logo" />
           ) : (
@@ -207,7 +207,7 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
           {empresa.nome}
         </h1>
         
-        <div className="mt-3 bg-teal-400/10 px-4 py-1.5 rounded-full text-[9px] font-black text-teal-200 uppercase tracking-[0.15em] border border-teal-300/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+        <div className="mt-3 bg-teal-400/10 px-4 py-1.5 rounded-full text-[9px] font-black text-teal-200 uppercase tracking-[0.15em] shadow-[0_4px_12px_rgba(0,0,0,0.18)]">
           {getRoleBadgeLabel(userRole)}
         </div>
       </div>
@@ -227,10 +227,10 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
                     onNavigate({ mode: 'global', view: menu.id as any });
                     if (onClose) onClose();
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-[1.15rem] transition-all duration-200 group border ${
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-[1.15rem] transition-all duration-200 group ${
                     isActive 
-                      ? 'bg-gradient-to-r from-[#00BFA5] to-[#14D6B3] text-white shadow-[0_16px_34px_rgba(0,191,165,0.24)] border-teal-200/30 translate-x-1' 
-                      : 'bg-[#10233a]/75 text-slate-200 border-white/7 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_24px_rgba(0,0,0,0.18)] hover:bg-[#16304e] hover:text-white hover:border-white/12'
+                      ? 'bg-gradient-to-r from-[#00BFA5] to-[#14D6B3] text-white shadow-[0_0_20px_rgba(0,220,180,0.18),0_10px_22px_rgba(0,0,0,0.18)] translate-x-1' 
+                      : 'bg-[#0D1D3B] text-slate-200 shadow-[0_4px_12px_rgba(0,0,0,0.20)] hover:bg-[#13284b] hover:text-white hover:shadow-[0_8px_18px_rgba(0,0,0,0.24)]'
                   }`}
                 >
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
@@ -249,14 +249,14 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
           <p className="px-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.24em] mb-3">Nossas Unidades</p>
           
           {getOrderedUnits().length > 0 ? getOrderedUnits().map((unit) => (
-            <div key={unit.id} className="rounded-[1.35rem] bg-[#0d2036]/90 border border-white/7 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_14px_34px_rgba(0,0,0,0.22)] p-2 space-y-2">
+            <div key={unit.id} className="rounded-[1.35rem] bg-[#0D1D3B] shadow-[0_4px_12px_rgba(0,0,0,0.20)] p-2 space-y-2">
               <button
                 onClick={() => toggleUnit(String(unit.id))}
                 disabled={!isMaster}
-                className={`w-full flex items-center justify-between gap-3 px-3 py-3 rounded-[1.05rem] transition-all duration-200 border group ${
+                className={`w-full flex items-center justify-between gap-3 px-3 py-3 rounded-[1.05rem] transition-all duration-200 group ${
                   expandedUnit === String(unit.id) || currentNav.unitId === unit.id || !isMaster
-                    ? 'bg-[#142b46] text-white border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]'
-                    : 'bg-transparent text-slate-300 border-transparent hover:bg-[#142b46] hover:text-white'
+                    ? 'bg-[#142b46] text-white shadow-[0_4px_12px_rgba(0,0,0,0.18)]'
+                    : 'bg-transparent text-slate-300 hover:bg-[#142b46] hover:text-white hover:shadow-[0_4px_12px_rgba(0,0,0,0.16)]'
                 } ${!isMaster ? 'cursor-default' : ''}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -286,10 +286,10 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
                         onNavigate({ mode: 'unit', view: sub.label, unitId: unit.id, unitName: unit.name });
                         if (onClose) onClose();
                       }}
-                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-[1.05rem] transition-all duration-200 font-bold border ${
+                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-[1.05rem] transition-all duration-200 font-bold ${
                         currentNav.unitId === unit.id && currentNav.view === sub.label
-                          ? 'bg-gradient-to-r from-[#00BFA5] to-[#14D6B3] text-white border-teal-200/30 shadow-[0_14px_28px_rgba(0,191,165,0.22)]'
-                          : 'bg-[#10233a]/75 text-slate-300 border-white/6 hover:text-white hover:bg-[#17314f]'
+                          ? 'bg-gradient-to-r from-[#00BFA5] to-[#14D6B3] text-white shadow-[0_0_20px_rgba(0,220,180,0.18),0_10px_22px_rgba(0,0,0,0.18)]'
+                          : 'bg-[#10233a] text-slate-300 shadow-[0_4px_12px_rgba(0,0,0,0.18)] hover:text-white hover:bg-[#17314f] hover:shadow-[0_8px_18px_rgba(0,0,0,0.22)]'
                       }`}
                     >
                       <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
@@ -309,16 +309,16 @@ const Sidebar: React.FC<SidebarProps> = ({ units, currentNav, onNavigate, userRo
         </div>
       </div>
 
-      <div className="mt-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-[#071426] border-t border-white/10 space-y-3 shrink-0">
+      <div className="mt-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-[#071426] space-y-3 shrink-0 shadow-[0_-8px_18px_rgba(0,0,0,0.16)]">
         <button
           onClick={() => {
             onNavigate({ mode: 'global', view: 'Meu Perfil' });
             if (onClose) onClose();
           }}
-          className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-[1.15rem] transition-all duration-300 group border ${
+          className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-[1.15rem] transition-all duration-300 group ${
             currentNav.view === 'Meu Perfil'
-              ? 'bg-gradient-to-r from-[#00BFA5] to-[#14D6B3] text-white shadow-[0_16px_34px_rgba(0,191,165,0.24)] border-teal-200/30'
-              : 'bg-[#10233a]/80 text-slate-200 hover:bg-[#16304e] border-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_24px_rgba(0,0,0,0.18)]'
+              ? 'bg-gradient-to-r from-[#00BFA5] to-[#14D6B3] text-white shadow-[0_0_20px_rgba(0,220,180,0.18),0_10px_22px_rgba(0,0,0,0.18)]'
+              : 'bg-[#0D1D3B] text-slate-200 hover:bg-[#13284b] shadow-[0_4px_12px_rgba(0,0,0,0.20)] hover:shadow-[0_8px_18px_rgba(0,0,0,0.24)]'
           }`}
         >
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0 ${
