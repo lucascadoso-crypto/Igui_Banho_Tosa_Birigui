@@ -17,6 +17,22 @@ const Auditoria: React.FC<AuditoriaProps> = ({ unit, supabaseClient, userProfile
   const [systemLogs, setSystemLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedError, setSelectedError] = useState<string | null>(null);
+
+  const getDateParts = (value?: string) => ({
+    date: value ? new Date(value).toLocaleDateString('pt-BR') : '-',
+    time: value ? new Date(value).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'
+  });
+
+  const getWhatsAppStatusMeta = (status?: string) => {
+    const normalized = status?.toLowerCase();
+    if (normalized === 'success' || status?.toUpperCase() === 'SUCESSO') {
+      return { label: 'Enviado', className: 'bg-emerald-100 text-emerald-700' };
+    }
+    if (normalized === 'pending' || status?.toUpperCase() === 'PENDENTE') {
+      return { label: 'Pendente', className: 'bg-amber-100 text-amber-700' };
+    }
+    return { label: 'Falha no Envio', className: 'bg-rose-100 text-rose-700' };
+  };
   
   useEffect(() => {
     if (activeTab === 'whatsapp') {
@@ -91,9 +107,29 @@ const Auditoria: React.FC<AuditoriaProps> = ({ unit, supabaseClient, userProfile
     }
   };
 
+  const renderMobileEmptyState = (message: string, restricted = false) => (
+    <div className="md:hidden bg-white rounded-[1.5rem] shadow-lg border border-slate-100 p-8 text-center">
+      <div className="flex flex-col items-center space-y-3 opacity-30">
+        <i className="fa-solid fa-ghost text-4xl"></i>
+        <span className="text-xs font-bold uppercase tracking-widest">{message}</span>
+      </div>
+      {restricted && <p className="text-[10px] text-rose-500 mt-3">Acesso restrito a administradores master.</p>}
+    </div>
+  );
+
+  const renderMobileLoading = () => (
+    <div className="md:hidden bg-white rounded-[1.5rem] shadow-lg border border-slate-100 p-8 text-center">
+      <div className="flex flex-col items-center space-y-3">
+        <i className="fa-solid fa-circle-notch fa-spin text-indigo-500 text-2xl"></i>
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Carregando rastro...</span>
+      </div>
+    </div>
+  );
+
   const renderWhatsAppLogs = () => (
-    <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
-      <div className="overflow-x-auto">
+    <>
+      <div className="hidden md:block bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
@@ -174,13 +210,80 @@ const Auditoria: React.FC<AuditoriaProps> = ({ unit, supabaseClient, userProfile
             )}
           </tbody>
         </table>
+        </div>
       </div>
-    </div>
+
+      <div className="md:hidden space-y-3 overflow-x-hidden">
+        {loading ? (
+          renderMobileLoading()
+        ) : logs.length === 0 ? (
+          renderMobileEmptyState('Nenhum log encontrado')
+        ) : (
+          logs.map((log) => {
+            const created = getDateParts(log.criado_em);
+            const statusMeta = getWhatsAppStatusMeta(log.status);
+            const hasError = (log.status?.toUpperCase() === 'ERRO' || log.status?.toLowerCase() === 'error') && log.detalhe_erro;
+
+            return (
+              <article key={log.id} className="w-full rounded-[1.35rem] bg-white border border-slate-100 shadow-lg shadow-slate-200/70 p-4 overflow-hidden">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em]">Data / Hora</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-black text-slate-800">{created.date}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-500">{created.time}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    title={hasError ? 'Ver erro' : undefined}
+                    onClick={() => hasError && setSelectedError(log.detalhe_erro)}
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-widest ${statusMeta.className}`}
+                  >
+                    {statusMeta.label}
+                  </button>
+                </div>
+
+                <div className="mt-4 min-w-0">
+                  <p className="text-base font-black text-slate-800 break-words">{log.nome_cliente || 'Cliente nao informado'}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-indigo-600">
+                      Pet: {log.nome_pet || 'N/A'}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      {log.tipo_agendamento || 'Sem tipo'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-2 text-xs font-bold text-slate-600">
+                  <div className="flex min-w-0 items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+                    <i className="fa-brands fa-whatsapp text-emerald-500"></i>
+                    <span className="break-words">{log.telefone || 'Telefone nao informado'}</span>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+                    <i className="fa-solid fa-store text-slate-400"></i>
+                    <span className="break-words">{(unit as any).nome || unit.name || 'Unidade'}</span>
+                  </div>
+                </div>
+
+                {log.mensagem && (
+                  <p className="mt-4 rounded-2xl bg-slate-50 p-3 text-xs font-semibold leading-relaxed text-slate-600 break-words">
+                    {log.mensagem}
+                  </p>
+                )}
+              </article>
+            );
+          })
+        )}
+      </div>
+    </>
   );
 
   const renderSystemLogs = () => (
-    <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
-      <div className="overflow-x-auto">
+    <>
+      <div className="hidden md:block bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
@@ -241,8 +344,55 @@ const Auditoria: React.FC<AuditoriaProps> = ({ unit, supabaseClient, userProfile
             )}
           </tbody>
         </table>
+        </div>
       </div>
-    </div>
+
+      <div className="md:hidden space-y-3 overflow-x-hidden">
+        {loading ? (
+          renderMobileLoading()
+        ) : systemLogs.length === 0 ? (
+          renderMobileEmptyState('Nenhuma atividade registrada na auditoria', !isMaster)
+        ) : (
+          systemLogs.map((log) => {
+            const created = getDateParts(log.criado_em);
+
+            return (
+              <article key={log.id} className="w-full rounded-[1.35rem] bg-white border border-slate-100 shadow-lg shadow-slate-200/70 p-4 overflow-hidden">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em]">Data / Hora</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-black text-slate-800">{created.date}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-500">{created.time}</span>
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-slate-900 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-white">
+                    {log.acao || '-'}
+                  </span>
+                </div>
+
+                <div className="mt-4 min-w-0">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em]">Usuario</p>
+                  <p className="mt-1 text-base font-black text-slate-800 break-words">
+                    {log.usuario_nome || log.usuario_email || 'N/A'}
+                  </p>
+                  {log.usuario_nome && log.usuario_email && (
+                    <p className="mt-1 text-xs font-bold text-slate-400 break-words">{log.usuario_email}</p>
+                  )}
+                </div>
+
+                <div className="mt-4 rounded-2xl bg-slate-50 p-3">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em]">Descricao</p>
+                  <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-600 break-words">
+                    {log.descricao || 'Sem descricao registrada.'}
+                  </p>
+                </div>
+              </article>
+            );
+          })
+        )}
+      </div>
+    </>
   );
 
   return (
