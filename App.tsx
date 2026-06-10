@@ -414,7 +414,7 @@ const { data, error: profileError } = await supabase
         onClose={() => setIsMobileMenuOpen(false)}
       />
       
-      <main className="app-mobile-main flex-1 min-h-screen md:ml-72 pt-[76px] md:pt-0 overflow-y-auto relative hide-scrollbar">
+      <main className="app-mobile-main flex-1 min-h-screen md:ml-72 pt-[76px] md:pt-0 overflow-y-visible md:overflow-y-auto relative hide-scrollbar">
         {hasError && (
           <div className="bg-rose-50 border-b border-rose-100 px-10 py-3 flex items-center justify-between">
             <div className="flex items-center space-x-3 text-rose-600 font-bold text-sm">
