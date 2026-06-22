@@ -68,10 +68,18 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   const extraItems = services.filter(isExtraItem);
   const valorTransporte = Number(appt.valor_transporte || 0);
   const valorDesconto = Number(appt.valor_desconto || appt.desconto || 0);
-  const valorServicos = Number(appt.valor_servicos ?? Math.max(0, Number(appt.valor_total || 0) - valorTransporte));
   const totalExtraItens = extraItems.reduce((acc: number, item: any) => acc + getItemValue(item), 0);
   const totalExtra = extraItems.length > 0 ? totalExtraItens : 0;
   const totalBaseAgendamento = Number(appt.valor_total || 0);
+  const totalMainItems = mainItems.reduce((acc: number, item: any) => acc + getItemValue(item), 0);
+  const valorServicosSalvo = Number(appt.valor_servicos || 0);
+  const valorServicosCalculado = Math.max(0, totalBaseAgendamento - valorTransporte - totalExtra + valorDesconto);
+  const valorServicosDireto = valorServicosSalvo > 0 ? valorServicosSalvo : totalMainItems;
+  const totalDireto = valorServicosDireto + valorTransporte + totalExtra - valorDesconto;
+  const deveUsarFallbackDoTotal = totalBaseAgendamento > 0 && (valorServicosDireto <= 0 || Math.abs(totalDireto - totalBaseAgendamento) > 0.01);
+  const valorServicos = appt.pacote_id
+    ? Math.max(0, valorServicosDireto || totalBaseAgendamento)
+    : (deveUsarFallbackDoTotal ? valorServicosCalculado : Math.max(0, valorServicosDireto));
   const totalGeral = appt.pacote_id ? totalBaseAgendamento : Math.max(0, valorServicos + valorTransporte + totalExtra - valorDesconto);
   const isSomaValida = !isDividirPagamento || (Math.abs((valor1 + valor2) - totalGeral) < 0.01);
   const client = appt.clientes || appt.pets?.clientes;
