@@ -1010,6 +1010,21 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     setSelectedServiceIds(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
   };
 
+  const sanitizeAppointmentCreatePayload = (payload: Record<string, any>) => {
+    const {
+      id,
+      created_at,
+      updated_at,
+      agendamento_itens,
+      pets,
+      clientes,
+      pacotes,
+      ...safePayload
+    } = payload;
+
+    return safePayload;
+  };
+
   const saveAppointment = async () => {
     if (!selectedClient || !selectedPetId || selectedServiceIds.length === 0) {
       setConfirmacao({ visivel: true, acao: 'erro', mensagem: 'Selecione o Cliente, o Pet e ao menos 1 Serviço.' });
@@ -1061,7 +1076,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
         throw new Error("Por favor, selecione um cliente cadastrado para garantir a integridade do agendamento.");
       }
 
-      let apptId = currentAppointmentId;
+      let apptId = isEditing ? currentAppointmentId : null;
       if (isEditing && apptId) {
         const { error: updateError } = await supabaseClient.from('agendamentos').update(apptPayload).eq('id', apptId);
         if (updateError) throw updateError;
@@ -1083,7 +1098,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
           .eq('agendamento_id', apptId)
           .eq('eh_extra', false);
       } else {
-        const { data, error: insertError } = await supabaseClient.from('agendamentos').insert([apptPayload]).select().single();
+        const createPayload = sanitizeAppointmentCreatePayload(apptPayload);
+        const { data, error: insertError } = await supabaseClient.from('agendamentos').insert([createPayload]).select().single();
         if (insertError) throw insertError;
         apptId = data.id;
 
