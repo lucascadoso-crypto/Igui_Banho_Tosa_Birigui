@@ -1297,16 +1297,16 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                     const statusAccentClass = getAppointmentStatusAccent(appt.status);
 
                     return (
-                     <div key={appt.id} className={`rounded-[2rem] border border-slate-200/80 shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col md:flex-row md:items-center relative isolate p-6 group ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'} ${appt.status === 'Cancelado' ? 'bg-[#f3f4f6]' : 'bg-white'}`}>
+                     <div key={appt.id} className={`relative ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'}`}>
                        {statusAccentClass && (
                           <div
                              aria-hidden="true"
-                             className="appointment-status-accent"
+                             className="appointment-status-backdrop"
                              data-status={statusAccentClass}
                           ></div>
                        )}
-                       
-                       
+                       <div className="rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col md:flex-row md:items-center relative isolate z-10 p-6 group">
+
                        {/* Horário */}
                        <div className="relative z-[2] w-24 text-center border-r border-slate-100 mr-8 hidden md:block shrink-0">
                           <p className="text-2xl font-black text-slate-800 tracking-tighter">{String(appt.horario_inicio).substring(0, 5)}</p>
@@ -1489,6 +1489,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                          )}
                       </div>
                    </div>
+                  </div>
                     );
                   })}
                </div>
