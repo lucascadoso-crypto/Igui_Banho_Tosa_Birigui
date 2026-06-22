@@ -597,11 +597,64 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     }
   };
 
+  const updateAppointmentStatus = async (
+    agendamentoId: number | string,
+    novoStatus: string,
+    options: {
+      notificarAoFinalizar?: boolean;
+      dataInicioReal?: string;
+      dataFimReal?: string;
+    } = {}
+  ) => {
+    const payload: any = { status: novoStatus };
+
+    if (typeof options.notificarAoFinalizar === 'boolean') {
+      payload.notificar_ao_finalizar = options.notificarAoFinalizar;
+    }
+
+    if (options.dataInicioReal) payload.data_inicio_real = options.dataInicioReal;
+    if (options.dataFimReal) payload.data_fim_real = options.dataFimReal;
+
+    const selectColumns = typeof options.notificarAoFinalizar === 'boolean'
+      ? 'id,status,notificar_ao_finalizar'
+      : 'id,status';
+
+    const runUpdate = (updatePayload: any) => supabaseClient
+      .from('agendamentos')
+      .update(updatePayload)
+      .eq('id', agendamentoId)
+      .select(selectColumns)
+      .single();
+
+    let { data, error } = await runUpdate(payload);
+
+    const schemaCacheMiss = error?.message?.includes("notificar_ao_finalizar")
+      || error?.details?.includes("notificar_ao_finalizar")
+      || error?.hint?.includes("notificar_ao_finalizar");
+
+    if (schemaCacheMiss && typeof options.notificarAoFinalizar === 'boolean') {
+      console.warn('Schema cache ainda nao reconheceu notificar_ao_finalizar; finalizando sem bloquear o atendimento.', error);
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.notificar_ao_finalizar;
+      const fallbackResult = await supabaseClient
+        .from('agendamentos')
+        .update(fallbackPayload)
+        .eq('id', agendamentoId)
+        .select('id,status')
+        .single();
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+    }
+
+    if (error) throw error;
+    if (!data?.id) throw new Error('O Supabase nao confirmou a atualizacao do atendimento.');
+    return data;
+  };
+
   const performCancelAppointment = async (appt: any) => {
     setLoading(true);
     try {
-      const { error } = await supabaseClient.from('agendamentos').update({ status: 'Cancelado' }).eq('id', appt.id);
-      if (error) throw error;
+      await updateAppointmentStatus(appt.id, 'Cancelado');
       
       // Log de Auditoria
       registrarAtividade(
@@ -615,8 +668,10 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
       setIsDetailModalOpen(false);
       await fetchData();
+      showToast('Atendimento cancelado.', 'sucesso');
     } catch (err) {
       console.error("Erro ao cancelar agendamento:", err);
+      showToast(`Falha ao cancelar atendimento: ${(err as any)?.message || 'erro desconhecido.'}`, 'erro');
     } finally {
       setLoading(false);
       setConfirmacao({ visivel: false, acao: null, mensagem: '' });
@@ -626,8 +681,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const performReactivateAppointment = async (appt: any) => {
     setLoading(true);
     try {
-      const { error } = await supabaseClient.from('agendamentos').update({ status: 'Agendado' }).eq('id', appt.id);
-      if (error) throw error;
+      await updateAppointmentStatus(appt.id, 'Agendado');
       
       // Log de Auditoria
       registrarAtividade(
@@ -652,11 +706,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const performStartAtendimento = async (appt: any) => {
     setLoading(true);
     try {
-      const { error } = await supabaseClient.from('agendamentos').update({ 
-        status: 'Em Andamento',
-        data_inicio_real: new Date().toISOString()
-      }).eq('id', appt.id);
-      if (error) throw error;
+      await updateAppointmentStatus(appt.id, 'Em Andamento', { dataInicioReal: new Date().toISOString() });
       
       // Log de Auditoria
       registrarAtividade(
@@ -724,21 +774,13 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
   const performFinalizeAppointment = async (appt: any, notifyClient: boolean = true) => {
     setFinalizingAppointmentId(appt.id);
-    setLoading(true);
+      setLoading(true);
     try {
       showToast('Concluindo...', 'info');
-      const { data: updatedAppointment, error } = await supabaseClient
-        .from('agendamentos')
-        .update({
-          status: 'Finalizado',
-          notificar_ao_finalizar: notifyClient,
-          data_fim_real: new Date().toISOString()
-        })
-        .eq('id', appt.id)
-        .select('id,status')
-        .single();
-      if (error) throw error;
-      if (!updatedAppointment?.id) throw new Error('O Supabase nao confirmou a finalizacao do atendimento.');
+      await updateAppointmentStatus(appt.id, 'Finalizado', {
+        notificarAoFinalizar: notifyClient,
+        dataFimReal: new Date().toISOString()
+      });
 
       registrarAtividade(
         unit.id,
