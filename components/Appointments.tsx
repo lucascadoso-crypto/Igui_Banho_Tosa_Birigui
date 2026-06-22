@@ -157,6 +157,28 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     window.open(mapsUrl, '_blank', 'noopener,noreferrer');
   };
 
+  const getAppointmentStatusAccent = (status?: string) => {
+    const normalizedStatus = String(status || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toUpperCase();
+
+    if (normalizedStatus === 'CANCELADO' || normalizedStatus === 'CANCELADA') {
+      return 'cancelado';
+    }
+
+    if (normalizedStatus === 'EM ANDAMENTO' || normalizedStatus === 'INICIADO' || normalizedStatus === 'INICIADA') {
+      return 'andamento';
+    }
+
+    if (normalizedStatus === 'FINALIZADO' || normalizedStatus === 'FINALIZADA' || normalizedStatus === 'CONCLUIDO' || normalizedStatus === 'CONCLUIDA') {
+      return 'finalizado';
+    }
+
+    return '';
+  };
+
   const getTodayBR = () => {
     const dataLocalBR = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     const [dia, mes, ano] = dataLocalBR.split('/');
@@ -1272,12 +1294,21 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                     const clientObservation = appt.clienteRestricoes || '';
                     const hasTransport = appt.tem_taxi || appt.pet_taxi || appt.agendamento_itens?.some((it: any) => it.servicos?.nome?.toUpperCase().includes('TÁXI'));
                     const routeAddress = hasTransport ? buildMapsDestination(appt) : '';
+                    const statusAccentClass = getAppointmentStatusAccent(appt.status);
 
                     return (
-                     <div key={appt.id} className={`rounded-[2rem] border border-slate-200/80 shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col md:flex-row md:items-center relative p-6 group ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'} ${appt.status === 'Cancelado' ? 'bg-[#f3f4f6]' : 'bg-white'}`}>
+                     <div key={appt.id} className={`rounded-[2rem] border border-slate-200/80 shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col md:flex-row md:items-center relative isolate p-6 group ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'} ${appt.status === 'Cancelado' ? 'bg-[#f3f4f6]' : 'bg-white'}`}>
+                       {statusAccentClass && (
+                          <div
+                             aria-hidden="true"
+                             className="appointment-status-accent"
+                             data-status={statusAccentClass}
+                          ></div>
+                       )}
+                       
                        
                        {/* Horário */}
-                       <div className="w-24 text-center border-r border-slate-100 mr-8 hidden md:block shrink-0">
+                       <div className="relative z-[2] w-24 text-center border-r border-slate-100 mr-8 hidden md:block shrink-0">
                           <p className="text-2xl font-black text-slate-800 tracking-tighter">{String(appt.horario_inicio).substring(0, 5)}</p>
                           <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${
                             appt.status === 'Em Andamento' ? 'text-amber-500' : 
@@ -1289,7 +1320,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                        </div>
 
                        {/* Informações do Pet e Cliente */}
-                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenDetail(appt)}>
+                       <div className="relative z-[2] flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenDetail(appt)}>
                           <div className="flex items-center space-x-3 mb-1">
                              <h4 className="font-black text-xl text-slate-800 truncate group-hover:text-amber-600 transition-colors">
                                 {appt.pets?.nome}
@@ -1367,7 +1398,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                       </div>
 
                       {/* Financeiro e Status */}
-                      <div className="mt-4 md:mt-0 md:text-right flex items-center md:flex-col justify-between md:justify-center md:items-end gap-2 shrink-0 md:ml-8">
+                      <div className="relative z-[2] mt-4 md:mt-0 md:text-right flex items-center md:flex-col justify-between md:justify-center md:items-end gap-2 shrink-0 md:ml-8">
                          <div className="flex items-center gap-3">
                             <div className="text-right">
                                <p className="font-black text-xl text-slate-800 tracking-tighter leading-none">R$ {(parseFloat(appt.valor_total) || 0).toFixed(2)}</p>
@@ -1391,7 +1422,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                       </div>
 
                       {/* Botão de Ação (3 Pontinhos) */}
-                      <div className="absolute top-4 right-4 md:static md:ml-6 md:mt-0">
+                      <div className="z-[3] absolute top-4 right-4 md:static md:ml-6 md:mt-0">
                          <button 
                             onClick={(e) => {
                                e.stopPropagation();

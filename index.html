@@ -27,6 +27,35 @@
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+        .appointment-status-accent {
+            position: absolute;
+            pointer-events: none;
+            top: 18px;
+            bottom: 12px;
+            left: 10px;
+            right: 38%;
+            z-index: 1;
+            border-left: 4px solid transparent;
+            border-bottom: 4px solid transparent;
+            border-bottom-left-radius: 1.35rem;
+            box-shadow: none;
+        }
+
+        .appointment-status-accent[data-status="cancelado"] {
+            border-color: #dc2626;
+            filter: drop-shadow(0 4px 8px rgba(220, 38, 38, 0.22));
+        }
+
+        .appointment-status-accent[data-status="andamento"] {
+            border-color: #f59e0b;
+            filter: drop-shadow(0 4px 8px rgba(245, 158, 11, 0.22));
+        }
+
+        .appointment-status-accent[data-status="finalizado"] {
+            border-color: #10b981;
+            filter: drop-shadow(0 4px 8px rgba(16, 185, 129, 0.22));
+        }
+
         @media (max-width: 767px) {
             html,
             body,
