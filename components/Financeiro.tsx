@@ -44,6 +44,31 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
     cartao: 0
   });
 
+  const toNumber = (value: any) => Number.parseFloat(String(value ?? 0)) || 0;
+
+  const normalizePaymentMethod = (method: string) => {
+    const normalized = String(method || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+
+    if (normalized.includes('pix')) return 'pix';
+    if (normalized.includes('dinheiro')) return 'dinheiro';
+    if (normalized.includes('debito')) return 'debito';
+    if (normalized.includes('credito')) return 'credito';
+    if (normalized.includes('transferencia')) return 'transferencia';
+    return normalized ? 'outro' : '';
+  };
+
+  const addPaymentToTotals = (method: string, value: number) => {
+    const normalized = normalizePaymentMethod(method);
+    if (normalized === 'pix') return { pix: value, dinheiro: 0, cartao: 0 };
+    if (normalized === 'dinheiro') return { pix: 0, dinheiro: value, cartao: 0 };
+    if (normalized) return { pix: 0, dinheiro: 0, cartao: value };
+    return { pix: 0, dinheiro: 0, cartao: 0 };
+  };
+
   useEffect(() => {
     fetchFinancialData();
   }, [unit.id, selectedDate]);
@@ -54,7 +79,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
       // 1. Buscar Agendamentos Avulsos Pagos (Onde pacote_id é NULO)
       const apptsPromise = supabaseClient
         .from('agendamentos')
-        .select('id, valor_total, valor_transporte, forma_pagamento, valor_pagamento_2, forma_pagamento_2, data_agendamento, pets(nome), agendamento_itens(servicos(nome))')
+        .select('id, unidade_id, cliente_id, pet_id, pacote_id, valor_total, valor_transporte, forma_pagamento, valor_pagamento_2, forma_pagamento_2, data_agendamento, pets(nome), agendamento_itens(servicos(nome))')
         .eq('unidade_id', unit.id)
         .eq('data_agendamento', selectedDate)
         .eq('pago', true)
@@ -84,17 +109,27 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
         .eq('data_pagamento_extra', selectedDate)
         .eq('status_pagamento_extra', 'PAGO');
 
+      const financialMovementsPromise = supabaseClient
+        .from('financeiro_movimentos')
+        .select('id, unidade_id, cliente_id, pet_id, pacote_id, agendamento_id, tipo, categoria, descricao, valor_total, data_competencia, data_vencimento, status, origem, origem_id, financeiro_pagamentos(id, forma_pagamento, valor, pago_em, observacao)')
+        .eq('unidade_id', unit.id)
+        .eq('data_competencia', selectedDate)
+        .eq('tipo', 'receita')
+        .not('agendamento_id', 'is', null);
+
       const [
         { data: appts, error: apptErr },
         { data: packs, error: packErr },
         { data: expenses, error: expErr },
-        { data: extras, error: extraErr }
-      ] = await Promise.all([apptsPromise, packsPromise, expensesPromise, extrasPromise]);
+        { data: extras, error: extraErr },
+        { data: financialMovements, error: financialMovementsErr }
+      ] = await Promise.all([apptsPromise, packsPromise, expensesPromise, extrasPromise, financialMovementsPromise]);
 
       if (apptErr) throw apptErr;
       if (packErr) throw packErr;
       if (expErr) throw expErr;
       if (extraErr) throw extraErr;
+      if (financialMovementsErr) throw financialMovementsErr;
 
       // 4. Mesclar e Processar
       const combined: any[] = [];
@@ -106,34 +141,60 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
       let pDinheiro = 0;
       let pCartao = 0;
 
+      const adjustedMovementByAppointment = new Map<number, any>();
+      financialMovements?.forEach((movement: any) => {
+        if (!movement?.agendamento_id) return;
+        if (movement?.origem === 'extras_agendamento' || movement?.categoria === 'extras') return;
+        const current = adjustedMovementByAppointment.get(Number(movement.agendamento_id));
+        if (!current || Number(movement.id) > Number(current.id)) {
+          adjustedMovementByAppointment.set(Number(movement.agendamento_id), movement);
+        }
+      });
+
       appts?.forEach((a: any) => {
         try {
           // Se for de pacote, não conta como receita avulsa (já foi contado na venda do pacote)
           if (a?.pacote_id) return;
 
-          const v1 = parseFloat(a?.valor_total) || 0;
-          const v2 = parseFloat(a?.valor_pagamento_2) || 0;
-          const totalAtendimento = v1 + v2;
+          const ajusteFinanceiro = adjustedMovementByAppointment.get(Number(a.id));
+          const pagamentosAjuste = Array.isArray(ajusteFinanceiro?.financeiro_pagamentos)
+            ? [...ajusteFinanceiro.financeiro_pagamentos].sort((pa: any, pb: any) => Number(pa.id) - Number(pb.id))
+            : [];
+
+          const v1 = ajusteFinanceiro ? toNumber(pagamentosAjuste[0]?.valor ?? ajusteFinanceiro.valor_total) : toNumber(a?.valor_total);
+          const v2 = ajusteFinanceiro ? toNumber(pagamentosAjuste[1]?.valor) : toNumber(a?.valor_pagamento_2);
+          const totalAtendimento = ajusteFinanceiro ? toNumber(ajusteFinanceiro.valor_total) : v1 + v2;
           
-          const taxi = parseFloat(a?.valor_transporte) || 0;
+          const taxi = toNumber(a?.valor_transporte);
           sumAvulso += (totalAtendimento - taxi);
           sumTransporte += taxi;
           
-          const m1 = (a?.forma_pagamento || '').toLowerCase();
-          const m2 = (a?.forma_pagamento_2 || '').toLowerCase();
+          const m1 = ajusteFinanceiro ? (pagamentosAjuste[0]?.forma_pagamento || '') : (a?.forma_pagamento || '');
+          const m2 = ajusteFinanceiro ? (pagamentosAjuste[1]?.forma_pagamento || '') : (a?.forma_pagamento_2 || '');
 
           // Contabilizar Valor 1
-          if (m1 === 'pix') pPix += v1;
-          else if (m1 === 'dinheiro') pDinheiro += v1;
-          else if (m1) pCartao += v1;
+          const totalM1 = addPaymentToTotals(m1, v1);
+          pPix += totalM1.pix;
+          pDinheiro += totalM1.dinheiro;
+          pCartao += totalM1.cartao;
 
           // Contabilizar Valor 2
-          if (m2 === 'pix') pPix += v2;
-          else if (m2 === 'dinheiro') pDinheiro += v2;
-          else if (m2) pCartao += v2;
+          const totalM2 = addPaymentToTotals(m2, v2);
+          pPix += totalM2.pix;
+          pDinheiro += totalM2.dinheiro;
+          pCartao += totalM2.cartao;
 
           // Processar lista de serviços com segurança
           const listaServicos = a?.agendamento_itens?.map((it: any) => it?.servicos?.nome).filter(Boolean).join(', ') || 'Serviço não especificado';
+
+          const originalData = ajusteFinanceiro ? {
+            ...a,
+            ajuste_financeiro: ajusteFinanceiro,
+            valor_total: v1,
+            forma_pagamento: m1,
+            valor_pagamento_2: v2,
+            forma_pagamento_2: m2
+          } : a;
 
           combined.push({
             id: a?.id || Math.random().toString(36).substr(2, 9),
@@ -141,11 +202,11 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
             descricao: `Banho: ${a?.pets?.nome || 'Pet'}`,
             subDescricao: listaServicos,
             valor: totalAtendimento,
-            metodo: m2 ? `${a.forma_pagamento} + ${a.forma_pagamento_2}` : (a?.forma_pagamento || 'N/A'),
+            metodo: m2 ? `${m1} + ${m2}` : (m1 || 'N/A'),
             hora: 'Atendimento',
             natureza: 'Entrada',
             sourceTable: 'agendamentos',
-            originalData: a
+            originalData
           });
         } catch (innerErr) {
           console.error("Erro ao processar agendamento individual:", innerErr, a);
@@ -266,6 +327,140 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
     return `${d}/${m}/${y}`;
   };
 
+  const saveAppointmentFinancialAdjustment = async (transaction: any, originalData: any) => {
+    const valorPrincipal = toNumber(editForm.valor);
+    const valorSecundario = toNumber(editForm.valor2);
+    const valorTotal = valorPrincipal + valorSecundario;
+    const metodoPrincipal = normalizePaymentMethod(editForm.metodo);
+    const metodoSecundario = normalizePaymentMethod(editForm.metodo2);
+
+    if (valorPrincipal <= 0) {
+      throw new Error('Informe um valor principal maior que zero.');
+    }
+
+    if (!metodoPrincipal) {
+      throw new Error('Informe o método de pagamento principal.');
+    }
+
+    if (valorSecundario > 0 && !metodoSecundario) {
+      throw new Error('Informe o método do segundo pagamento.');
+    }
+
+    const baseMovement = {
+      unidade_id: unit.id,
+      cliente_id: originalData.cliente_id || null,
+      pet_id: originalData.pet_id || null,
+      pacote_id: originalData.pacote_id || null,
+      agendamento_id: originalData.id,
+      tipo: 'receita',
+      categoria: 'banho_avulso',
+      descricao: transaction.descricao,
+      valor_total: valorTotal,
+      data_competencia: originalData.data_agendamento || selectedDate,
+      data_vencimento: originalData.data_agendamento || selectedDate,
+      status: 'pago',
+      origem: 'ajuste_agendamento',
+      origem_id: String(originalData.id)
+    };
+
+    let movimento = originalData.ajuste_financeiro;
+
+    if (!movimento?.id) {
+      const { data: existingMovements, error: existingMovementError } = await supabaseClient
+        .from('financeiro_movimentos')
+        .select('id, origem, categoria')
+        .eq('unidade_id', unit.id)
+        .eq('agendamento_id', originalData.id)
+        .order('id', { ascending: false });
+
+      if (existingMovementError) throw existingMovementError;
+
+      movimento = existingMovements?.find((item: any) => item?.origem !== 'extras_agendamento' && item?.categoria !== 'extras');
+    }
+
+    if (movimento?.id) {
+      const { error: updateMovementError } = await supabaseClient
+        .from('financeiro_movimentos')
+        .update(baseMovement)
+        .eq('id', movimento.id);
+
+      if (updateMovementError) throw updateMovementError;
+    } else {
+      const { data: insertedMovement, error: insertMovementError } = await supabaseClient
+        .from('financeiro_movimentos')
+        .insert([baseMovement])
+        .select('id')
+        .single();
+
+      if (insertMovementError) throw insertMovementError;
+      movimento = insertedMovement;
+    }
+
+    const { data: existingPayments, error: paymentsFetchError } = await supabaseClient
+      .from('financeiro_pagamentos')
+      .select('id')
+      .eq('movimento_id', movimento.id)
+      .order('id', { ascending: true });
+
+    if (paymentsFetchError) throw paymentsFetchError;
+
+    const paidAt = `${originalData.data_agendamento || selectedDate}T12:00:00-03:00`;
+    const desiredPayments = [
+      {
+        unidade_id: unit.id,
+        movimento_id: movimento.id,
+        forma_pagamento: metodoPrincipal,
+        valor: valorPrincipal,
+        pago_em: paidAt,
+        observacao: `Pagamento principal ajustado do agendamento ${originalData.id}`
+      }
+    ];
+
+    if (valorSecundario > 0) {
+      desiredPayments.push({
+        unidade_id: unit.id,
+        movimento_id: movimento.id,
+        forma_pagamento: metodoSecundario,
+        valor: valorSecundario,
+        pago_em: paidAt,
+        observacao: `Pagamento complementar ajustado do agendamento ${originalData.id}`
+      });
+    }
+
+    for (let index = 0; index < desiredPayments.length; index += 1) {
+      const payment = desiredPayments[index];
+      const existingPayment = existingPayments?.[index];
+
+      if (existingPayment?.id) {
+        const { error: updatePaymentError } = await supabaseClient
+          .from('financeiro_pagamentos')
+          .update(payment)
+          .eq('id', existingPayment.id);
+
+        if (updatePaymentError) throw updatePaymentError;
+      } else {
+        const { error: insertPaymentError } = await supabaseClient
+          .from('financeiro_pagamentos')
+          .insert([payment]);
+
+        if (insertPaymentError) throw insertPaymentError;
+      }
+    }
+
+    const stalePayments = existingPayments?.slice(desiredPayments.length) || [];
+    for (const stalePayment of stalePayments) {
+      const { error: stalePaymentError } = await supabaseClient
+        .from('financeiro_pagamentos')
+        .update({
+          valor: 0,
+          observacao: `Pagamento excedente zerado pelo ajuste financeiro do agendamento ${originalData.id}`
+        })
+        .eq('id', stalePayment.id);
+
+      if (stalePaymentError) throw stalePaymentError;
+    }
+  };
+
   const handleSaveAdjustment = async () => {
     // Segurança Extra: Validação em tempo de execução
     if (!isMaster) {
@@ -284,15 +479,8 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
 
       // Montar objeto de atualização baseado na origem
       if (sourceTable === 'agendamentos') {
-        updates = {
-          valor_total: editForm.valor,
-          forma_pagamento: editForm.metodo,
-          valor_pagamento_2: editForm.valor2,
-          forma_pagamento_2: editForm.metodo2,
-          // Garante que o agendamento continue marcado como pago
-          pago: true,
-          data_pagamento: originalData.data_pagamento || selectedDate
-        };
+        await saveAppointmentFinancialAdjustment(editingTransaction, originalData);
+        targetTable = 'financeiro_movimentos';
       } else if (sourceTable === 'pacotes') {
         updates = {
           valor_total: editForm.valor,
@@ -317,12 +505,14 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
       }
 
       // Executar Atualização
-      const { error } = await supabaseClient
-        .from(targetTable)
-        .update(updates)
-        .eq('id', originalData.id);
+      if (sourceTable !== 'agendamentos') {
+        const { error } = await supabaseClient
+          .from(targetTable)
+          .update(updates)
+          .eq('id', originalData.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       // Gerar Log de Auditoria Detalhado
       const oldValDetailed = `${oldValor.toFixed(2)} (${oldMetodo})`;
@@ -343,10 +533,10 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
 
       setEditingTransaction(null);
       fetchFinancialData();
-      alert('Lançamento ajustado com sucesso. O log de auditoria foi registrado.');
+      alert('Ajuste financeiro salvo com sucesso.');
     } catch (err: any) {
       console.error('Erro ao salvar ajuste:', err);
-      alert('Falha na sincronização: ' + (err.message || 'Erro desconhecido'));
+      alert('Falha ao salvar ajuste financeiro: ' + (err.message || 'Erro desconhecido'));
     } finally {
       setSavingEdit(false);
     }
