@@ -28,6 +28,9 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const [activeCardMenuId, setActiveCardMenuId] = useState<number | string | null>(null);
   const [expandedObservationId, setExpandedObservationId] = useState<string | null>(null);
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
+  const [showTaxiRouteMenu, setShowTaxiRouteMenu] = useState(false);
+  const [loadingTaxiRoute, setLoadingTaxiRoute] = useState<'manha' | 'tarde' | null>(null);
+  const [taxiRoutePreview, setTaxiRoutePreview] = useState<any | null>(null);
 
   // Novo modal de cadastro rápido
   const [isQuickClientModalOpen, setIsQuickClientModalOpen] = useState(false);
@@ -155,6 +158,79 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
     const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(enderecoCompleto)}`;
     window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const isTaxiAppointment = (appt: any) => Boolean(appt.tem_taxi || appt.pet_taxi);
+
+  const isCancelledStatus = (status?: string) => {
+    const normalized = String(status || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toUpperCase();
+    return normalized === 'CANCELADO' || normalized === 'CANCELADA';
+  };
+
+  const getTaxiRouteStopsCount = (turno: 'manha' | 'tarde') => {
+    const addresses = new Set<string>();
+
+    appointments.forEach((appt: any) => {
+      if (!isTaxiAppointment(appt) || isCancelledStatus(appt.status)) return;
+      const hour = String(appt.horario_inicio || '00:00').substring(0, 5);
+      const isMorning = hour < '12:00';
+      if ((turno === 'manha' && !isMorning) || (turno === 'tarde' && isMorning)) return;
+
+      const client = appt.clientes || appt.pets?.clientes;
+      const pet = appt.pets;
+      const address = buildMapsDestination({ ...appt, clientes: client });
+      if (!client?.id || !pet?.id || address.length < 10) return;
+      addresses.add(address.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase());
+    });
+
+    return addresses.size;
+  };
+
+  const handleGenerateTaxiRoute = async (turno: 'manha' | 'tarde') => {
+    setLoadingTaxiRoute(turno);
+    setShowTaxiRouteMenu(false);
+    try {
+      const { data, error } = await supabaseClient.functions.invoke('gerar-rota-taxi', {
+        body: {
+          unidadeId: unit.id,
+          data: selectedDate,
+          turno
+        }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setTaxiRoutePreview(data);
+    } catch (err: any) {
+      console.error('Erro ao gerar rota do táxi:', err);
+      showToast(err.message || 'Não foi possível gerar a rota do táxi.', 'erro');
+    } finally {
+      setLoadingTaxiRoute(null);
+    }
+  };
+
+  const openMapsUrl = (url?: string) => {
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const formatRouteDistance = (meters?: number | null) => {
+    if (!meters) return '--';
+    return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${meters} m`;
+  };
+
+  const formatRouteDuration = (seconds?: number | null) => {
+    if (!seconds) return '--';
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return `${hours}h${rest ? ` ${rest}min` : ''}`;
   };
 
   const getAppointmentStatusAccent = (status?: string) => {
@@ -1105,6 +1181,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     pendentes: appointments.filter(a => a.status === 'Agendado').length,
     pacotes: appointments.filter(a => a.pacote_id !== null).length
   };
+  const taxiMorningStops = getTaxiRouteStopsCount('manha');
+  const taxiAfternoonStops = getTaxiRouteStopsCount('tarde');
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 relative">
@@ -1125,6 +1203,166 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
         </div>
       )}
 
+      {loadingTaxiRoute && (
+        <div className="app-modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="app-modal-panel bg-white rounded-[2rem] shadow-2xl p-8 flex items-center gap-4">
+            <i className="fa-solid fa-route fa-spin text-2xl text-teal-600"></i>
+            <div>
+              <p className="font-black text-slate-800">Calculando melhor rota...</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                {loadingTaxiRoute === 'manha' ? 'Rota da manhã' : 'Rota da tarde'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {taxiRoutePreview && (
+        <div className="app-modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="app-modal-panel bg-white w-full max-w-4xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in duration-200">
+            <header className="app-modal-header bg-teal-600 text-white p-5 md:p-7 flex items-start justify-between shrink-0">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-teal-100">Ferramenta operacional</p>
+                <h3 className="text-xl md:text-2xl font-black">
+                  Rota do Táxi — {taxiRoutePreview.turno === 'manha' ? 'Manhã' : 'Tarde'}
+                </h3>
+                <p className="text-xs font-bold text-teal-100 mt-1">
+                  {selectedDate.split('-').reverse().join('/')} · {taxiRoutePreview.unidade?.nome || unit.name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTaxiRoutePreview(null)}
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xl"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </header>
+
+            <div className="app-modal-body flex-1 overflow-y-auto p-5 md:p-7 space-y-5">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 text-center">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Paradas</p>
+                  <p className="text-2xl font-black text-slate-800">{taxiRoutePreview.quantidadeParadas || 0}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 text-center">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Pets</p>
+                  <p className="text-2xl font-black text-slate-800">{taxiRoutePreview.quantidadePets || 0}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 text-center">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Distância</p>
+                  <p className="text-2xl font-black text-slate-800">{formatRouteDistance(taxiRoutePreview.distanciaMetros)}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 text-center">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Duração</p>
+                  <p className="text-2xl font-black text-slate-800">{formatRouteDuration(taxiRoutePreview.duracaoSegundos)}</p>
+                </div>
+              </div>
+
+              {taxiRoutePreview.quantidadeParadas === 0 ? (
+                <div className="rounded-3xl bg-slate-50 border border-slate-100 p-8 text-center">
+                  <i className="fa-solid fa-route text-4xl text-slate-300 mb-3"></i>
+                  <p className="font-black text-slate-700">Sem paradas para este período.</p>
+                  <p className="text-sm font-bold text-slate-400 mt-1">Não há atendimentos com táxi e endereço válido neste turno.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-teal-100 bg-teal-50 p-4 flex items-start gap-3">
+                    <span className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-black shrink-0">1</span>
+                    <div>
+                      <p className="font-black text-slate-800">{taxiRoutePreview.unidade?.nome || unit.name} — Saída</p>
+                      <p className="text-xs font-bold text-slate-500 break-words">{taxiRoutePreview.unidade?.endereco}</p>
+                    </div>
+                  </div>
+
+                  {taxiRoutePreview.paradas?.map((stop: any, index: number) => (
+                    <div key={`${stop.endereco}-${index}`} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                      <div className="flex items-start gap-3">
+                        <span className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-black shrink-0">{index + 2}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-black text-slate-800 break-words">{stop.endereco}</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">{(stop.clientes || []).join(' / ')}</p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {(stop.agendamentos || []).map((item: any) => (
+                              <span key={item.id} className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2 text-[10px] font-black text-slate-600">
+                                {item.pet} — {String(item.horario || '').substring(0, 5)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openMapsUrl(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(stop.endereco)}`)}
+                          className="shrink-0 rounded-full bg-teal-50 text-teal-700 px-3 py-2 text-[10px] font-black hover:bg-teal-100"
+                        >
+                          Maps
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="rounded-2xl border border-teal-100 bg-teal-50 p-4 flex items-start gap-3">
+                    <span className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-black shrink-0">{(taxiRoutePreview.paradas?.length || 0) + 2}</span>
+                    <div>
+                      <p className="font-black text-slate-800">{taxiRoutePreview.unidade?.nome || unit.name} — Retorno</p>
+                      <p className="text-xs font-bold text-slate-500 break-words">{taxiRoutePreview.unidade?.endereco}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {taxiRoutePreview.ignorados?.length > 0 && (
+                <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4">
+                  <p className="text-sm font-black text-amber-800">
+                    {taxiRoutePreview.ignorados.length} atendimentos não entraram na rota porque o endereço do cliente está ausente ou incompleto.
+                  </p>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {taxiRoutePreview.ignorados.map((item: any) => (
+                      <div key={`${item.agendamentoId}-${item.pet}`} className="rounded-xl bg-white/70 px-3 py-2 text-xs font-bold text-amber-900">
+                        {item.cliente} · {item.pet} {item.horario ? `· ${item.horario}` : ''}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <footer className="app-modal-footer bg-slate-50 border-t border-slate-100 p-4 md:p-6 flex flex-col sm:flex-row gap-3 justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setTaxiRoutePreview(null)}
+                className="px-6 py-3 rounded-2xl bg-white border border-slate-200 text-slate-500 font-black text-xs uppercase tracking-widest hover:bg-slate-100"
+              >
+                CANCELAR
+              </button>
+              {taxiRoutePreview.mapsUrl ? (
+                <button
+                  type="button"
+                  onClick={() => openMapsUrl(taxiRoutePreview.mapsUrl)}
+                  disabled={!taxiRoutePreview.mapsUrl}
+                  className="px-6 py-3 rounded-2xl bg-teal-600 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-teal-500/20 disabled:opacity-50"
+                >
+                  ABRIR ROTA NO MAPS
+                </button>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {taxiRoutePreview.trechos?.map((segment: any, index: number) => (
+                    <button
+                      key={`${segment.titulo}-${index}`}
+                      type="button"
+                      onClick={() => openMapsUrl(segment.mapsUrl)}
+                      className="px-4 py-3 rounded-2xl bg-teal-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-teal-500/20"
+                    >
+                      ABRIR {segment.titulo} NO MAPS
+                    </button>
+                  ))}
+                </div>
+              )}
+            </footer>
+          </div>
+        </div>
+      )}
+
       {/* Header Principal */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
         <div className="flex items-center space-x-4">
@@ -1136,11 +1374,57 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
               <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">iG {unit.name}</p>
            </div>
         </div>
-        {!isReadOnly && (
-          <button onClick={handleOpenNew} className="bg-[#F59E0B] hover:opacity-90 text-white px-8 py-3 rounded-2xl font-black flex items-center shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
-            <i className="fa-solid fa-plus mr-2"></i> NOVO BANHO
-          </button>
-        )}
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowTaxiRouteMenu(prev => !prev)}
+              className="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white px-5 py-3 rounded-2xl font-black flex items-center justify-center shadow-lg shadow-teal-500/20 active:scale-95 transition-all text-xs uppercase tracking-widest"
+            >
+              <i className="fa-solid fa-route mr-2"></i>
+              ROTA DO TÁXI
+            </button>
+
+            {showTaxiRouteMenu && (
+              <div className="absolute right-0 mt-3 w-[min(92vw,320px)] bg-white rounded-3xl shadow-2xl border border-slate-100 z-50 p-3">
+                {([
+                  { turno: 'manha' as const, titulo: 'Rota da Manhã', subtitulo: 'ATÉ 12:00', count: taxiMorningStops },
+                  { turno: 'tarde' as const, titulo: 'Rota da Tarde', subtitulo: 'APÓS 12:00', count: taxiAfternoonStops }
+                ]).map((item) => {
+                  const disabled = item.count === 0 || loadingTaxiRoute !== null;
+                  return (
+                    <button
+                      key={item.turno}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => handleGenerateTaxiRoute(item.turno)}
+                      className={`w-full rounded-2xl p-4 text-left flex items-center justify-between transition-all ${disabled ? 'opacity-45 cursor-not-allowed' : 'hover:bg-teal-50 active:scale-[0.99]'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center">
+                          <i className={`fa-solid ${item.turno === 'manha' ? 'fa-sun' : 'fa-moon'}`}></i>
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-slate-800">{item.titulo}</p>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{item.subtitulo}</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-teal-600">
+                        {loadingTaxiRoute === item.turno ? 'Calculando...' : item.count > 0 ? `${item.count} paradas` : 'Sem paradas'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {!isReadOnly && (
+            <button onClick={handleOpenNew} className="bg-[#F59E0B] hover:opacity-90 text-white px-8 py-3 rounded-2xl font-black flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
+              <i className="fa-solid fa-plus mr-2"></i> NOVO BANHO
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
