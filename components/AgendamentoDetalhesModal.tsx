@@ -38,6 +38,13 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   const [formaPagamento, setFormaPagamento] = useState('Pix');
   const [toast, setToast] = useState<{ visivel: boolean; mensagem: string; tipo: 'sucesso' | 'erro' | 'carregando' }>({ visivel: false, mensagem: '', tipo: 'carregando' });
   const [loadingReminder, setLoadingReminder] = useState(false);
+  const [showPackageConversion, setShowPackageConversion] = useState(false);
+  const [packageConversionMode, setPackageConversionMode] = useState<'future' | 'include_current'>('include_current');
+  const [paidConversionChoice, setPaidConversionChoice] = useState<'credit' | 'separate'>('credit');
+  const [packageSessionCount, setPackageSessionCount] = useState(4);
+  const [packageIntervalDays, setPackageIntervalDays] = useState(7);
+  const [packageTotalValue, setPackageTotalValue] = useState(Number(appt?.valor_total || 0) * 4);
+  const [loadingPackageConversion, setLoadingPackageConversion] = useState(false);
 
   // Estados para Extras
   const [isAddingExtra, setIsAddingExtra] = useState(false);
@@ -68,11 +75,193 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   const totalBaseAgendamento = Number(appt.valor_total || 0);
   const totalGeral = appt.pacote_id ? totalBaseAgendamento : Math.max(0, valorServicos + valorTransporte + totalExtra - valorDesconto);
   const isSomaValida = !isDividirPagamento || (Math.abs((valor1 + valor2) - totalGeral) < 0.01);
-  const client = appt.pets?.clientes;
+  const client = appt.clientes || appt.pets?.clientes;
   const pet = appt.pets;
+  const normalizedStatus = String(appt.status || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+  const canCreatePackage = !isReadOnly && !['somente_leitura'].includes(userProfile?.cargo || '');
+  const canTurnIntoPackage = !appt.pacote_id && normalizedStatus !== 'CANCELADO' && normalizedStatus !== 'CANCELADA' && client?.id && pet?.id && canCreatePackage;
+  const conversionServiceIds = mainItems
+    .map((item: any) => item.servico_id)
+    .filter((id: any) => id !== null && id !== undefined);
+  const currentServiceTotal = Math.max(0, valorServicos || totalBaseAgendamento || Number(appt.valor_total || 0));
+  const packagePricePerSession = packageSessionCount > 0 ? (Number(packageTotalValue || 0) / packageSessionCount) : 0;
   const showToast = (mensagem: string, tipo: 'sucesso' | 'erro' | 'carregando' = 'sucesso') => {
     setToast({ visivel: true, mensagem, tipo });
     setTimeout(() => setToast(prev => ({ ...prev, visivel: false })), 3000);
+  };
+
+  const addDays = (dateStr: string, days: number) => {
+    const date = new Date(`${dateStr}T12:00:00`);
+    date.setDate(date.getDate() + days);
+    return date.toISOString().split('T')[0];
+  };
+
+  const openPackageConversion = () => {
+    if (!canTurnIntoPackage) return;
+    setPackageConversionMode('include_current');
+    setPaidConversionChoice('credit');
+    setPackageSessionCount(4);
+    setPackageIntervalDays(7);
+    setPackageTotalValue(Math.max(currentServiceTotal * 4, Number(appt.valor_total || 0)));
+    setShowPackageConversion(true);
+  };
+
+  const handleCreatePackageFromAppointment = async () => {
+    if (!canTurnIntoPackage || loadingPackageConversion) return;
+    if (!client?.id || !pet?.id) {
+      showToast('Cliente ou pet nÃ£o vinculado ao agendamento.', 'erro');
+      return;
+    }
+    if (packageSessionCount < 1 || Number(packageTotalValue || 0) <= 0) {
+      showToast('Informe a quantidade de sessÃµes e o valor do pacote.', 'erro');
+      return;
+    }
+    if (conversionServiceIds.length === 0) {
+      showToast('Este agendamento nÃ£o possui serviÃ§o principal para usar como referÃªncia.', 'erro');
+      return;
+    }
+
+    let createdPackageId: number | string | null = null;
+    setLoadingPackageConversion(true);
+    try {
+      const petName = pet?.nome || 'Pet';
+      const packageName = `Pacote convertido - ${petName}`;
+      const shouldUseCredit = Boolean(appt.pago) && paidConversionChoice === 'credit';
+      const packagePayload: any = {
+        nome: packageName,
+        nome_pacote: packageName,
+        cliente_id: client.id,
+        pet_id: pet.id,
+        unidade_id: appt.unidade_id,
+        qtd_sessoes: packageSessionCount,
+        valor_total: Number(packageTotalValue),
+        valor_transporte: 0,
+        ativo: true,
+        renovacao_automatica: false,
+        status: 'ATIVO',
+        pago: shouldUseCredit,
+        forma_pagamento: shouldUseCredit ? (appt.forma_pagamento || 'CrÃ©dito de agendamento') : null,
+        data_pagamento: shouldUseCredit ? new Date().toISOString().split('T')[0] : null
+      };
+
+      const { data: pack, error: packError } = await supabaseClient
+        .from('pacotes')
+        .insert([packagePayload])
+        .select()
+        .single();
+
+      if (packError) throw packError;
+      createdPackageId = pack.id;
+
+      const sessionsToCreate = packageConversionMode === 'include_current'
+        ? Math.max(0, packageSessionCount - 1)
+        : packageSessionCount;
+      const firstOffset = packageConversionMode === 'include_current' ? 1 : 1;
+
+      const appointmentsPayload = Array.from({ length: sessionsToCreate }).map((_, index) => {
+        const sessionNumber = packageConversionMode === 'include_current' ? index + 2 : index + 1;
+        return {
+          pet_id: pet.id,
+          cliente_id: client.id,
+          pacote_id: pack.id,
+          unidade_id: appt.unidade_id,
+          data_agendamento: addDays(appt.data_agendamento, packageIntervalDays * (index + firstOffset)),
+          horario_inicio: appt.horario_inicio,
+          valor_total: packagePricePerSession,
+          valor_transporte: 0,
+          status: 'Agendado',
+          numero_sessao: sessionNumber,
+          tem_taxi: false
+        };
+      });
+
+      const { data: newAppointments, error: appointmentsError } = appointmentsPayload.length > 0
+        ? await supabaseClient.from('agendamentos').insert(appointmentsPayload).select()
+        : { data: [], error: null };
+
+      if (appointmentsError) throw appointmentsError;
+
+      if (packageConversionMode === 'include_current') {
+        const updatePayload: any = {
+          pacote_id: pack.id,
+          numero_sessao: 1,
+          valor_total: packagePricePerSession,
+          cliente_id: client.id,
+          pet_id: pet.id
+        };
+
+        if (!appt.pago) {
+          updatePayload.pago = false;
+          updatePayload.forma_pagamento = null;
+          updatePayload.valor_pagamento_2 = 0;
+          updatePayload.forma_pagamento_2 = null;
+        }
+
+        const { error: updateAppointmentError } = await supabaseClient
+          .from('agendamentos')
+          .update(updatePayload)
+          .eq('id', appt.id);
+
+        if (updateAppointmentError) throw updateAppointmentError;
+      }
+
+      const itemsPayload: any[] = [];
+      (newAppointments || []).forEach((newAppt: any) => {
+        mainItems.forEach((item: any) => {
+          if (!item.servico_id) return;
+          itemsPayload.push({
+            unidade_id: appt.unidade_id,
+            agendamento_id: newAppt.id,
+            servico_id: item.servico_id,
+            descricao: item.descricao || item.servicos?.nome || null,
+            tipo: 'principal',
+            eh_extra: false,
+            valor: 0,
+            valor_extra: 0,
+            valor_cobrado: 0
+          });
+        });
+      });
+
+      if (itemsPayload.length > 0) {
+        const { error: itemsError } = await supabaseClient.from('agendamento_itens').insert(itemsPayload);
+        if (itemsError) throw itemsError;
+      }
+
+      registrarAtividade(
+        appt.unidade_id,
+        userProfile?.email || 'sistema',
+        'CONVERTER_AGENDAMENTO_PACOTE',
+        `Converteu o agendamento ${appt.id} do pet ${petName} em pacote ${pack.id}. Modo: ${packageConversionMode === 'include_current' ? 'sessÃ£o atual como 1' : 'prÃ³ximos atendimentos'}. Extras preservados separadamente.`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+
+      showToast('Pacote criado com sucesso.');
+      setShowPackageConversion(false);
+      onRefresh();
+    } catch (err: any) {
+      console.error('Erro ao tornar agendamento em pacote:', err);
+      if (createdPackageId) {
+        await supabaseClient
+          .from('agendamentos')
+          .update({
+            pacote_id: null,
+            numero_sessao: null,
+            valor_total: totalBaseAgendamento
+          })
+          .eq('id', appt.id);
+        await supabaseClient.from('agendamentos').delete().eq('pacote_id', createdPackageId).neq('id', appt.id);
+        await supabaseClient.from('pacotes').delete().eq('id', createdPackageId);
+      }
+      showToast(err.message || 'NÃ£o foi possÃ­vel criar o pacote.', 'erro');
+    } finally {
+      setLoadingPackageConversion(false);
+    }
   };
 
   const normalizeFormaPagamento = (method: string) => {
@@ -901,7 +1090,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
         </div>
 
         <footer className="app-modal-footer p-4 md:p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center shrink-0 gap-2">
-          <div className="flex gap-2 flex-1 md:flex-none">
+          <div className="flex flex-wrap gap-2 flex-1 md:flex-none">
             {!isReadOnly && (
               <button 
                 onClick={() => onEdit(appt)}
@@ -923,6 +1112,16 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
               )}
               ENVIAR LEMBRETE
             </button>
+
+            {canTurnIntoPackage && (
+              <button
+                onClick={openPackageConversion}
+                className="flex-1 md:flex-none bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-3 md:px-8 md:py-3.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-[0.15em] shadow-lg shadow-indigo-500/20 active:scale-95 transition-all flex items-center justify-center"
+              >
+                <i className="fa-solid fa-layer-group mr-2 text-sm"></i>
+                TORNAR PACOTE
+              </button>
+            )}
           </div>
           
           <div className="relative">
@@ -970,6 +1169,152 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
           </div>
         </footer>
       </div>
+
+      {showPackageConversion && (
+        <div className="app-modal-overlay fixed inset-0 z-[180] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="app-modal-panel bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+            <header className="app-modal-header p-5 md:p-7 bg-indigo-600 text-white flex items-center justify-between shrink-0">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-100">Converter agendamento</p>
+                <h3 className="text-xl md:text-2xl font-black">Tornar pacote</h3>
+              </div>
+              <button
+                onClick={() => setShowPackageConversion(false)}
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xl"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </header>
+
+            <div className="app-modal-body flex-1 overflow-y-auto p-5 md:p-7 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Cliente</p>
+                  <p className="font-black text-slate-800 truncate">{client?.nome}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Pet</p>
+                  <p className="font-black text-slate-800 truncate">{pet?.nome}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">SessÃµes</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={packageSessionCount}
+                    onChange={(e) => setPackageSessionCount(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 font-black outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Intervalo</span>
+                  <select
+                    value={packageIntervalDays}
+                    onChange={(e) => setPackageIntervalDays(Number(e.target.value))}
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 font-black outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value={7}>Semanal</option>
+                    <option value={14}>Quinzenal</option>
+                  </select>
+                </label>
+                <label className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Valor pacote</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={packageTotalValue}
+                    onChange={(e) => setPackageTotalValue(Number(e.target.value) || 0)}
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 font-black outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </label>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setPackageConversionMode('future')}
+                  className={`w-full text-left rounded-2xl border p-4 transition-all ${packageConversionMode === 'future' ? 'border-indigo-300 bg-indigo-50 ring-2 ring-indigo-100' : 'border-slate-100 bg-white hover:bg-slate-50'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <i className="fa-solid fa-forward text-indigo-500 mt-1"></i>
+                    <div>
+                      <p className="font-black text-slate-800">ComeÃ§ar pacote nos prÃ³ximos atendimentos</p>
+                      <p className="text-xs font-bold text-slate-500 mt-1">Este agendamento continua avulso. O pacote serÃ¡ usado somente nos prÃ³ximos banhos.</p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPackageConversionMode('include_current')}
+                  className={`w-full text-left rounded-2xl border p-4 transition-all ${packageConversionMode === 'include_current' ? 'border-indigo-300 bg-indigo-50 ring-2 ring-indigo-100' : 'border-slate-100 bg-white hover:bg-slate-50'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <i className="fa-solid fa-layer-group text-indigo-500 mt-1"></i>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-black text-slate-800">Contar este atendimento como primeira sessÃ£o</p>
+                        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-black uppercase text-indigo-600">Recomendado</span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-500 mt-1">Este agendamento serÃ¡ convertido na sessÃ£o 1 do pacote. Os prÃ³ximos atendimentos serÃ£o criados como as sessÃµes restantes.</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4 text-xs font-bold text-amber-800 space-y-2">
+                {!appt.pago ? (
+                  <p>O valor avulso serÃ¡ substituÃ­do pela cobranÃ§a do pacote apÃ³s a confirmaÃ§Ã£o.</p>
+                ) : (
+                  <div className="space-y-3">
+                    <p>Este agendamento jÃ¡ estÃ¡ pago. Escolha como tratar o recebimento:</p>
+                    <label className="flex items-start gap-2">
+                      <input type="radio" className="mt-0.5 accent-indigo-600" checked={paidConversionChoice === 'credit'} onChange={() => setPaidConversionChoice('credit')} />
+                      <span>Usar pagamento jÃ¡ recebido como crÃ©dito do pacote</span>
+                    </label>
+                    <label className="flex items-start gap-2">
+                      <input type="radio" className="mt-0.5 accent-indigo-600" checked={paidConversionChoice === 'separate'} onChange={() => setPaidConversionChoice('separate')} />
+                      <span>Manter este pagamento como avulso e cobrar o pacote separadamente</span>
+                    </label>
+                  </div>
+                )}
+                <p>Extras deste atendimento permanecem separados do pacote.</p>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">ServiÃ§os usados como referÃªncia</p>
+                <div className="flex flex-wrap gap-2">
+                  {mainItems.map((item: any) => (
+                    <span key={item.id} className="rounded-xl bg-white border border-slate-100 px-3 py-2 text-[10px] font-black text-slate-600">
+                      {item.descricao || item.servicos?.nome || 'ServiÃ§o'}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <footer className="app-modal-footer p-4 md:p-6 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row gap-3 justify-end shrink-0">
+              <button
+                onClick={() => setShowPackageConversion(false)}
+                className="px-6 py-3 rounded-2xl bg-white border border-slate-200 text-slate-500 font-black text-xs uppercase tracking-widest hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreatePackageFromAppointment}
+                disabled={loadingPackageConversion}
+                className="px-6 py-3 rounded-2xl bg-indigo-600 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/20 active:scale-95 disabled:opacity-60 flex items-center justify-center"
+              >
+                {loadingPackageConversion ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : <i className="fa-solid fa-check-circle mr-2"></i>}
+                Confirmar pacote
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
 
       {toast.visivel && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] animate-in slide-in-from-bottom-5 duration-300">
