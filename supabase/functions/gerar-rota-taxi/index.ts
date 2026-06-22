@@ -144,7 +144,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         error: "O otimizador de rotas ainda nao foi configurado. Configure a chave da Google Routes API para gerar a melhor sequencia de paradas.",
         code: "GOOGLE_ROUTES_KEY_MISSING",
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
     }
 
     const { unidadeId, data, turno } = await req.json() as {
