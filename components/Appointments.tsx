@@ -179,6 +179,43 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     return '';
   };
 
+  const getAppointmentStatusBackdropStyle = (statusAccent: string): React.CSSProperties => {
+    const baseStyle: React.CSSProperties = {
+      position: 'absolute',
+      pointerEvents: 'none',
+      top: 8,
+      right: 6,
+      bottom: -6,
+      left: -6,
+      zIndex: 0,
+      borderRadius: '2rem',
+      opacity: 0.9,
+      transform: 'translateZ(0)'
+    };
+
+    if (statusAccent === 'cancelado') {
+      return {
+        ...baseStyle,
+        background: 'linear-gradient(145deg, rgba(185, 28, 28, 0.76), rgba(239, 68, 68, 0.42))',
+        boxShadow: '0 16px 32px rgba(185, 28, 28, 0.28)'
+      };
+    }
+
+    if (statusAccent === 'andamento') {
+      return {
+        ...baseStyle,
+        background: 'linear-gradient(145deg, rgba(217, 119, 6, 0.78), rgba(245, 158, 11, 0.44))',
+        boxShadow: '0 16px 32px rgba(217, 119, 6, 0.28)'
+      };
+    }
+
+    return {
+      ...baseStyle,
+      background: 'linear-gradient(145deg, rgba(4, 120, 87, 0.76), rgba(16, 185, 129, 0.42))',
+      boxShadow: '0 16px 32px rgba(4, 120, 87, 0.28)'
+    };
+  };
+
   const getTodayBR = () => {
     const dataLocalBR = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     const [dia, mes, ano] = dataLocalBR.split('/');
@@ -1295,6 +1332,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                     const hasTransport = appt.tem_taxi || appt.pet_taxi || appt.agendamento_itens?.some((it: any) => it.servicos?.nome?.toUpperCase().includes('TÁXI'));
                     const routeAddress = hasTransport ? buildMapsDestination(appt) : '';
                     const statusAccentClass = getAppointmentStatusAccent(appt.status);
+                    const statusBackdropStyle = statusAccentClass ? getAppointmentStatusBackdropStyle(statusAccentClass) : undefined;
 
                     return (
                      <div key={appt.id} className={`relative ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'}`}>
@@ -1303,6 +1341,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                              aria-hidden="true"
                              className="appointment-status-backdrop"
                              data-status={statusAccentClass}
+                             style={statusBackdropStyle}
                           ></div>
                        )}
                        <div className="rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col md:flex-row md:items-center relative isolate z-10 p-6 group">
@@ -1351,14 +1390,26 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                       openMapsRoute(appt);
                                    }}
                                    aria-label={`Abrir rota de ${appt.pets?.nome || 'pet'} no Google Maps`}
-                                   className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${
+                                   className={`w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-[11px] font-black tracking-wide whitespace-nowrap shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-95 ${
                                       routeAddress
-                                         ? 'bg-teal-50 text-teal-700 hover:bg-teal-100'
-                                         : 'bg-slate-100 text-slate-400'
+                                         ? 'border-teal-100 bg-white/90 text-teal-800 hover:border-teal-200 hover:bg-teal-50'
+                                         : 'border-slate-200 bg-white/80 text-slate-400'
                                    }`}
                                 >
-                                   <i className="fa-solid fa-route text-[11px]"></i>
-                                   Rota no Maps
+                                   <svg
+                                      aria-hidden="true"
+                                      viewBox="0 0 24 24"
+                                      className="h-4 w-4 shrink-0 drop-shadow-sm"
+                                      fill="none"
+                                   >
+                                      <path d="M12 22s7-6.18 7-12A7 7 0 0 0 5 10c0 5.82 7 12 7 12Z" fill="#34A853" />
+                                      <path d="M12 2a7 7 0 0 1 7 7.5c0 2.23-1.03 4.65-2.34 6.78L12 12V2Z" fill="#4285F4" />
+                                      <path d="M12 22s-7-6.18-7-12c0-1.78.67-3.4 1.77-4.63L12 12v10Z" fill="#FBBC05" />
+                                      <path d="M16.66 16.28C14.72 19.42 12 22 12 22v-10l4.66 4.28Z" fill="#EA4335" />
+                                      <circle cx="12" cy="10" r="2.45" fill="white" />
+                                      <circle cx="12" cy="10" r="1.25" fill="#1f2937" opacity="0.72" />
+                                   </svg>
+                                   Maps
                                 </button>
                              </div>
                           )}

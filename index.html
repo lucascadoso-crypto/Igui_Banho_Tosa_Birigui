@@ -27,34 +27,6 @@
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        .appointment-status-backdrop {
-            position: absolute;
-            pointer-events: none;
-            top: 8px;
-            right: 6px;
-            bottom: -5px;
-            left: -4px;
-            z-index: 0;
-            border-radius: 2rem;
-            opacity: 0.62;
-            transform: translateZ(0);
-        }
-
-        .appointment-status-backdrop[data-status="cancelado"] {
-            background: linear-gradient(145deg, rgba(239, 68, 68, 0.42), rgba(248, 113, 113, 0.18));
-            box-shadow: 0 12px 24px rgba(220, 38, 38, 0.14);
-        }
-
-        .appointment-status-backdrop[data-status="andamento"] {
-            background: linear-gradient(145deg, rgba(245, 158, 11, 0.44), rgba(251, 191, 36, 0.18));
-            box-shadow: 0 12px 24px rgba(245, 158, 11, 0.14);
-        }
-
-        .appointment-status-backdrop[data-status="finalizado"] {
-            background: linear-gradient(145deg, rgba(16, 185, 129, 0.42), rgba(52, 211, 153, 0.18));
-            box-shadow: 0 12px 24px rgba(16, 185, 129, 0.14);
-        }
-
         @media (max-width: 767px) {
             html,
             body,
