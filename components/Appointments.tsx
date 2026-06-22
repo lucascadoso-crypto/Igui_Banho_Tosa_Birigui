@@ -26,6 +26,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const [services, setServices] = useState<Service[]>([]);
   const [viewingAppt, setViewingAppt] = useState<any>(null);
   const [activeCardMenuId, setActiveCardMenuId] = useState<number | string | null>(null);
+  const [expandedObservationId, setExpandedObservationId] = useState<string | null>(null);
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
 
   // Novo modal de cadastro rápido
@@ -50,6 +51,110 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     setTimeout(() => {
       setToast(prev => ({ ...prev, visivel: false }));
     }, 4000);
+  };
+
+  const getCleanObservation = (...values: Array<string | null | undefined>) => {
+    const invalidDefaults = [
+      'nenhuma restricao',
+      'nenhuma restrição',
+      'nenhuma observacao',
+      'nenhuma observação',
+      'nao informado',
+      'não informado',
+      'sem observacao',
+      'sem observação'
+    ];
+
+    return values
+      .map((value) => String(value || '').trim())
+      .find((value) => value && !invalidDefaults.some((defaultText) => value.toLowerCase().includes(defaultText))) || '';
+  };
+
+  const renderObservationNote = (
+    id: string,
+    title: string,
+    text: string,
+    icon: string,
+    tone: 'pet' | 'client'
+  ) => {
+    if (!text) return null;
+
+    const isExpanded = expandedObservationId === id;
+    const canToggle = text.length > 120;
+    const toneClasses = tone === 'pet'
+      ? 'border-l-teal-400 bg-teal-50/55 text-teal-600'
+      : 'border-l-sky-400 bg-sky-50/60 text-sky-600';
+
+    return (
+      <div className={`rounded-2xl border border-slate-100 border-l-4 ${toneClasses} px-4 py-3`} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 w-7 h-7 rounded-xl bg-white/75 flex items-center justify-center shrink-0 shadow-sm">
+            <i className={`fa-solid ${icon} text-[11px]`}></i>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">{title}</p>
+            <p className={`mt-1 text-xs font-semibold leading-relaxed text-slate-700 break-words ${isExpanded ? '' : 'line-clamp-2'}`}>
+              {text}
+            </p>
+            {canToggle && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedObservationId(isExpanded ? null : id);
+                }}
+                className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-800 transition-colors"
+              >
+                {isExpanded ? 'Recolher' : 'Ver observação'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const cleanAddressPart = (value: unknown) => String(value || '').trim();
+
+  const buildMapsDestination = (appt: any) => {
+    const client = appt.clientes || appt.pets?.clientes || {};
+    const directAddress = cleanAddressPart(appt.endereco_busca || appt.pet_taxi_endereco || client.endereco_completo);
+
+    if (directAddress) return directAddress;
+
+    const street = cleanAddressPart(client.logradouro || client.endereco);
+    const number = cleanAddressPart(client.numero);
+    const complement = cleanAddressPart(client.complemento);
+    const neighborhood = cleanAddressPart(client.bairro);
+    const city = cleanAddressPart(client.cidade);
+    const state = cleanAddressPart(client.estado || client.uf);
+    const cep = cleanAddressPart(client.cep);
+
+    if (!street) return '';
+
+    const parts = [
+      street && number ? `${street}, ${number}` : street,
+      complement,
+      neighborhood,
+      city,
+      state,
+      cep
+    ].filter(Boolean);
+
+    return parts.join(', ');
+  };
+
+  const openMapsRoute = (appt: any) => {
+    const enderecoCompleto = buildMapsDestination(appt);
+    const hasMinimumAddress = enderecoCompleto.length >= 10;
+
+    if (!hasMinimumAddress) {
+      showToast('Endereço do cliente não cadastrado ou incompleto para traçar a rota.', 'info');
+      return;
+    }
+
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(enderecoCompleto)}`;
+    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
   };
 
   const getTodayBR = () => {
@@ -140,7 +245,38 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
           *,
           pets (
             *,
-            clientes (*)
+            clientes:clientes!pets_cliente_id_fkey (
+              id,
+              nome,
+              telefone,
+              telefone_adicional,
+              email,
+              notas_internas,
+              restricoes,
+              logradouro,
+              cep,
+              numero,
+              bairro,
+              complemento,
+              cidade,
+              estado
+            )
+          ),
+          clientes:clientes!agendamentos_cliente_id_fkey (
+            id,
+            nome,
+            telefone,
+            telefone_adicional,
+            email,
+            notas_internas,
+            restricoes,
+            logradouro,
+            cep,
+            numero,
+            bairro,
+            complemento,
+            cidade,
+            estado
           ),
           funcionarios (nome),
           pacotes (
@@ -165,6 +301,14 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
         
       if (apptData) {
         const processedAppts = apptData.map((appt: any) => {
+          const cardClient = appt.clientes || appt.pets?.clientes || {};
+          const normalizedAppt = {
+            ...appt,
+            cardClient,
+            clienteRestricoes: getCleanObservation(cardClient.restricoes),
+            petObservacoes: getCleanObservation(appt.pets?.notas_internas, appt.pets?.restricoes)
+          };
+
           if (appt.pacote_id && appt.pacotes?.agendamentos) {
             const sortedPackageAppts = [...appt.pacotes.agendamentos].sort((a, b) => {
               const dateCompare = a.data_agendamento.localeCompare(b.data_agendamento);
@@ -173,10 +317,10 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
             });
             const index = sortedPackageAppts.findIndex(a => a.id === appt.id);
             if (index !== -1) {
-              return { ...appt, numero_sessao: index + 1 };
+              return { ...normalizedAppt, numero_sessao: index + 1 };
             }
           }
-          return appt;
+          return normalizedAppt;
         });
         setAppointments(processedAppts);
         
@@ -1122,8 +1266,15 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
               return agendamentosFiltrados.length > 0 ? (
                 <div className="space-y-3">
-                  {agendamentosFiltrados.map(appt => (
-                     <div key={appt.id} className={`rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center relative p-6 group ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'} ${appt.status === 'Cancelado' ? 'bg-[#f3f4f6]' : 'bg-white'}`}>
+                  {agendamentosFiltrados.map(appt => {
+                    const cardClient = appt.cardClient || appt.clientes || appt.pets?.clientes || {};
+                    const petObservation = appt.petObservacoes || '';
+                    const clientObservation = appt.clienteRestricoes || '';
+                    const hasTransport = appt.tem_taxi || appt.pet_taxi || appt.agendamento_itens?.some((it: any) => it.servicos?.nome?.toUpperCase().includes('TÁXI'));
+                    const routeAddress = hasTransport ? buildMapsDestination(appt) : '';
+
+                    return (
+                     <div key={appt.id} className={`rounded-[2rem] border border-slate-200/80 shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col md:flex-row md:items-center relative p-6 group ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'} ${appt.status === 'Cancelado' ? 'bg-[#f3f4f6]' : 'bg-white'}`}>
                        
                        {/* Horário */}
                        <div className="w-24 text-center border-r border-slate-100 mr-8 hidden md:block shrink-0">
@@ -1150,19 +1301,35 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                              )}
                           </div>
                           <p className="text-xs text-slate-400 font-bold truncate flex items-center">
-                             <i className="fa-solid fa-user-tag mr-2 opacity-50 text-[10px]"></i> {appt.pets?.clientes?.nome}
+                             <i className="fa-solid fa-user-tag mr-2 opacity-50 text-[10px]"></i> {cardClient.nome}
                           </p>
 
-                          {(appt.tem_taxi || appt.pet_taxi || appt.agendamento_itens?.some((it: any) => it.servicos?.nome?.toUpperCase().includes('TÁXI'))) && (
-                             <p className="text-xs text-slate-400 font-bold truncate flex items-center mt-1">
-                                <i className="fa-solid fa-location-dot mr-2 opacity-50 text-[10px] text-amber-500"></i>
-                                <span className="mr-1">Endereço:</span>
-                                <span className="text-slate-500">
-                                   {appt.endereco_busca || (appt.pets?.clientes?.logradouro 
-                                      ? `${appt.pets.clientes.logradouro}, ${appt.pets.clientes.numero}${appt.pets.clientes.bairro ? ' - ' + appt.pets.clientes.bairro : ''}` 
-                                      : 'Rua das Flores, 123 - Centro, Araçatuba, SP')}
-                                </span>
-                             </p>
+                          {hasTransport && (
+                             <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-2">
+                                <p className="text-xs text-slate-400 font-bold truncate flex items-center min-w-0">
+                                   <i className="fa-solid fa-location-dot mr-2 opacity-50 text-[10px] text-amber-500"></i>
+                                   <span className="mr-1 shrink-0">Endereço:</span>
+                                   <span className="text-slate-500 truncate">
+                                      {routeAddress || 'Endereço não cadastrado'}
+                                   </span>
+                                </p>
+                                <button
+                                   type="button"
+                                   onClick={(e) => {
+                                      e.stopPropagation();
+                                      openMapsRoute(appt);
+                                   }}
+                                   aria-label={`Abrir rota de ${appt.pets?.nome || 'pet'} no Google Maps`}
+                                   className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${
+                                      routeAddress
+                                         ? 'bg-teal-50 text-teal-700 hover:bg-teal-100'
+                                         : 'bg-slate-100 text-slate-400'
+                                   }`}
+                                >
+                                   <i className="fa-solid fa-route text-[11px]"></i>
+                                   Rota no Maps
+                                </button>
+                             </div>
                           )}
                          
                          {/* Lista de Micro-serviços */}
@@ -1172,12 +1339,31 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                   {it.servicos?.nome}
                                </span>
                             ))}
-                            {(appt.tem_taxi || appt.pet_taxi) && (
+                            {hasTransport && (
                                <span className="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1">
                                   🚕 TÁXI
                                </span>
                             )}
                          </div>
+
+                         {(petObservation || clientObservation) && (
+                            <div className="mt-3 grid grid-cols-1 gap-2">
+                               {renderObservationNote(
+                                  `${appt.id}-pet`,
+                                  'Observação do pet',
+                                  petObservation,
+                                  'fa-paw',
+                                  'pet'
+                               )}
+                               {renderObservationNote(
+                                  `${appt.id}-client`,
+                                  'Observação do cliente',
+                                  clientObservation,
+                                  'fa-comment-dots',
+                                  'client'
+                               )}
+                            </div>
+                         )}
                       </div>
 
                       {/* Financeiro e Status */}
@@ -1272,7 +1458,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                          )}
                       </div>
                    </div>
-                 ))}
+                    );
+                  })}
                </div>
              ) : (
                 <div className="bg-white p-20 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center opacity-20">
