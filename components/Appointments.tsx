@@ -1085,10 +1085,20 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   };
 
   // Lógica de cálculo para o Painel de Resumo
+  const normalizeAppointmentStatus = (status?: string) => String(status || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+
   const statsResumo = {
     total: appointments.length,
     finalizados: appointments.filter(a => a.status === 'Finalizado').length,
     emAndamento: appointments.filter(a => a.status === 'Em Andamento').length,
+    cancelados: appointments.filter(a => {
+      const status = normalizeAppointmentStatus(a.status);
+      return status === 'CANCELADO' || status === 'CANCELADA';
+    }).length,
     pendentes: appointments.filter(a => a.status === 'Agendado').length,
     pacotes: appointments.filter(a => a.pacote_id !== null).length
   };
@@ -1170,7 +1180,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
         <div className="lg:col-span-3 space-y-4">
            
            {/* PAINEL DE RESUMO DO DIA */}
-           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
               <div className="bg-[#009688] p-4 rounded-xl text-white text-center shadow-md">
                  <p className="text-[10px] font-black uppercase opacity-60 tracking-widest mb-1">Total do Dia</p>
                  <p className="text-xl font-black">{statsResumo.total}</p>
@@ -1182,6 +1192,13 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
               <div className="bg-amber-500 p-4 rounded-xl text-white text-center shadow-md border-2 border-white/20">
                  <p className="text-[10px] font-black uppercase opacity-80 tracking-widest mb-1">Em Andamento</p>
                  <p className="text-xl font-black">{statsResumo.emAndamento}</p>
+              </div>
+              <div className="relative overflow-hidden bg-[#DC2626] p-4 rounded-xl text-white text-center shadow-md shadow-rose-500/20">
+                 <i className="fa-solid fa-ban absolute right-3 top-1/2 -translate-y-1/2 text-4xl opacity-15"></i>
+                 <div className="relative">
+                    <p className="text-[10px] font-black uppercase opacity-85 tracking-widest mb-1">Cancelados</p>
+                    <p className="text-xl font-black">{statsResumo.cancelados}</p>
+                 </div>
               </div>
               <div className="bg-[#009688] p-4 rounded-xl text-white text-center shadow-md">
                  <p className="text-[10px] font-black uppercase opacity-60 tracking-widest mb-1">A Realizar</p>

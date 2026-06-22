@@ -113,15 +113,15 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   const handleCreatePackageFromAppointment = async () => {
     if (!canTurnIntoPackage || loadingPackageConversion) return;
     if (!client?.id || !pet?.id) {
-      showToast('Cliente ou pet nÃ£o vinculado ao agendamento.', 'erro');
+      showToast('Cliente ou pet não vinculado ao agendamento.', 'erro');
       return;
     }
     if (packageSessionCount < 1 || Number(packageTotalValue || 0) <= 0) {
-      showToast('Informe a quantidade de sessÃµes e o valor do pacote.', 'erro');
+      showToast('Informe a quantidade de sessões e o valor do pacote.', 'erro');
       return;
     }
     if (conversionServiceIds.length === 0) {
-      showToast('Este agendamento nÃ£o possui serviÃ§o principal para usar como referÃªncia.', 'erro');
+      showToast('Este agendamento não possui serviço principal para usar como referência.', 'erro');
       return;
     }
 
@@ -144,7 +144,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
         renovacao_automatica: false,
         status: 'ATIVO',
         pago: shouldUseCredit,
-        forma_pagamento: shouldUseCredit ? (appt.forma_pagamento || 'CrÃ©dito de agendamento') : null,
+        forma_pagamento: shouldUseCredit ? (appt.forma_pagamento || 'Crédito de agendamento') : null,
         data_pagamento: shouldUseCredit ? new Date().toISOString().split('T')[0] : null
       };
 
@@ -236,7 +236,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
         appt.unidade_id,
         userProfile?.email || 'sistema',
         'CONVERTER_AGENDAMENTO_PACOTE',
-        `Converteu o agendamento ${appt.id} do pet ${petName} em pacote ${pack.id}. Modo: ${packageConversionMode === 'include_current' ? 'sessÃ£o atual como 1' : 'prÃ³ximos atendimentos'}. Extras preservados separadamente.`,
+        `Converteu o agendamento ${appt.id} do pet ${petName} em pacote ${pack.id}. Modo: ${packageConversionMode === 'include_current' ? 'sessão atual como 1' : 'próximos atendimentos'}. Extras preservados separadamente.`,
         userProfile?.nome,
         userProfile?.cargo
       );
@@ -258,7 +258,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
         await supabaseClient.from('agendamentos').delete().eq('pacote_id', createdPackageId).neq('id', appt.id);
         await supabaseClient.from('pacotes').delete().eq('id', createdPackageId);
       }
-      showToast(err.message || 'NÃ£o foi possÃ­vel criar o pacote.', 'erro');
+      showToast(err.message || 'Não foi possível criar o pacote.', 'erro');
     } finally {
       setLoadingPackageConversion(false);
     }
@@ -1200,7 +1200,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <label className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">SessÃµes</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sessões</span>
                   <input
                     type="number"
                     min={1}
@@ -1241,8 +1241,8 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                   <div className="flex items-start gap-3">
                     <i className="fa-solid fa-forward text-indigo-500 mt-1"></i>
                     <div>
-                      <p className="font-black text-slate-800">ComeÃ§ar pacote nos prÃ³ximos atendimentos</p>
-                      <p className="text-xs font-bold text-slate-500 mt-1">Este agendamento continua avulso. O pacote serÃ¡ usado somente nos prÃ³ximos banhos.</p>
+                      <p className="font-black text-slate-800">Começar pacote nos próximos atendimentos</p>
+                      <p className="text-xs font-bold text-slate-500 mt-1">Este agendamento continua avulso. O pacote será usado somente nos próximos banhos.</p>
                     </div>
                   </div>
                 </button>
@@ -1256,10 +1256,10 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                     <i className="fa-solid fa-layer-group text-indigo-500 mt-1"></i>
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-black text-slate-800">Contar este atendimento como primeira sessÃ£o</p>
-                        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-black uppercase text-indigo-600">Recomendado</span>
+                        <p className="font-black text-slate-800">Contar este atendimento como primeira sessão</p>
+                        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-black uppercase text-indigo-600">RECOMENDADO</span>
                       </div>
-                      <p className="text-xs font-bold text-slate-500 mt-1">Este agendamento serÃ¡ convertido na sessÃ£o 1 do pacote. Os prÃ³ximos atendimentos serÃ£o criados como as sessÃµes restantes.</p>
+                      <p className="text-xs font-bold text-slate-500 mt-1">Este agendamento será convertido na sessão 1 do pacote. Os próximos atendimentos serão criados como as sessões restantes.</p>
                     </div>
                   </div>
                 </button>
@@ -1267,13 +1267,13 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
 
               <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4 text-xs font-bold text-amber-800 space-y-2">
                 {!appt.pago ? (
-                  <p>O valor avulso serÃ¡ substituÃ­do pela cobranÃ§a do pacote apÃ³s a confirmaÃ§Ã£o.</p>
+                  <p>O valor avulso será substituído pela cobrança do pacote após a confirmação.</p>
                 ) : (
                   <div className="space-y-3">
-                    <p>Este agendamento jÃ¡ estÃ¡ pago. Escolha como tratar o recebimento:</p>
+                    <p>Este agendamento já está pago. Escolha como tratar o recebimento:</p>
                     <label className="flex items-start gap-2">
                       <input type="radio" className="mt-0.5 accent-indigo-600" checked={paidConversionChoice === 'credit'} onChange={() => setPaidConversionChoice('credit')} />
-                      <span>Usar pagamento jÃ¡ recebido como crÃ©dito do pacote</span>
+                      <span>Usar pagamento já recebido como crédito do pacote</span>
                     </label>
                     <label className="flex items-start gap-2">
                       <input type="radio" className="mt-0.5 accent-indigo-600" checked={paidConversionChoice === 'separate'} onChange={() => setPaidConversionChoice('separate')} />
@@ -1285,11 +1285,11 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
               </div>
 
               <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">ServiÃ§os usados como referÃªncia</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">SERVIÇOS USADOS COMO REFERÊNCIA</p>
                 <div className="flex flex-wrap gap-2">
                   {mainItems.map((item: any) => (
                     <span key={item.id} className="rounded-xl bg-white border border-slate-100 px-3 py-2 text-[10px] font-black text-slate-600">
-                      {item.descricao || item.servicos?.nome || 'ServiÃ§o'}
+                      {item.descricao || item.servicos?.nome || 'Serviço'}
                     </span>
                   ))}
                 </div>
@@ -1301,7 +1301,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                 onClick={() => setShowPackageConversion(false)}
                 className="px-6 py-3 rounded-2xl bg-white border border-slate-200 text-slate-500 font-black text-xs uppercase tracking-widest hover:bg-slate-100"
               >
-                Cancelar
+                CANCELAR
               </button>
               <button
                 onClick={handleCreatePackageFromAppointment}
@@ -1309,7 +1309,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                 className="px-6 py-3 rounded-2xl bg-indigo-600 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/20 active:scale-95 disabled:opacity-60 flex items-center justify-center"
               >
                 {loadingPackageConversion ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : <i className="fa-solid fa-check-circle mr-2"></i>}
-                Confirmar pacote
+                CONFIRMAR PACOTE
               </button>
             </footer>
           </div>
