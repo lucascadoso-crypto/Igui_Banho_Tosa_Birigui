@@ -47,11 +47,30 @@ export async function enviarNotificacaoWhatsApp({
 
     if (error) {
       console.error('Erro na Edge Function de WhatsApp (via invoke):', error);
+      let detalhe: any = error.context || null;
+      try {
+        if (error.context && typeof error.context.json === 'function') {
+          detalhe = await error.context.json();
+        } else if (error.context && typeof error.context.text === 'function') {
+          detalhe = await error.context.text();
+        }
+      } catch (parseError) {
+        console.warn('Nao foi possivel ler o detalhe do erro da Edge Function:', parseError);
+      }
+
+      const detalheTexto = typeof detalhe === 'string'
+        ? detalhe
+        : detalhe?.detalhe || detalhe?.error || detalhe?.erro || null;
+
       return {
         ok: false,
-        error: error.message || 'Erro na Edge Function',
-        detalhe: error.context || null,
+        error: detalhe?.erro || detalhe?.error || error.message || 'Erro na Edge Function',
+        detalhe: detalheTexto,
       };
+    }
+
+    if (typeof result === 'string') {
+      return { ok: true, data: { mensagem: result } };
     }
 
     if (result?.ok === false) {

@@ -31,6 +31,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const [showTaxiRouteMenu, setShowTaxiRouteMenu] = useState(false);
   const [loadingTaxiRoute, setLoadingTaxiRoute] = useState<'manha' | 'tarde' | null>(null);
   const [taxiRoutePreview, setTaxiRoutePreview] = useState<any | null>(null);
+  const [finalizingAppointmentId, setFinalizingAppointmentId] = useState<number | string | null>(null);
+  const [notifyingAppointmentId, setNotifyingAppointmentId] = useState<number | string | null>(null);
 
   // Novo modal de cadastro rápido
   const [isQuickClientModalOpen, setIsQuickClientModalOpen] = useState(false);
@@ -163,13 +165,22 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const isTaxiAppointment = (appt: any) => Boolean(appt.tem_taxi || appt.pet_taxi);
 
   const isCancelledStatus = (status?: string) => {
-    const normalized = String(status || '')
+    const normalized = normalizeStatusLabel(status);
+    return normalized === 'CANCELADO' || normalized === 'CANCELADA';
+  };
+
+  const isFinalizedStatus = (status?: string) => {
+    const normalized = normalizeStatusLabel(status);
+    return ['FINALIZADO', 'FINALIZADA', 'CONCLUIDO', 'CONCLUIDA'].includes(normalized);
+  };
+
+  function normalizeStatusLabel(status?: string) {
+    return String(status || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .trim()
       .toUpperCase();
-    return normalized === 'CANCELADO' || normalized === 'CANCELADA';
-  };
+  }
 
   const getTaxiRouteStopsCount = (turno: 'manha' | 'tarde') => {
     const addresses = new Set<string>();
@@ -666,96 +677,112 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     }
   };
 
+  const notifyFinishedAppointment = async (appt: any, origem: 'auto' | 'manual' = 'manual') => {
+    setNotifyingAppointmentId(appt.id);
+    try {
+      const result = await enviarNotificacaoWhatsApp({
+        supabaseClient,
+        agendamentoId: appt.id,
+        tipo: 'pronto',
+        origem
+      });
+
+      if (!result?.ok) {
+        const detail = result?.detalhe ? ` Motivo: ${result.detalhe}` : '';
+        const fallback = result?.error || 'Erro desconhecido.';
+        showToast(`Atendimento concluido - aviso nao enviado. ${detail || `Motivo: ${fallback}`}`, 'info');
+        console.error('Falha no WhatsApp ao avisar cliente:', result?.error, result?.detalhe);
+        registrarAtividade(
+          unit.id,
+          userProfile?.email || 'sistema',
+          'WHATSAPP_AVISO_FINALIZADO_ERRO',
+          `Falha ao avisar cliente sobre finalizacao do agendamento ${appt.id}: ${result?.error || result?.detalhe || 'Erro desconhecido'}`,
+          userProfile?.nome,
+          userProfile?.cargo
+        );
+        return false;
+      }
+
+      showToast('Atendimento concluido e cliente avisado!', 'sucesso');
+      registrarAtividade(
+        unit.id,
+        userProfile?.email || 'sistema',
+        'WHATSAPP_AVISO_FINALIZADO',
+        `Avisou cliente sobre finalizacao do agendamento ${appt.id} (Pet: ${appt.pets?.nome || 'Pet'})`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+      return true;
+    } catch (err: any) {
+      console.error('Erro critico no WhatsApp ao avisar cliente:', err);
+      showToast(`Atendimento concluido - aviso nao enviado. Motivo: ${err?.message || 'Erro inesperado.'}`, 'info');
+      return false;
+    } finally {
+      setNotifyingAppointmentId(null);
+    }
+  };
+
   const performFinalizeAppointment = async (appt: any, notifyClient: boolean = true) => {
+    setFinalizingAppointmentId(appt.id);
     setLoading(true);
     try {
-      const { error } = await supabaseClient.from('agendamentos').update({ 
-        status: 'Finalizado',
-        notificar_ao_finalizar: notifyClient,
-        data_fim_real: new Date().toISOString()
-      }).eq('id', appt.id);
+      showToast('Concluindo...', 'info');
+      const { data: updatedAppointment, error } = await supabaseClient
+        .from('agendamentos')
+        .update({
+          status: 'Finalizado',
+          notificar_ao_finalizar: notifyClient,
+          data_fim_real: new Date().toISOString()
+        })
+        .eq('id', appt.id)
+        .select('id,status')
+        .single();
       if (error) throw error;
-      
-      // Log de Auditoria
+      if (!updatedAppointment?.id) throw new Error('O Supabase nao confirmou a finalizacao do atendimento.');
+
       registrarAtividade(
-        unit.id, 
-        userProfile?.email || 'sistema', 
-        'Finalização de Atendimento', 
+        unit.id,
+        userProfile?.email || 'sistema',
+        'Finalizacao de Atendimento',
         `Pet: ${appt.pets?.nome} - Finalizou atendimento ${appt.id}${!notifyClient ? ' (SEM AVISO)' : ''}`,
         userProfile?.nome,
         userProfile?.cargo
       );
 
-      // --- LÓGICA DE RENOVAÇÃO AUTOMÁTICA DE PACOTE ---
       if (appt.pacote_id && appt.pacotes) {
         const isLastSession = appt.numero_sessao === appt.pacotes.qtd_sessoes;
-        
+
         if (isLastSession) {
           if (appt.pacotes.renovacao_automatica) {
             try {
               await renovarPacote(appt.pacotes);
-              // Mensagem de Feedback
-              setConfirmacao({ 
-                visivel: true, 
-                acao: 'info', 
-                mensagem: 'Pacote renovado automaticamente! Um novo ciclo foi gerado com status pendente.' 
+              setConfirmacao({
+                visivel: true,
+                acao: 'info',
+                mensagem: 'Pacote renovado automaticamente! Um novo ciclo foi gerado com status pendente.'
               });
             } catch (renovError) {
-              console.error("Erro na renovação automática:", renovError);
+              console.error('Erro na renovacao automatica:', renovError);
             }
           } else {
-            // Se for a última sessão e NÃO tiver renovação automática, marca como FINALIZADO
             await supabaseClient.from('pacotes').update({ status: 'FINALIZADO' }).eq('id', appt.pacote_id);
           }
         }
       }
 
-      const petName = appt.pets?.nome;
-      const clientName = appt.pets?.clientes?.nome;
-      const clientPhone = appt.pets?.clientes?.telefone?.replace(/\D/g, '');
-      
-      // Lógica de WhatsApp Inteligente (Táxi ou não)
-      const hasTaxi = appt.tem_taxi || appt.pet_taxi || appt.agendamento_itens?.some((it: any) => 
-        it.servicos?.nome?.toLowerCase().includes('táxi') || 
-        it.servicos?.nome?.toLowerCase().includes('taxi')
-      );
-
-      let msg = `Olá! 🐾 O banho do(a) ${petName} terminou e ele(a) já está pronto(a) para ser buscado(a)! 🛁`;
-
-      if (clientPhone && notifyClient) {
-        // --- GATILHO WHATSAPP (NÃO-BLOQUEANTE mas monitorado) ---
-        enviarNotificacaoWhatsApp({
-          telefone: clientPhone,
-          mensagem: msg,
-          unidadeId: unit.id,
-          supabaseClient,
-          agendamentoId: appt.id,
-          tipo: 'pronto',
-          origem: 'auto'
-        }).then(result => {
-          if (result && !result.ok) {
-            console.error('Falha no WhatsApp ao finalizar:', result.error);
-            showToast(`Finalizado. (${result.error || 'Aviso WhatsApp não enviado'})`, 'info');
-          } else {
-            setConfirmacao({
-              visivel: true,
-              acao: 'info',
-              mensagem: 'Serviço concluído e cliente avisado!'
-            });
-          }
-        }).catch(err => {
-          console.error('Erro crítico no WhatsApp ao finalizar:', err);
-          showToast('Agendamento finalizado. (Erro no WhatsApp)', 'info');
-        });
-      }
       setIsDetailModalOpen(false);
       await fetchData();
-    } catch (err) {
-      console.error("Erro ao finalizar agendamento:", err);
+      showToast('Atendimento concluido.', 'sucesso');
+
+      if (notifyClient) {
+        await notifyFinishedAppointment({ ...appt, status: 'Finalizado' }, 'auto');
+      }
+    } catch (err: any) {
+      console.error('Erro ao finalizar agendamento:', err);
+      showToast(`Falha ao concluir atendimento: ${err?.message || 'erro desconhecido.'}`, 'erro');
     } finally {
       setLoading(false);
-      // Limpa confirmação apenas se for a ação de finalizar para fechar o diálogo original, 
-      // mas preserva 'info' ou 'erro' (mensagens de feedback)
+      setFinalizingAppointmentId(null);
       setConfirmacao(prev => (prev.acao === 'finalizar') ? { visivel: false, acao: null, mensagem: '' } : prev);
     }
   };
@@ -1808,34 +1835,55 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                   </button>
                                )}
 
-                               {appt.status !== 'Finalizado' && appt.status !== 'Cancelado' && !isReadOnly && (
+                               {!isFinalizedStatus(appt.status) && !isCancelledStatus(appt.status) && !isReadOnly && (
                                   <>
-                                     <button onClick={() => { performFinalizeAppointment(appt); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-emerald-600 hover:bg-emerald-50 transition-colors border-b border-slate-50">
-                                        <i className="fa-solid fa-circle-check mr-3 text-emerald-500 text-sm"></i> Concluir e Avisar
+                                     <button
+                                       onClick={() => { performFinalizeAppointment(appt); setActiveCardMenuId(null); }}
+                                       disabled={finalizingAppointmentId === appt.id}
+                                       className="w-full flex items-center px-5 py-3 text-xs font-bold text-emerald-600 hover:bg-emerald-50 transition-colors border-b border-slate-50 disabled:opacity-50"
+                                     >
+                                        <i className={`fa-solid ${finalizingAppointmentId === appt.id ? 'fa-circle-notch fa-spin' : 'fa-circle-check'} mr-3 text-emerald-500 text-sm`}></i>
+                                        {finalizingAppointmentId === appt.id ? 'Concluindo...' : 'Concluir e Avisar'}
                                      </button>
-                                     <button onClick={() => { performFinalizeAppointment(appt, false); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-blue-500 hover:bg-blue-50 transition-colors border-b border-slate-50">
-                                        <i className="fa-solid fa-check mr-3 text-blue-500 text-sm"></i> Finalizar Sem Aviso
+                                     <button
+                                       onClick={() => { performFinalizeAppointment(appt, false); setActiveCardMenuId(null); }}
+                                       disabled={finalizingAppointmentId === appt.id}
+                                       className="w-full flex items-center px-5 py-3 text-xs font-bold text-blue-500 hover:bg-blue-50 transition-colors border-b border-slate-50 disabled:opacity-50"
+                                     >
+                                        <i className={`fa-solid ${finalizingAppointmentId === appt.id ? 'fa-circle-notch fa-spin' : 'fa-check'} mr-3 text-blue-500 text-sm`}></i>
+                                        {finalizingAppointmentId === appt.id ? 'Concluindo...' : 'Finalizar Sem Aviso'}
                                      </button>
                                   </>
+                               )}
+
+                               {isFinalizedStatus(appt.status) && !isReadOnly && (
+                                  <button
+                                    onClick={() => { notifyFinishedAppointment(appt, 'manual'); setActiveCardMenuId(null); }}
+                                    disabled={notifyingAppointmentId === appt.id}
+                                    className="w-full flex items-center px-5 py-3 text-xs font-bold text-emerald-600 hover:bg-emerald-50 transition-colors border-b border-slate-50 disabled:opacity-50"
+                                  >
+                                     <i className={`fa-brands ${notifyingAppointmentId === appt.id ? 'fa-whatsapp fa-bounce' : 'fa-whatsapp'} mr-3 text-emerald-500 text-sm`}></i>
+                                     {notifyingAppointmentId === appt.id ? 'Enviando...' : 'Avisar Cliente'}
+                                  </button>
                                )}
 
                                <button onClick={() => { handleOpenDetail(appt); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                                   <i className="fa-solid fa-eye mr-3 text-purple-500"></i> Ver Detalhes
                                </button>
                                
-                               {appt.status !== 'Finalizado' && appt.status !== 'Cancelado' && !isReadOnly && (
+                               {!isFinalizedStatus(appt.status) && !isCancelledStatus(appt.status) && !isReadOnly && (
                                   <button onClick={() => { handleStartEdit(appt); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                                      <i className="fa-solid fa-pen-to-square mr-3 text-amber-500"></i> Alterar Dados
                                   </button>
                                )}
                                
-                               {!appt.pago && appt.status !== 'Cancelado' && !isReadOnly && (
+                               {!appt.pago && !isCancelledStatus(appt.status) && !isReadOnly && (
                                   <button onClick={() => { setViewingAppt(appt); setShowPaymentSelector(true); setIsDetailModalOpen(true); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-emerald-600 hover:bg-emerald-50 transition-colors">
                                      <i className="fa-solid fa-dollar-sign mr-3 text-emerald-500"></i> Receber Agora
                                   </button>
                                )}
                                
-                               {appt.status !== 'Cancelado' && !isReadOnly && (
+                               {!isCancelledStatus(appt.status) && !isReadOnly && (
                                   <button onClick={() => { performCancelAppointment(appt); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-rose-500 hover:bg-rose-50 transition-colors border-t border-slate-50 mt-1">
                                      <i className="fa-solid fa-ban mr-3 text-rose-500"></i> Cancelar Atendimento
                                   </button>
