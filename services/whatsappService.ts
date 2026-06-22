@@ -1,61 +1,72 @@
+type WhatsAppTipo = 'confirmacao' | 'lembrete' | 'pronto' | 'manual' | string;
+type WhatsAppOrigem = 'auto' | 'manual';
 
-/**
- * Serviço de Integração com WhatsApp (Mega API)
- * Preparado para múltiplas instâncias por unidade.
- */
-export async function enviarNotificacaoWhatsApp({ 
-  telefone, 
-  mensagem, 
-  unidadeId, 
-  supabaseClient,
-  agendamentoId,
-  tipo = 'manual',
-  whatsapp_nome_instancia,
-  whatsapp_token,
-  whatsapp_url_servidor,
-  whatsapp_ativo,
-  forceDirect = false
-}: { 
-  telefone?: string; 
-  mensagem?: string; 
-  unidadeId?: number | string; 
+interface EnviarNotificacaoWhatsAppParams {
+  telefone?: string;
+  mensagem?: string;
+  unidadeId?: number | string;
   supabaseClient: any;
   agendamentoId?: number | string;
-  tipo?: string;
+  tipo?: WhatsAppTipo;
+  origem?: WhatsAppOrigem;
   whatsapp_nome_instancia?: string;
   whatsapp_token?: string;
   whatsapp_url_servidor?: string;
   whatsapp_ativo?: boolean;
   forceDirect?: boolean;
-}) {
+}
+
+/**
+ * Servico centralizado de WhatsApp.
+ * O frontend chama a Edge Function autenticada; tokens da Evolution ficam apenas no Supabase.
+ */
+export async function enviarNotificacaoWhatsApp({
+  telefone,
+  mensagem,
+  unidadeId,
+  supabaseClient,
+  agendamentoId,
+  tipo = 'manual',
+  origem = 'manual',
+}: EnviarNotificacaoWhatsAppParams) {
   try {
-    // Agora sempre enviamos via Edge Function para evitar erros de CORS e centralizar a lógica no robô
-    console.log(`[WhatsApp] Disparando via Edge Function (Tipo: ${tipo}${agendamentoId ? ', Agendamento: ' + agendamentoId : ''})`);
-    
-    // Se não for passado telefone/mensagem mas tiver agendamentoId, o robô buscará no banco
-    // Se for um disparo manual (telefone + mensagem), o robô enviará diretamente
-    
-    // Usamos o invoke do próprio cliente Supabase (mais limpo e gerencia Auth automaticamente)
-    const { data: result, error } = await supabaseClient.functions.invoke('whatsapp-reminder', {
-      body: { 
+    console.log(`[WhatsApp] Disparando via Edge Function lembrete-24h (Tipo: ${tipo}${agendamentoId ? ', Agendamento: ' + agendamentoId : ''})`);
+
+    const { data: result, error } = await supabaseClient.functions.invoke('lembrete-24h', {
+      body: {
+        agendamentoId,
         agendamento_id: agendamentoId,
-        telefone: telefone,
-        mensagem: mensagem,
+        telefone,
+        mensagem,
+        unidadeId,
         unidade_id: unidadeId,
-        tipo: tipo
-      }
+        tipo,
+        origem,
+      },
     });
 
     if (error) {
       console.error('Erro na Edge Function de WhatsApp (via invoke):', error);
-      return { ok: false, error: error.message || 'Erro na Edge Function' };
+      return {
+        ok: false,
+        error: error.message || 'Erro na Edge Function',
+        detalhe: error.context || null,
+      };
     }
 
-    console.log('Mensagem processada com sucesso pela Edge Function:', result);
-    return { ok: true, data: result };
+    if (result?.ok === false) {
+      return {
+        ok: false,
+        error: result.erro || 'Mensagem de WhatsApp nao enviada.',
+        detalhe: result.detalhe || null,
+        data: result,
+      };
+    }
 
+    console.log('Mensagem processada pela Edge Function:', result);
+    return { ok: true, data: result };
   } catch (err: any) {
-    console.error('Erro crítico no serviço de WhatsApp (Centralizado):', err);
+    console.error('Erro critico no servico de WhatsApp (Centralizado):', err);
     return { ok: false, error: err.message };
   }
 }

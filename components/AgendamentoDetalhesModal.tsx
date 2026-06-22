@@ -45,7 +45,6 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   const [packageIntervalDays, setPackageIntervalDays] = useState(7);
   const [packageTotalValue, setPackageTotalValue] = useState(Number(appt?.valor_total || 0) * 4);
   const [loadingPackageConversion, setLoadingPackageConversion] = useState(false);
-
   // Estados para Extras
   const [isAddingExtra, setIsAddingExtra] = useState(false);
   const [extraServices, setExtraServices] = useState<any[]>([]);
@@ -82,6 +81,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toUpperCase();
+  const isAppointmentFinished = ['FINALIZADO', 'FINALIZADA', 'CONCLUIDO', 'CONCLUIDA'].includes(normalizedStatus);
   const canCreatePackage = !isReadOnly && !['somente_leitura'].includes(userProfile?.cargo || '');
   const canTurnIntoPackage = !appt.pacote_id && normalizedStatus !== 'CANCELADO' && normalizedStatus !== 'CANCELADA' && client?.id && pet?.id && canCreatePackage;
   const conversionServiceIds = mainItems
@@ -623,12 +623,13 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
         unidadeId: appt.unidade_id,
         supabaseClient,
         agendamentoId: appt.id,
-        tipo: 'manual',
+        tipo: isAppointmentFinished ? 'pronto' : 'lembrete',
+        origem: 'manual',
         forceDirect: true
       });
 
       if (result?.ok) {
-        setToast({ visivel: true, mensagem: 'Lembrete enviado com sucesso!', tipo: 'sucesso' });
+        setToast({ visivel: true, mensagem: 'MENSAGEM ENVIADA', tipo: 'sucesso' });
         
         registrarAtividade(
           appt.unidade_id,
@@ -639,10 +640,11 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
           userProfile?.cargo
         );
       } else {
-        console.error('Falha no WhatsApp ao enviar lembrete:', result?.error);
+        const detalhe = result?.detalhe ? ` Motivo: ${result.detalhe}` : '';
+        console.error('Falha no WhatsApp ao enviar mensagem:', result?.error, result?.detalhe);
         setToast({ 
           visivel: true, 
-          mensagem: result?.error || 'Aviso de WhatsApp não enviado.', 
+          mensagem: `${result?.error || 'Nao foi possivel enviar a mensagem.'}${detalhe}`,
           tipo: 'erro' 
         });
       }
@@ -1110,7 +1112,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
               ) : (
                 <i className="fa-brands fa-whatsapp mr-2 text-sm"></i>
               )}
-              ENVIAR LEMBRETE
+              {isAppointmentFinished ? 'AVISAR CLIENTE' : 'ENVIAR LEMBRETE'}
             </button>
 
             {canTurnIntoPackage && (

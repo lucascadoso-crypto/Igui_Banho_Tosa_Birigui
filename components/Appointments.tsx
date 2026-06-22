@@ -654,7 +654,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
           unidadeId: unit.id,
           supabaseClient,
           agendamentoId: appt.id,
-          tipo: 'manual'
+          tipo: 'pronto',
+          origem: 'auto'
         }).then(result => {
           if (result && !result.ok) {
             console.error('Falha no WhatsApp ao finalizar:', result.error);
@@ -989,7 +990,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
             unidadeId: unit.id,
             supabaseClient,
             agendamentoId: apptId,
-            tipo: 'manual',
+            tipo: 'confirmacao',
+            origem: 'auto',
             forceDirect: true,
             whatsapp_nome_instancia: unit.whatsapp_nome_instancia,
             whatsapp_token: unit.whatsapp_token,
@@ -1050,7 +1052,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       unidadeId: unit.id,
       supabaseClient,
       agendamentoId: appt.id,
-      tipo: 'manual',
+      tipo: 'lembrete',
+      origem: 'manual',
       forceDirect: true
     }).then(result => {
       if (result?.ok) {
