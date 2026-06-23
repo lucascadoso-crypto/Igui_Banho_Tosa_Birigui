@@ -27,12 +27,24 @@ function normalizeTipo(value: unknown): MessageTipo {
   const tipo = String(value || "lembrete")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .trim()
     .toLowerCase();
 
-  if (tipo === "confirmacao" || tipo === "confirmacao_agendamento") return "confirmacao";
-  if (tipo === "pronto" || tipo === "concluido" || tipo === "finalizado") return "pronto";
+  if (tipo.includes("confirmacao")) return "confirmacao";
+  if (tipo.includes("aviso_pronto") || tipo.includes("pronto") || tipo.includes("concluido") || tipo.includes("finalizado")) {
+    return "pronto";
+  }
+  if (tipo.includes("lembrete")) return "lembrete";
   if (tipo === "manual") return "manual";
   return "lembrete";
+}
+
+function normalizeToken(value: unknown) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
 }
 
 function normalizeStatus(value: unknown) {
@@ -90,9 +102,25 @@ function getSaoPauloDate(offsetDays = 0) {
   return date.toISOString().slice(0, 10);
 }
 
-function getLogTipo(tipo: MessageTipo, modo: "manual" | "automatico", janela?: AutomaticJanela) {
-  if (modo === "automatico") return janela === "amanha" ? "LEMBRETE_18H" : "LEMBRETE_08H";
-  if (tipo === "pronto") return "AVISO_PRONTO";
+function getLogTipo(
+  tipo: MessageTipo,
+  modo: "manual" | "automatico",
+  janela?: AutomaticJanela,
+  rawTipo?: unknown,
+  origem?: unknown,
+) {
+  const token = normalizeToken(rawTipo);
+  const origemToken = normalizeToken(origem);
+
+  if (modo === "automatico") {
+    if (token === "LEMBRETE_08H" || token === "LEMBRETE_18H") return token;
+    return janela === "amanha" ? "LEMBRETE_18H" : "LEMBRETE_08H";
+  }
+
+  if (token === "AVISO_PRONTO_MANUAL" || token === "AVISO_PRONTO_AUTO") return token;
+  if (token === "LEMBRETE_MANUAL") return token;
+  if (token === "CONFIRMACAO" || token === "CONFIRMACAO_AGENDAMENTO") return "CONFIRMACAO";
+  if (tipo === "pronto") return origemToken === "AUTO" ? "AVISO_PRONTO_AUTO" : "AVISO_PRONTO_MANUAL";
   if (tipo === "lembrete") return "LEMBRETE_MANUAL";
   if (tipo === "confirmacao") return "CONFIRMACAO";
   return "MANUAL";
@@ -350,10 +378,10 @@ async function sendAndLogMessage(
   return { ok: true, ignored: false, telefone, providerStatus: sendResult.status };
 }
 
-async function processAutomatic(supabase: any, janelaInput: unknown, origem: unknown) {
+async function processAutomatic(supabase: any, janelaInput: unknown, origem: unknown, rawTipo: unknown) {
   const janela: AutomaticJanela = janelaInput === "amanha" ? "amanha" : "hoje";
   const targetDate = janela === "amanha" ? getSaoPauloDate(1) : getSaoPauloDate(0);
-  const logTipo = getLogTipo("lembrete", "automatico", janela);
+  const logTipo = getLogTipo("lembrete", "automatico", janela, rawTipo, origem);
 
   const { data: agendamentos, error } = await supabase
     .from("agendamentos")
@@ -405,7 +433,7 @@ async function processAutomatic(supabase: any, janelaInput: unknown, origem: unk
 
 async function processManual(supabase: any, req: Request, body: any, agendamentoId: number | string) {
   const tipo = normalizeTipo(body?.tipo);
-  const logTipo = getLogTipo(tipo, "manual");
+  const logTipo = getLogTipo(tipo, "manual", undefined, body?.tipo, body?.origem);
 
   const authHeader = req.headers.get("Authorization") || "";
   const jwt = authHeader.replace("Bearer ", "");
@@ -490,7 +518,7 @@ serve(async (req) => {
 
   try {
     if (modo === "automatico") {
-      return await processAutomatic(supabase, janela, body?.origem);
+      return await processAutomatic(supabase, janela, body?.origem, body?.tipo);
     }
 
     if (agendamentoId) {
