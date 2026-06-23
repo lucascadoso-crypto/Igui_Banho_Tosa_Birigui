@@ -899,16 +899,16 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
           { label: 'Receita (Ativos)', value: formatCurrency(kpiReceitaAtivos), hint: 'Pacotes em aberto', icon: 'fa-dollar-sign' },
           { label: 'Receita (Finalizados)', value: formatCurrency(kpiReceitaFinalizados), hint: 'Ciclos concluídos', icon: 'fa-chart-simple' }
         ].map((kpi) => (
-          <div key={kpi.label} className="min-h-[132px] rounded-[1.45rem] bg-gradient-to-br from-[#00897B] via-[#007F75] to-[#075E59] p-5 md:p-6 shadow-[0_16px_32px_rgba(0,137,123,0.18)] text-white relative overflow-hidden border border-white/10">
-            <div className="relative z-10 flex min-h-[84px] flex-col justify-between">
+          <div key={kpi.label} className="min-h-[132px] md:min-h-[112px] rounded-[1.45rem] bg-gradient-to-br from-[#00897B] via-[#007F75] to-[#075E59] p-5 md:p-4 shadow-[0_16px_32px_rgba(0,137,123,0.18)] text-white relative overflow-hidden border border-white/10">
+            <div className="relative z-10 flex min-h-[84px] md:min-h-[76px] flex-col justify-between">
               <p className="text-[10px] md:text-[11px] font-black text-white/78 uppercase tracking-[0.14em] leading-tight">{kpi.label}</p>
               <div className="min-w-0">
-                <p className="text-3xl md:text-[2.15rem] font-black tracking-tight leading-none truncate" title={String(kpi.value)}>{kpi.value}</p>
-                <p className="text-[11px] md:text-xs font-black text-teal-100/95 mt-2 leading-snug break-words">{kpi.hint}</p>
+                <p className="text-3xl md:text-[1.85rem] font-black tracking-tight leading-none truncate" title={String(kpi.value)}>{kpi.value}</p>
+                <p className="text-[11px] md:text-[11px] font-black text-teal-100/95 mt-2 md:mt-1.5 leading-snug break-words">{kpi.hint}</p>
               </div>
             </div>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 w-14 h-14 md:w-16 md:h-16 rounded-2xl border border-white/10 bg-white/7 flex items-center justify-center opacity-45">
-              <i className={`fa-solid ${kpi.icon} text-3xl md:text-4xl text-white/70`}></i>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 w-14 h-14 md:w-12 md:h-12 rounded-2xl border border-white/10 bg-white/7 flex items-center justify-center opacity-45">
+              <i className={`fa-solid ${kpi.icon} text-3xl md:text-[1.65rem] text-white/70`}></i>
             </div>
             <div className="absolute -right-8 -bottom-10 w-32 h-32 rounded-full bg-white/8"></div>
           </div>
@@ -976,7 +976,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
         <span className="px-3 py-2 rounded-full bg-orange-50 text-orange-600 text-[11px] font-black border border-orange-100"><i className="fa-regular fa-clock mr-1"></i>A vencer: {kpiRenovar}</span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
         {loading && packages.length === 0 ? (
           <div className="col-span-full py-20 text-center"><i className="fa-solid fa-circle-notch fa-spin text-4xl text-teal-600"></i></div>
         ) : pacotesPaginados.map(p => {
