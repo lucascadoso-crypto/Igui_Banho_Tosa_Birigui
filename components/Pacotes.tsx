@@ -889,20 +889,28 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
         )}
       </header>
 
-      <div className="md:grid md:grid-cols-4 md:gap-5 flex gap-4 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
         {[
           { label: 'Pacotes Ativos', value: kpiPacotesAtivos, hint: `${kpiRenovar} para renovar`, icon: 'fa-circle-check' },
-          { label: 'Total em Sessões', value: kpiTotalSessoes, hint: `${packages.length} pacotes no total`, icon: 'fa-calendar-days' },
-          { label: 'Receita (Ativos)', value: formatCurrency(kpiReceitaAtivos), hint: `${kpiPendentes} pendentes`, icon: 'fa-dollar-sign' },
-          { label: 'Receita (Finalizados)', value: formatCurrency(kpiReceitaFinalizados), hint: 'ciclos concluídos', icon: 'fa-chart-simple' }
+          { label: 'Total em Sessões', value: kpiTotalSessoes, hint: `${packages.length} pacotes cadastrados`, icon: 'fa-calendar-days' },
+          { label: 'Para Renovar', value: kpiRenovar, hint: 'Até 2 sessões restantes', icon: 'fa-rotate' },
+          { label: 'Pendentes', value: kpiPendentes, hint: 'Pagamentos em aberto', icon: 'fa-wallet' },
+          { label: 'Banhos Hoje', value: packages.filter(hasSessionToday).length, hint: 'Agendados para hoje', icon: 'fa-calendar-day' },
+          { label: 'Receita (Ativos)', value: formatCurrency(kpiReceitaAtivos), hint: 'Pacotes em aberto', icon: 'fa-dollar-sign' },
+          { label: 'Receita (Finalizados)', value: formatCurrency(kpiReceitaFinalizados), hint: 'Ciclos concluídos', icon: 'fa-chart-simple' }
         ].map((kpi) => (
-          <div key={kpi.label} className="min-w-[190px] md:min-w-0 snap-start bg-[#08213c] p-5 rounded-[1.35rem] shadow-xl shadow-slate-900/10 text-white relative overflow-hidden">
-            <div className="relative z-10 min-w-0">
-              <p className="text-[10px] font-black text-white/80 uppercase tracking-wider mb-2 truncate">{kpi.label}</p>
-              <p className="text-2xl md:text-3xl font-black tracking-tight truncate" title={String(kpi.value)}>{kpi.value}</p>
-              <p className="text-[11px] font-black text-teal-300 mt-2 truncate">{kpi.hint}</p>
+          <div key={kpi.label} className="min-h-[132px] rounded-[1.45rem] bg-gradient-to-br from-[#00897B] via-[#007F75] to-[#075E59] p-5 md:p-6 shadow-[0_16px_32px_rgba(0,137,123,0.18)] text-white relative overflow-hidden border border-white/10">
+            <div className="relative z-10 flex min-h-[84px] flex-col justify-between">
+              <p className="text-[10px] md:text-[11px] font-black text-white/78 uppercase tracking-[0.14em] leading-tight">{kpi.label}</p>
+              <div className="min-w-0">
+                <p className="text-3xl md:text-[2.15rem] font-black tracking-tight leading-none truncate" title={String(kpi.value)}>{kpi.value}</p>
+                <p className="text-[11px] md:text-xs font-black text-teal-100/95 mt-2 leading-snug break-words">{kpi.hint}</p>
+              </div>
             </div>
-            <i className={`fa-solid ${kpi.icon} absolute right-5 top-1/2 -translate-y-1/2 text-5xl text-teal-300/25`}></i>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 w-14 h-14 md:w-16 md:h-16 rounded-2xl border border-white/10 bg-white/7 flex items-center justify-center opacity-45">
+              <i className={`fa-solid ${kpi.icon} text-3xl md:text-4xl text-white/70`}></i>
+            </div>
+            <div className="absolute -right-8 -bottom-10 w-32 h-32 rounded-full bg-white/8"></div>
           </div>
         ))}
       </div>

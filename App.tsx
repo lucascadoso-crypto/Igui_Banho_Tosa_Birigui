@@ -381,9 +381,9 @@ const { data, error: profileError } = await supabase
       )}
 
       {/* Topbar Mobile */}
-      <header className="app-mobile-header md:hidden fixed top-0 left-0 right-0 z-30 h-[76px] bg-slate-950 text-white px-4 flex items-center justify-between shadow-xl shadow-slate-900/20">
+      <header className="app-mobile-header md:hidden fixed top-0 left-0 right-0 z-30 h-[76px] bg-white text-slate-900 px-4 flex items-center justify-between shadow-lg shadow-slate-900/10 border-b border-slate-100">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-white/10 shadow-lg shrink-0">
+          <div className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-sm shrink-0">
             <img
               src={mobileLogo}
               alt="Logo da unidade"
@@ -392,13 +392,13 @@ const { data, error: profileError } = await supabase
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-black leading-tight tracking-tight">Sistema Pet</p>
-            <p className="text-[11px] font-bold text-white/75 leading-tight truncate">{mobileUnitName}</p>
-            <p className="text-[10px] font-semibold text-white/45 leading-tight truncate">{mobileUserName}</p>
+            <p className="text-[11px] font-bold text-slate-500 leading-tight truncate">{mobileUnitName}</p>
+            <p className="text-[10px] font-semibold text-slate-400 leading-tight truncate">{mobileUserName}</p>
           </div>
         </div>
         <button 
           onClick={() => setIsMobileMenuOpen(true)}
-          className="w-11 h-11 bg-white/10 rounded-2xl flex items-center justify-center text-white hover:bg-white/15 active:scale-95 transition-all shrink-0 ml-3"
+          className="w-11 h-11 bg-teal-50 rounded-2xl flex items-center justify-center text-teal-700 hover:bg-teal-100 active:scale-95 transition-all shrink-0 ml-3 border border-teal-100"
           aria-label="Abrir menu"
         >
           <i className="fa-solid fa-bars"></i>
@@ -417,7 +417,7 @@ const { data, error: profileError } = await supabase
         onClose={() => setIsMobileMenuOpen(false)}
       />
       
-      <main className="app-mobile-main flex-1 min-h-screen md:ml-72 pt-[76px] md:pt-0 overflow-y-visible md:overflow-y-auto relative hide-scrollbar">
+      <main className="app-mobile-main flex-1 min-h-screen md:ml-60 pt-[76px] md:pt-0 overflow-y-visible md:overflow-y-auto relative hide-scrollbar">
         {hasError && (
           <div className="bg-rose-50 border-b border-rose-100 px-10 py-3 flex items-center justify-between">
             <div className="flex items-center space-x-3 text-rose-600 font-bold text-sm">
