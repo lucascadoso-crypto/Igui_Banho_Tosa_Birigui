@@ -789,7 +789,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
 
   const renderFilterPanel = (compact = false) => (
     <div className={`${compact ? 'space-y-5' : 'rounded-[1.6rem] border border-slate-100 bg-white p-5 shadow-sm space-y-5'}`}>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 md:justify-center">
         {(['Todos', 'Ativos', 'Finalizados', 'Cancelados', 'A vencer'] as const).map((opt) => (
           <button key={opt} onClick={() => setStatusFiltro(opt)} className={`px-4 py-2 rounded-xl text-[11px] font-black transition-all ${statusFiltro === opt ? 'bg-[#00897B] text-white shadow-lg shadow-teal-500/20' : 'bg-white border border-slate-100 text-slate-600 hover:border-teal-200'}`}>
             {opt}
@@ -801,7 +801,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:max-w-5xl md:mx-auto">
         <label className="space-y-2">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tutor</span>
           <select value={tutorFiltro} onChange={(e) => setTutorFiltro(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl outline-none text-xs font-bold text-slate-700">
@@ -828,8 +828,8 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
           </select>
         </label>
       </div>
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-between">
-        <label className="space-y-2 sm:min-w-[220px]">
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-center md:max-w-5xl md:mx-auto">
+        <label className="space-y-2 sm:min-w-[220px] md:min-w-[260px]">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ordenar por</span>
           <select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value as any)} className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl outline-none text-xs font-bold text-slate-700">
             {(['Próxima sessão', 'Menos sessões restantes', 'Mais recente', 'Maior pendência', 'Nome do pet'] as const).map(opt => <option key={opt}>{opt}</option>)}
@@ -1065,7 +1065,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
                 <button onClick={() => handleSendPackageReminder(p)} title="WhatsApp" className="w-11 h-11 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-emerald-500 hover:border-emerald-100 transition-all"><i className="fa-brands fa-whatsapp"></i></button>
                 <button onClick={() => openDetails(p)} title="Agendar / sessões" className="w-11 h-11 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-teal-600 hover:border-teal-100 transition-all"><i className="fa-regular fa-calendar"></i></button>
                 {!isReadOnly && (
-                  <button onClick={() => setPacoteParaCancelar(p)} title="Cancelar pacote" className="w-11 h-11 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-rose-500 hover:border-rose-100 transition-all"><i className="fa-solid fa-ellipsis-vertical"></i></button>
+                  <button onClick={() => setPacoteParaCancelar(p)} title="Cancelar pacote" className="w-11 h-11 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all"><i className="fa-solid fa-trash-can"></i></button>
                 )}
               </div>
             </article>
