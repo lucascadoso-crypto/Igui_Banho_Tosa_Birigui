@@ -117,13 +117,23 @@ function getLogTipo(
     return janela === "amanha" ? "LEMBRETE_18H" : "LEMBRETE_08H";
   }
 
-  if (token === "AVISO_PRONTO_MANUAL" || token === "AVISO_PRONTO_AUTO") return token;
+  if (token === "AVISO_PRONTO_MANUAL" || token === "AVISO_PRONTO_AUTO" || token === "AVISO_PRONTO_AUTOMATICO") return token;
   if (token === "LEMBRETE_MANUAL") return token;
   if (token === "CONFIRMACAO" || token === "CONFIRMACAO_AGENDAMENTO") return "CONFIRMACAO";
   if (tipo === "pronto") return origemToken === "AUTO" ? "AVISO_PRONTO_AUTO" : "AVISO_PRONTO_MANUAL";
   if (tipo === "lembrete") return "LEMBRETE_MANUAL";
   if (tipo === "confirmacao") return "CONFIRMACAO";
   return "MANUAL";
+}
+
+function shouldPreventDuplicate(logTipo: string) {
+  return [
+    "LEMBRETE_08H",
+    "LEMBRETE_18H",
+    "CONFIRMACAO",
+    "AVISO_PRONTO_AUTO",
+    "AVISO_PRONTO_AUTOMATICO",
+  ].includes(logTipo);
 }
 
 function getAgendamentoParts(agendamento: any) {
@@ -461,7 +471,7 @@ async function processManual(supabase: any, req: Request, body: any, agendamento
 
   const mensagem = String(body?.mensagem || "").trim() || buildManualMessage(agendamento, tipo);
 
-  if (await alreadySent(supabase, Number(agendamento.id), logTipo)) {
+  if (shouldPreventDuplicate(logTipo) && await alreadySent(supabase, Number(agendamento.id), logTipo)) {
     return jsonResponse({
       ok: true,
       tipo,
