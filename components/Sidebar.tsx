@@ -195,7 +195,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
       )}
 
       <aside className={`w-[86vw] max-w-[21rem] md:w-60 md:max-w-none bg-[#F8FAFC] h-screen text-slate-800 flex flex-col fixed left-0 top-0 z-40 border-r border-slate-200/80 shadow-2xl md:shadow-[8px_0_28px_rgba(15,23,42,0.04)] transition-transform duration-300 ease-in-out md:translate-x-0 overflow-hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="pt-[max(1.1rem,env(safe-area-inset-top))] pb-4 px-4 md:pt-3 md:pb-3 md:px-3 flex flex-col items-center shrink-0 relative bg-white border-b border-slate-100">
+        <div className="pt-[max(1.1rem,env(safe-area-inset-top))] pb-4 px-4 md:pt-3 md:pb-2 md:px-3 flex flex-col items-center shrink-0 relative bg-white border-b border-slate-100">
           <button
             onClick={onClose}
             className="absolute right-3 top-[max(0.85rem,env(safe-area-inset-top))] w-10 h-10 flex items-center justify-center rounded-2xl bg-slate-100 text-slate-600 hover:bg-slate-200 md:hidden"
@@ -220,26 +220,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
             {getRoleBadgeLabel(userRole)}
           </div>
 
-          {activeUnit && (
-            <button
-              onClick={() => {
-                if (isMaster) setExpandedUnit(String(activeUnit.id));
-              }}
-              className="hidden md:flex w-full mt-2 items-center gap-2.5 px-3 py-2 rounded-[1rem] bg-teal-50 text-teal-900 border border-teal-100"
-            >
-              <span className="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0">
-                <i className="fa-solid fa-store text-xs"></i>
-              </span>
-              <span className="text-left min-w-0 flex-1">
-                <span className="text-[11px] font-black truncate leading-tight block">{activeUnit.name.replace(/^iG\s+/i, '')}</span>
-                <span className="text-[8px] font-black uppercase tracking-widest text-teal-600/80 mt-0.5 block">Unidade atual</span>
-              </span>
-              {isMaster && <i className="fa-solid fa-chevron-down text-[9px] text-teal-600"></i>}
-            </button>
-          )}
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden sidebar-scroll py-4 px-3 space-y-5 md:py-3 md:px-2.5 md:space-y-3 bg-[#F8FAFC]">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden sidebar-scroll py-4 px-3 space-y-5 md:py-2.5 md:px-2.5 md:space-y-3 bg-[#F8FAFC]">
           {filteredGlobalMenus.length > 0 && (
             <nav className="space-y-2 md:space-y-1.5">
               <p className="px-3 text-[10px] md:text-[9px] font-black text-slate-400 uppercase tracking-[0.22em] mb-2 md:mb-1.5">Operação</p>
