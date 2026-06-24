@@ -66,12 +66,14 @@ const App: React.FC = () => {
 
   const normalizeRole = (role?: string): UserRole => {
     switch (role) {
-      case 'admin_unidade':
-        return 'administrador';
       case 'atendente':
       case 'tosador':
       case 'somente_leitura':
-        return 'comum';
+      case 'admin_unidade':
+      case 'gerente':
+      case 'financeiro':
+      case 'master':
+        return role;
       default:
         return (role || 'comum') as UserRole;
     }
@@ -106,12 +108,12 @@ const App: React.FC = () => {
   }, []);
 
   // Busca perfil - Removido 'units' das dependências para quebrar o loop
-  const fetchProfile = useCallback(async (email: string, currentUnits: Unit[]) => {
+  const fetchProfile = useCallback(async (authUser: any, currentUnits: Unit[]) => {
     try {
 const { data, error: profileError } = await supabase
         .from('funcionarios')
         .select('*')
-        .eq('email', email)
+        .eq('user_id', authUser.id)
         .maybeSingle();
 
       if (profileError) throw profileError;
@@ -123,7 +125,7 @@ const { data, error: profileError } = await supabase
         setUserRole(normalizedRole);
         
         // Se o usuário não for master nem financeiro, trava ele na unidade dele
-        if (normalizedRole !== 'master' && normalizedRole !== 'financeiro' && data.unidade_id) {
+        if (normalizedRole !== 'master' && data.unidade_id) {
           const userUnit = currentUnits.find(u => u.id === data.unidade_id);
           setNavState({
             mode: 'unit',
@@ -133,9 +135,13 @@ const { data, error: profileError } = await supabase
           });
         }
       } else {
-        // ROLLBACK: Temporariamente permitindo acesso básico se o perfil não for encontrado para evitar loops
-        console.warn("Usuário não encontrado na tabela de funcionários. Usando perfil padrão.");
-        setUserProfile({ cargo: 'comum', ativo: true });
+        console.warn("Login sem acesso liberado na tabela de funcionarios.");
+        setUserProfile({
+          cargo: 'pendente',
+          ativo: false,
+          email: authUser.email,
+          nome: authUser.user_metadata?.name || authUser.email
+        });
         setUserRole('comum');
       }
     } catch (err) {
@@ -145,9 +151,9 @@ const { data, error: profileError } = await supabase
     }
   }, [handleLogout]);
 
-  const initializeApp = useCallback(async (email: string) => {
+  const initializeApp = useCallback(async (authUser: any) => {
     // Se já inicializamos para este email, não fazemos de novo
-    if (lastEmailRef.current === email && userProfile) {
+    if (lastEmailRef.current === authUser.email && userProfile) {
       setLoading(false);
       return;
     }
@@ -155,8 +161,8 @@ const { data, error: profileError } = await supabase
     setLoading(true);
     try {
       const loadedUnits = await fetchUnits();
-      await fetchProfile(email, loadedUnits);
-      lastEmailRef.current = email;
+      await fetchProfile(authUser, loadedUnits);
+      lastEmailRef.current = authUser.email;
       setHasError(false);
     } catch (err) {
       console.error("FALHA NA INICIALIZAÇÃO DO APP:", err);
@@ -187,7 +193,7 @@ const { data, error: profileError } = await supabase
         if (!mounted) return;
         setSession(session);
         if (session?.user?.email) {
-          await initializeApp(session.user.email);
+          await initializeApp(session.user);
         }
       } catch (err: any) {
         console.error("Erro ao buscar sessão:", err);
@@ -226,7 +232,7 @@ const { data, error: profileError } = await supabase
         if (session?.user?.email) {
           // Só dispara inicialização se for um novo email ou se ainda não temos o perfil
           if (lastEmailRef.current !== session.user.email || !userProfile) {
-            await initializeApp(session.user.email);
+            await initializeApp(session.user);
           }
         } else {
           // Se não há sessão, limpa tudo (Logout)

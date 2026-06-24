@@ -16,12 +16,14 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [pendingLogins, setPendingLogins] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any | null>(null);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isMaster = currentUserRole === 'master' || currentUserRole === 'financeiro';
+  const isMaster = currentUserRole === 'master';
+  const canManageAccess = isMaster && !isReadOnly;
 
   useEffect(() => {
     fetchEmployees();
@@ -30,7 +32,9 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
 
   const fetchCurrentUser = async () => {
     const { data: { user } } = await supabaseClient.auth.getUser();
-    if (user) setCurrentUserEmail(user.email);
+    if (user) {
+      setCurrentUserEmail(user.email);
+    }
   };
 
   const fetchEmployees = async () => {
@@ -43,6 +47,15 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
         .order('nome', { ascending: true });
 
       if (error) throw error;
+      const { data: pendingData, error: pendingError } = isMaster
+        ? await supabaseClient.rpc('listar_logins_pendentes_equipe')
+        : { data: [], error: null };
+
+      if (pendingError) {
+        console.warn('Logins pendentes ainda indisponiveis:', pendingError.message);
+      }
+
+      setPendingLogins(pendingData || []);
       setEmployees(data || []);
     } catch (err) {
       console.error("Erro ao buscar funcionários:", err);
@@ -54,6 +67,12 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
   const handleOpenModal = (employee: any = null) => {
     setEditingEmployee(employee ? {
       ...employee,
+      nome: employee.nome || employee.funcionario_nome || '',
+      email: employee.email || '',
+      cargo: employee.cargo || employee.funcionario_cargo || 'atendente',
+      unidade_id: employee.unidade_id || employee.funcionario_unidade_id || units[0]?.id,
+      auth_user_id: employee.auth_user_id || employee.user_id || null,
+      status_login: employee.status_login,
       status: employee.ativo ? 'Ativo' : 'Inativo'
     } : {
       nome: '',
@@ -61,7 +80,9 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
       cargo: 'atendente',
       unidade_id: units[0]?.id,
       status: 'Inativo', // Pendente por padrão
-      foto_url: ''
+      foto_url: '',
+      auth_user_id: null,
+      status_login: 'SEM_LOGIN_VINCULADO'
     });
     setIsModalOpen(true);
   };
@@ -83,17 +104,15 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
     setLoading(true);
     try {
       // Sincroniza o status da UI com o booleano 'ativo' do banco
-      const payload = { 
+      const basePayload = { 
         nome: editingEmployee.nome,
         email: editingEmployee.email,
-        cargo: editingEmployee.cargo,
-        unidade_id: editingEmployee.unidade_id,
-        foto_url: editingEmployee.foto_url,
-        ativo: editingEmployee.status === 'Ativo'
+        foto_url: editingEmployee.foto_url
       };
 
+      let funcionarioId = editingEmployee.id;
       if (editingEmployee.id) {
-        const { error } = await supabaseClient.from('funcionarios').update(payload).eq('id', editingEmployee.id);
+        const { error } = await supabaseClient.from('funcionarios').update(basePayload).eq('id', editingEmployee.id);
         if (error) throw error;
         
         registrarAtividade(
@@ -105,8 +124,15 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
           userProfile?.cargo
         );
       } else {
-        const { error } = await supabaseClient.from('funcionarios').insert([payload]);
+        const createPayload = {
+          ...basePayload,
+          cargo: editingEmployee.cargo,
+          unidade_id: editingEmployee.unidade_id,
+          ativo: false
+        };
+        const { data, error } = await supabaseClient.from('funcionarios').insert([createPayload]).select('id').single();
         if (error) throw error;
+        funcionarioId = data.id;
 
         registrarAtividade(
           editingEmployee.unidade_id || units[0].id,
@@ -116,6 +142,19 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
           userProfile?.nome,
           userProfile?.cargo
         );
+      }
+
+      if (editingEmployee.auth_user_id) {
+        const { error: accessError } = await supabaseClient.rpc('salvar_acesso_funcionario', {
+          p_funcionario_id: funcionarioId,
+          p_auth_user_id: editingEmployee.auth_user_id,
+          p_unidade_id: Number(editingEmployee.unidade_id),
+          p_perfil: editingEmployee.cargo,
+          p_ativo: editingEmployee.status === 'Ativo'
+        });
+        if (accessError) throw accessError;
+      } else if (editingEmployee.status === 'Ativo') {
+        throw new Error('Selecione um login pendente antes de liberar acesso ativo.');
       }
 
       setIsModalOpen(false);
@@ -140,10 +179,19 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
     setLoading(true);
     try {
       // Realiza o update no Supabase (Transformando Excluir em Inativar para manter histórico)
-      const { error } = await supabaseClient
-        .from('funcionarios')
-        .update({ ativo: false })
-        .eq('id', emp.id);
+      const accessUserId = emp.auth_user_id || emp.user_id;
+      const { error } = accessUserId
+        ? await supabaseClient.rpc('salvar_acesso_funcionario', {
+            p_funcionario_id: emp.id,
+            p_auth_user_id: accessUserId,
+            p_unidade_id: Number(emp.unidade_id),
+            p_perfil: emp.cargo,
+            p_ativo: false
+          })
+        : await supabaseClient
+            .from('funcionarios')
+            .update({ ativo: false })
+            .eq('id', emp.id);
 
       if (error) throw error;
       
@@ -180,6 +228,20 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
     }
   };
 
+  const getAccessStatusInfo = (emp: any) => {
+    const status = emp.status_login || (emp.user_id ? (emp.ativo ? 'ACESSO_ATIVO' : 'ACESSO_SUSPENSO') : 'SEM_LOGIN_VINCULADO');
+    switch (status) {
+      case 'PENDENTE_DE_APROVACAO':
+        return { label: 'PENDENTE DE APROVAÇÃO', badge: 'bg-amber-50 text-amber-700', icon: 'fa-hourglass-half' };
+      case 'ACESSO_ATIVO':
+        return { label: 'ACESSO ATIVO', badge: 'bg-emerald-50 text-emerald-600', icon: 'fa-circle-check' };
+      case 'ACESSO_SUSPENSO':
+        return { label: 'ACESSO SUSPENSO', badge: 'bg-rose-50 text-rose-600', icon: 'fa-ban' };
+      default:
+        return { label: 'SEM LOGIN VINCULADO', badge: 'bg-slate-50 text-slate-500', icon: 'fa-user-slash' };
+    }
+  };
+
   return (
     <div className="space-y-5 md:space-y-8 pt-2 md:pt-0 animate-in fade-in duration-500">
       
@@ -193,12 +255,58 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
               <p className="text-orange-500 text-[10px] font-black uppercase tracking-[0.2em]">Gestão de Funcionários</p>
            </div>
         </div>
-        {isMaster && !isReadOnly && (
+        {canManageAccess && (
           <button onClick={() => handleOpenModal()} className="w-full md:w-auto justify-center bg-slate-900 hover:bg-black text-white px-6 md:px-8 py-3.5 md:py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center">
             <i className="fa-solid fa-plus mr-3"></i> NOVO MEMBRO
           </button>
         )}
       </header>
+
+      {isMaster && pendingLogins.length > 0 && (
+        <section className="bg-amber-50 border border-amber-100 rounded-[1.75rem] md:rounded-[2rem] p-4 md:p-6 shadow-sm">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-sm font-black text-amber-900 uppercase tracking-tight">Logins pendentes de aprovação</h3>
+              <p className="text-xs font-bold text-amber-700/80 mt-1">Vincule o login real ao funcionário. Ninguém recebe acesso automaticamente.</p>
+            </div>
+            <span className="shrink-0 bg-white/80 text-amber-700 border border-amber-100 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+              {pendingLogins.length}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {pendingLogins.map((login) => (
+              <button
+                key={login.user_id}
+                type="button"
+                onClick={() => handleOpenModal({
+                  id: login.funcionario_id,
+                  nome: login.funcionario_nome || '',
+                  email: login.email,
+                  cargo: login.funcionario_cargo || 'atendente',
+                  unidade_id: login.funcionario_unidade_id || units[0]?.id,
+                  ativo: false,
+                  auth_user_id: login.user_id,
+                  status_login: login.status_login
+                })}
+                className="text-left rounded-2xl bg-white/85 border border-amber-100 p-4 hover:bg-white hover:shadow-md transition-all"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                    <i className="fa-solid fa-user-clock"></i>
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-black text-slate-800 text-sm truncate">{login.funcionario_nome || 'Login sem funcionário cadastrado'}</span>
+                    <span className="block text-xs font-bold text-slate-500 truncate">{login.email}</span>
+                    <span className="mt-2 inline-flex px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-[9px] font-black uppercase tracking-widest">
+                      {getAccessStatusInfo(login).label}
+                    </span>
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="bg-white rounded-[1.75rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
         
@@ -223,6 +331,7 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
               <div className="py-20 text-center text-slate-400 font-bold"><i className="fa-solid fa-circle-notch fa-spin mr-2"></i>Sincronizando...</div>
             ) : employees.map(emp => {
               const role = getRoleInfo(emp.cargo);
+              const accessStatus = getAccessStatusInfo(emp);
               const isSelf = emp.email === currentUserEmail;
               
               return (
@@ -257,12 +366,9 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
 
                   <div className="flex items-center justify-between md:block mb-3 md:mb-0">
                     <span className="md:hidden text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</span>
-                    <span className={`inline-flex items-center px-3 py-1.5 md:py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                      !emp.ativo 
-                        ? 'bg-rose-50 text-rose-600' 
-                        : 'bg-emerald-50 text-emerald-600'
-                    }`}>
-                      {emp.ativo ? 'Ativo' : 'Inativo'}
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 md:py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${accessStatus.badge}`}>
+                      <i className={`fa-solid ${accessStatus.icon} text-[8px]`}></i>
+                      {accessStatus.label}
                     </span>
                   </div>
 
@@ -274,7 +380,7 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
                       </div>
                     ) : (
                       <div className="flex items-center justify-end gap-2 md:space-x-3">
-                        {!isReadOnly && (
+                        {canManageAccess && (
                           <>
                             <button 
                               onClick={() => handleOpenModal(emp)}
@@ -381,6 +487,14 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
                          <option value="Inativo">🔴 Inativo (Bloqueado)</option>
                       </select>
                    </div>
+                   <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 text-xs font-bold text-slate-500 leading-relaxed">
+                      <p className="font-black text-slate-700 uppercase tracking-widest text-[10px] mb-1">Status do login</p>
+                      <p className="mb-2">{getAccessStatusInfo(editingEmployee).label}</p>
+                      <p>O acesso será definido automaticamente conforme o cargo e a unidade selecionados.</p>
+                      {!editingEmployee.auth_user_id && (
+                        <p className="mt-2 text-amber-700">Sem login vinculado: o colaborador pode ficar cadastrado, mas não acessa o sistema até o Master aprovar um login pendente.</p>
+                      )}
+                   </div>
                 </div>
 
                 <div className="pt-4 flex gap-2 md:gap-3">
@@ -395,7 +509,7 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
                      className="flex-[2] py-3 md:py-5 bg-slate-900 text-white rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest shadow-xl shadow-slate-900/20 hover:bg-black transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center"
                    >
                      {loading ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : <i className="fa-solid fa-check-circle mr-2"></i>}
-                     {editingEmployee.id ? 'Salvar' : 'Criar'}
+                     {editingEmployee.auth_user_id ? 'SALVAR ACESSO' : editingEmployee.id ? 'SALVAR CADASTRO' : 'CRIAR CADASTRO'}
                    </button>
                 </div>
              </form>

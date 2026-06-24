@@ -328,7 +328,7 @@ for each row execute function public.guard_funcionarios_access_columns();
 -- 5. RPC oficial para liberar/revogar acesso.
 create or replace function public.salvar_acesso_funcionario(
   p_funcionario_id bigint,
-  p_user_id uuid,
+  p_auth_user_id uuid,
   p_unidade_id bigint,
   p_perfil public.user_profile,
   p_ativo boolean
@@ -377,7 +377,7 @@ begin
 
   select au.email::text into auth_email
   from auth.users au
-  where au.id = p_user_id;
+  where au.id = p_auth_user_id;
 
   if auth_email is null then
     raise exception 'Login/auth user informado nao existe.';
@@ -400,7 +400,7 @@ begin
   if exists (
     select 1
     from public.funcionarios f
-    where f.user_id = p_user_id
+    where f.user_id = p_auth_user_id
       and f.id <> p_funcionario_id
   ) then
     raise exception 'Este login ja esta vinculado a outro funcionario.';
@@ -411,12 +411,12 @@ begin
   update public.usuarios_unidades
   set ativo = false,
       updated_at = now()
-  where user_id = p_user_id
+  where user_id = p_auth_user_id
     and (unidade_id is distinct from p_unidade_id or perfil is distinct from p_perfil or p_ativo = false);
 
   if p_ativo then
     insert into public.usuarios_unidades (user_id, unidade_id, perfil, ativo)
-    values (p_user_id, p_unidade_id, p_perfil, true)
+    values (p_auth_user_id, p_unidade_id, p_perfil, true)
     on conflict (user_id, unidade_id, perfil) do update
     set ativo = true,
         updated_at = now()
@@ -424,7 +424,7 @@ begin
   end if;
 
   update public.funcionarios
-  set user_id = p_user_id,
+  set user_id = p_auth_user_id,
       unidade_id = p_unidade_id,
       cargo = p_perfil,
       ativo = p_ativo,

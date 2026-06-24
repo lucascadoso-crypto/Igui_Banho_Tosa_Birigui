@@ -18,7 +18,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
   const [empresa, setEmpresa] = useState({ nome: 'IGUI BANHO E TOSA', logo_url: '' });
   const [listaUnidades, setListaUnidades] = useState<Unit[]>([]);
 
-  const isMaster = userRole === 'master' || userRole === 'financeiro';
+  const isMaster = userRole === 'master';
 
   const fetchSidebarData = async () => {
     if (!supabaseClient) return;
@@ -52,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
           whatsapp_ativo: u.whatsapp_ativo
         }));
 
-        if (userRole !== 'master' && userRole !== 'financeiro' && userProfile?.unidade_id) {
+        if (userRole !== 'master' && userProfile?.unidade_id) {
           finalUnits = finalUnits.filter((u: Unit) => u.id === userProfile.unidade_id);
         }
 
@@ -92,9 +92,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
   };
 
   const globalMenus: { id: GlobalView; label: string; icon: string; roles: UserRole[] }[] = [
-    { id: 'Painel Geral', label: 'Painel Geral', icon: 'fa-chart-pie', roles: ['master', 'financeiro'] },
-    { id: 'Financeiro Geral', label: 'Financeiro Geral', icon: 'fa-sack-dollar', roles: ['master', 'financeiro'] },
-    { id: 'Marketing', label: 'Marketing', icon: 'fa-bullhorn', roles: ['master', 'financeiro', 'administrador', 'gerente'] },
+    { id: 'Painel Geral', label: 'Painel Geral', icon: 'fa-chart-pie', roles: ['master'] },
+    { id: 'Financeiro Geral', label: 'Financeiro Geral', icon: 'fa-sack-dollar', roles: ['master'] },
+    { id: 'Marketing', label: 'Marketing', icon: 'fa-bullhorn', roles: ['master', 'admin_unidade', 'gerente'] },
     { id: 'Configurações', label: 'Configurações', icon: 'fa-gear', roles: ['master', 'financeiro'] },
     { id: 'Equipe', label: 'Equipe', icon: 'fa-users', roles: ['master', 'financeiro'] },
   ];

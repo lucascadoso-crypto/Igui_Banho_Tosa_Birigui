@@ -1,10 +1,10 @@
 # Revisao - Equipe como ponto oficial de acessos
 
-Status: preparado para revisao. Nada foi aplicado no Supabase, nada foi commitado, nada foi enviado para deploy.
+Status: preparado para revisao. Nada foi aplicado no Supabase e nenhum deploy foi disparado.
 
 ## Arquivo de migration preparado
 
-- `supabase/migrations/0020_access_control_roles.sql`
+- `supabase/migrations/0020_access_control_by_role.sql`
 
 ## Diagnostico das policies atuais em producao
 
@@ -47,7 +47,7 @@ Constraints relevantes:
 - `funcionarios_email_key`
 - `funcionarios_user_id_key`
 - FK `unidade_id -> unidades.id`
-- FK `user_id -> auth.users.id`
+- FK real confirmada por `pg_constraint`: `funcionarios.user_id -> auth.users(id) ON DELETE SET NULL`
 
 ### `public.usuarios_unidades`
 
@@ -65,7 +65,7 @@ Constraints relevantes:
 - `usuarios_unidades_unique_scope (user_id, unidade_id, perfil)`
 - `usuarios_unidades_unidade_required_for_non_master`
 - FK `unidade_id -> unidades.id`
-- FK `user_id -> auth.users.id`
+- FK real confirmada por `pg_constraint`: `usuarios_unidades.user_id -> auth.users(id) ON DELETE CASCADE`
 
 ## Tabelas com RLS ajustado na migration 0020
 
@@ -128,7 +128,7 @@ Mudanca principal: `financeiro` fica somente leitura no fiscal. Gerente/admin_un
 ```sql
 public.salvar_acesso_funcionario(
   p_funcionario_id bigint,
-  p_user_id uuid,
+  p_auth_user_id uuid,
   p_unidade_id bigint,
   p_perfil public.user_profile,
   p_ativo boolean
@@ -143,6 +143,7 @@ Regras implementadas na RPC:
 - permite execucao somente para Master
 - valida unidade ativa
 - valida existencia do login em `auth.users`
+- nao usa e nao cria `public.users`
 - valida existencia do funcionario
 - exige correspondencia exata de e-mail normalizado entre login e funcionario
 - impede vincular o mesmo login a outro funcionario
@@ -311,12 +312,10 @@ A migration 0020 substitui a regra anterior:
 
 ## O que nao foi alterado
 
-Nesta etapa local:
+Nesta etapa de preparacao:
 
 - nenhuma migration foi aplicada no Supabase;
 - nenhum dado real foi alterado;
-- nenhum commit foi criado;
-- nenhum push foi feito;
 - nenhum deploy foi disparado;
 - nenhuma nota fiscal real foi emitida;
 - nenhuma API externa foi chamada;
@@ -362,4 +361,3 @@ Nesta etapa local:
 3. Confirmar que aparece na lista segura de pendencias para Master.
 4. Vincular explicitamente a um funcionario com e-mail igual normalizado.
 5. Confirmar acesso apenas apos salvar pela tela Equipe.
-
