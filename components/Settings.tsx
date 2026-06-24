@@ -5,6 +5,7 @@ import { getLastImgBBUploadError, uploadToImgBB } from '../services/imgbbService
 import { registrarAtividade } from '../services/logger';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatarErroWhatsApp } from '../lib/errorParser';
+import FiscalSettings from './FiscalSettings';
 
 interface SettingsProps {
   supabaseClient: any;
@@ -15,7 +16,7 @@ interface SettingsProps {
 
 const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits, userProfile }) => {
   const isReadOnly = userProfile?.cargo === 'financeiro';
-  const [activeTab, setActiveTab] = useState<'identity' | 'units' | 'services' | 'whatsapp_logs'>('identity');
+  const [activeTab, setActiveTab] = useState<'identity' | 'units' | 'services' | 'fiscal' | 'whatsapp_logs'>('identity');
   const [loading, setLoading] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
@@ -443,6 +444,13 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
           <i className="fa-solid fa-tags"></i>
           <span>Serviços</span>
         </button>
+        <button
+          onClick={() => setActiveTab('fiscal')}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 ${activeTab === 'fiscal' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
+        >
+          <i className="fa-solid fa-file-invoice-dollar"></i>
+          <span>Fiscal</span>
+        </button>
         <button 
           onClick={() => setActiveTab('whatsapp_logs')}
           className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 ${activeTab === 'whatsapp_logs' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
@@ -755,6 +763,10 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
             )}
           </div>
         </div>
+      )}
+
+      {activeTab === 'fiscal' && (
+        <FiscalSettings supabaseClient={supabaseClient} units={units} userProfile={userProfile} />
       )}
 
       {/* Conteúdo Aba 4: Logs do WhatsApp */}

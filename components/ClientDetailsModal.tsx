@@ -1,8 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Client, Pet, UiId } from '../types';
 import ClienteModal from './ClienteModal';
 import { registrarAtividade } from '../services/logger';
+import FiscalHistory from './FiscalHistory';
+import { getLastImgBBUploadError, uploadToImgBB } from '../services/imgbbService';
 
 interface ClientDetailsModalProps {
   client: Client;
@@ -14,7 +16,7 @@ interface ClientDetailsModalProps {
 }
 
 const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabaseClient, unitId, onClose, onOpenNewPet, userProfile }) => {
-  const [activeTab, setActiveTab] = useState<'details' | 'payments' | 'history'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'payments' | 'history' | 'fiscal'>('details');
   const [pets, setPets] = useState<Pet[]>([]);
   const [loadingPets, setLoadingPets] = useState(false);
   
@@ -28,12 +30,15 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
   const [petToDelete, setPetToDelete] = useState<Pet | null>(null);
   const [savingPet, setSavingPet] = useState(false);
   const [deletingPet, setDeletingPet] = useState(false);
+  const [uploadingPetPhoto, setUploadingPetPhoto] = useState(false);
+  const petPhotoInputRef = useRef<HTMLInputElement>(null);
   const [localToast, setLocalToast] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
   
   // Estados para Edição
   const [isEditClientModalOpen, setIsEditClientModalOpen] = useState(false);
   const [petSelecionado, setPetSelecionado] = useState<Pet | null>(null);
   const [currentClient, setCurrentClient] = useState<Client>(client);
+  const canViewFiscal = ['master', 'financeiro', 'gerente', 'admin_unidade', 'administrador'].includes(userProfile?.cargo);
 
   useEffect(() => {
     setCurrentClient(client);
@@ -46,7 +51,8 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
     genero: 'Macho',
     porte: 'Médio',
     data_nascimento: '',
-    notas_internas: ''
+    notas_internas: '',
+    foto_url: ''
   });
 
   const tealColor = "#00BFA5";
@@ -177,6 +183,63 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
     setTimeout(() => setLocalToast(null), 3000);
   };
 
+  const resetPetForm = () => {
+    setPetSelecionado(null);
+    setNewPet({ id: '', nome: '', raca: '', genero: 'Macho', porte: 'Médio', data_nascimento: '', notas_internas: '', foto_url: '' });
+    setUploadingPetPhoto(false);
+    if (petPhotoInputRef.current) petPhotoInputRef.current.value = '';
+  };
+
+  const closePetModal = () => {
+    setIsNewPetModalOpen(false);
+    resetPetForm();
+  };
+
+  const handlePetPhotoUpload = async (file?: File) => {
+    if (!file) return;
+
+    const allowedTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+    if (!allowedTypes.has(file.type)) {
+      showToast('Envie uma foto JPG, PNG ou WEBP.', 'error');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('A foto deve ter no máximo 5 MB.', 'error');
+      return;
+    }
+
+    const previousUrl = newPet.foto_url;
+    const previewUrl = URL.createObjectURL(file);
+    setNewPet(prev => ({ ...prev, foto_url: previewUrl }));
+    setUploadingPetPhoto(true);
+
+    try {
+      const uploadedUrl = await uploadToImgBB(file);
+      if (!uploadedUrl) {
+        throw new Error(getLastImgBBUploadError() || 'Não foi possível enviar a foto do pet.');
+      }
+
+      setNewPet(prev => ({ ...prev, foto_url: uploadedUrl }));
+      showToast('Foto do pet enviada com sucesso!');
+    } catch (err) {
+      console.error('Erro ao enviar foto do pet:', err);
+      setNewPet(prev => ({ ...prev, foto_url: previousUrl || '' }));
+      showToast('Não foi possível enviar a foto do pet. Verifique sua conexão e tente novamente.', 'error');
+    } finally {
+      URL.revokeObjectURL(previewUrl);
+      setUploadingPetPhoto(false);
+      if (petPhotoInputRef.current) petPhotoInputRef.current.value = '';
+    }
+  };
+
+  const handleRemovePetPhoto = () => {
+    if (!newPet.foto_url) return;
+    if (!window.confirm('Remover a foto deste pet?')) return;
+    setNewPet(prev => ({ ...prev, foto_url: '' }));
+    showToast('Foto removida. Salve as alterações para concluir.');
+  };
+
   const handleSavePet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPet.nome) return;
@@ -198,6 +261,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
         porte: newPet.porte,
         data_nascimento: newPet.data_nascimento || null,
         notas_internas: newPet.notas_internas,
+        foto_url: newPet.foto_url || null,
         especie: 'Cachorro'
       };
 
@@ -241,8 +305,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
       }
 
       setIsNewPetModalOpen(false);
-      setPetSelecionado(null);
-      setNewPet({ id: '', nome: '', raca: '', genero: 'Macho', porte: 'Médio', data_nascimento: '', notas_internas: '' });
+      resetPetForm();
       fetchPets();
     } catch (err: any) {
       console.error("Erro ao salvar pet:", err);
@@ -261,7 +324,8 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
       genero: pet.genero || 'Macho',
       porte: pet.porte || 'Médio',
       data_nascimento: pet.data_nascimento || '',
-      notas_internas: pet.notas_internas || ''
+      notas_internas: pet.notas_internas || '',
+      foto_url: pet.foto_url || ''
     });
     setIsNewPetModalOpen(true);
   };
@@ -352,6 +416,15 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
               Histórico
               {activeTab === 'history' && <div className="absolute bottom-0 left-0 w-full h-1 bg-[#00BFA5] rounded-t-full"></div>}
             </button>
+            {canViewFiscal && (
+              <button
+                onClick={() => setActiveTab('fiscal')}
+                className={`pb-3 md:pb-4 text-[9px] md:text-sm font-black uppercase tracking-widest transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'fiscal' ? 'text-[#00BFA5]' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                Notas Fiscais
+                {activeTab === 'fiscal' && <div className="absolute bottom-0 left-0 w-full h-1 bg-[#00BFA5] rounded-t-full"></div>}
+              </button>
+            )}
           </div>
         </header>
 
@@ -615,27 +688,96 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                )}
             </div>
           )}
+
+          {activeTab === 'fiscal' && canViewFiscal && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <FiscalHistory supabaseClient={supabaseClient} clientId={Number(client.id)} compact />
+            </div>
+          )}
         </div>
       </div>
 
       {/* NOVO MODAL: ADICIONAR/EDITAR PET (INTERNO) */}
       {isNewPetModalOpen && (
-        <div className="app-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 md:p-4 overflow-y-auto overflow-x-hidden animate-in fade-in duration-200">
-          <div className="app-modal-panel bg-white w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] md:max-w-lg rounded-[2rem] md:rounded-[2.5rem] shadow-2xl overflow-y-auto overflow-x-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100vh-24px)]">
+        <div className="app-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 md:p-5 overflow-hidden animate-in fade-in duration-200">
+          <div className="app-modal-panel bg-white w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] md:w-full md:max-w-[960px] rounded-[2rem] md:rounded-[2.25rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100dvh-24px)] md:max-h-[calc(100dvh-40px)]">
             <header className="app-modal-header bg-[#00BFA5] p-5 md:p-8 text-white flex justify-between items-center gap-3 shrink-0">
                <div className="min-w-0">
                   <h3 className="text-lg md:text-xl font-black uppercase tracking-tighter break-words leading-tight">{petSelecionado ? 'Detalhes do Pet' : 'Adicionar Novo Pet'}</h3>
                   <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest break-words">Tutor: {currentClient.nome}</p>
                </div>
                <button 
-                 onClick={() => { setIsNewPetModalOpen(false); setPetSelecionado(null); }} 
+                 onClick={closePetModal} 
                  className="relative z-50 p-2 w-9 h-9 md:w-10 md:h-10 flex items-center justify-center hover:bg-white/10 rounded-full text-xl md:text-2xl cursor-pointer shrink-0"
                >
                  <i className="fa-solid fa-xmark pointer-events-none"></i>
                </button>
             </header>
 
-            <form onSubmit={handleSavePet} className="app-modal-body p-5 md:p-8 space-y-4 md:space-y-5">
+            <form onSubmit={handleSavePet} className="app-modal-body overflow-y-auto overflow-x-hidden">
+              <div className="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-5 md:gap-7 p-5 md:p-8">
+                <aside className="w-full md:w-[280px]">
+                  <div className="rounded-[1.75rem] border border-slate-100 bg-slate-50 p-4 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => petPhotoInputRef.current?.click()}
+                      className="group relative w-full aspect-square overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white flex items-center justify-center"
+                      aria-label={newPet.foto_url ? 'Trocar foto do pet' : 'Adicionar foto do pet'}
+                    >
+                      {newPet.foto_url ? (
+                        <img src={newPet.foto_url} alt="Foto do pet" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="text-center px-6">
+                          <div className="mx-auto mb-4 w-16 h-16 rounded-3xl bg-teal-50 text-[#00BFA5] flex items-center justify-center text-2xl">
+                            <i className="fa-solid fa-paw"></i>
+                          </div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Foto do pet</p>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-slate-950/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-sm font-black uppercase tracking-widest">
+                        <i className="fa-solid fa-camera mr-2"></i>
+                        {newPet.foto_url ? 'Trocar' : 'Adicionar'}
+                      </div>
+                    </button>
+
+                    <input
+                      ref={petPhotoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => handlePetPhotoUpload(e.target.files?.[0])}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => petPhotoInputRef.current?.click()}
+                      disabled={uploadingPetPhoto}
+                      className="mt-4 w-full py-3.5 rounded-2xl bg-[#00BFA5] text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#00BFA5]/15 hover:opacity-90 transition-all disabled:opacity-60"
+                    >
+                      {uploadingPetPhoto ? (
+                        <><i className="fa-solid fa-circle-notch fa-spin mr-2"></i>Enviando foto...</>
+                      ) : newPet.foto_url ? 'TROCAR FOTO' : 'ADICIONAR FOTO'}
+                    </button>
+
+                    {newPet.foto_url && (
+                      <button
+                        type="button"
+                        onClick={handleRemovePetPhoto}
+                        disabled={uploadingPetPhoto}
+                        className="mt-2 w-full py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-50"
+                      >
+                        REMOVER FOTO
+                      </button>
+                    )}
+
+                    <p className="mt-3 text-[10px] font-bold text-slate-400 leading-relaxed text-center">
+                      JPG, PNG ou WEBP até 5 MB.
+                    </p>
+                  </div>
+                </aside>
+
+                <div className="min-w-0 space-y-4 md:space-y-5">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome do Pet *</label>
                   <input 
@@ -657,6 +799,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                     className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-[#00BFA5] transition-all" 
                     placeholder="Ex: Golden Retriever" 
                   />
+               </div>
                </div>
 
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -686,7 +829,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                   </div>
                </div>
 
-               <div className="space-y-1.5">
+               <div className="space-y-1.5 md:max-w-xs">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data de Nascimento</label>
                   <input 
                     type="date" 
@@ -699,7 +842,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Detalhes / Obs de Saúde e Comportamento</label>
                   <textarea 
-                    rows={3}
+                    rows={5}
                     value={newPet.notas_internas}
                     onChange={(e) => setNewPet({...newPet, notas_internas: e.target.value})}
                     className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-medium text-slate-600 focus:ring-2 focus:ring-[#00BFA5] transition-all resize-none" 
@@ -707,20 +850,22 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                   />
                </div>
 
-               <div className="pt-4 flex flex-col-reverse md:flex-row gap-3">
+               <div className="pt-4 flex flex-col-reverse md:flex-row md:justify-end gap-3">
                   <button 
                     type="button" 
-                    onClick={() => { setIsNewPetModalOpen(false); setPetSelecionado(null); }}
-                    className="w-full md:flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all"
+                    onClick={closePetModal}
+                    className="w-full md:w-40 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all"
                   >Cancelar</button>
                   <button 
                     type="submit" 
-                    disabled={savingPet}
-                    className="w-full md:flex-[2] py-4 bg-[#00BFA5] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[#00BFA5]/20 hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
+                    disabled={savingPet || uploadingPetPhoto}
+                    className="w-full md:w-56 py-4 bg-[#00BFA5] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[#00BFA5]/20 hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    {savingPet ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'SALVAR'}
+                    {savingPet ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'SALVAR ALTERAÇÕES'}
                   </button>
                </div>
+                </div>
+              </div>
             </form>
           </div>
         </div>

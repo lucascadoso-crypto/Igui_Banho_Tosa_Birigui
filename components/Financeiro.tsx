@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Unit } from '../types';
 import { registrarAtividade } from '../services/logger';
+import FiscalDraftModal from './FiscalDraftModal';
+import FiscalHistory from './FiscalHistory';
 
 interface FinanceiroProps {
   unit: Unit;
@@ -13,7 +15,8 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
   const isReadOnly = userProfile?.cargo === 'financeiro';
   const isMaster = userProfile?.cargo === 'master';
   const [loading, setLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<'diaria' | 'auditoria'>('diaria');
+  const [viewMode, setViewMode] = useState<'diaria' | 'auditoria' | 'fiscal'>('diaria');
+  const [fiscalDraftTransaction, setFiscalDraftTransaction] = useState<any | null>(null);
 
   // Estado para o Modal de Ajuste
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
@@ -69,6 +72,24 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
     return { pix: 0, dinheiro: 0, cartao: 0 };
   };
 
+  const canCreateFiscalDraft = ['master', 'financeiro', 'gerente', 'admin_unidade', 'administrador'].includes(userProfile?.cargo);
+  const canViewFiscal = ['master', 'financeiro', 'gerente', 'admin_unidade', 'administrador'].includes(userProfile?.cargo);
+
+  const isFinalizedStatus = (status?: string) => {
+    const normalized = String(status || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    return normalized.includes('finalizado') || normalized.includes('concluido');
+  };
+
+  const canShowFiscalDraftAction = (transaction: any) => {
+    if (!canCreateFiscalDraft) return false;
+    if (!['agendamentos', 'pacotes'].includes(transaction?.sourceTable)) return false;
+    if (transaction.sourceTable === 'pacotes') return Boolean(transaction.originalData?.pago);
+    return Boolean(transaction.originalData?.pago) && isFinalizedStatus(transaction.originalData?.status);
+  };
+
   useEffect(() => {
     fetchFinancialData();
   }, [unit.id, selectedDate]);
@@ -79,7 +100,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
       // 1. Buscar Agendamentos Avulsos Pagos (Onde pacote_id é NULO)
       const apptsPromise = supabaseClient
         .from('agendamentos')
-        .select('id, unidade_id, cliente_id, pet_id, pacote_id, valor_total, valor_transporte, forma_pagamento, valor_pagamento_2, forma_pagamento_2, data_agendamento, pets(nome), agendamento_itens(servicos(nome))')
+        .select('id, unidade_id, cliente_id, pet_id, pacote_id, status, valor_total, valor_transporte, forma_pagamento, valor_pagamento_2, forma_pagamento_2, data_agendamento, pets(nome), agendamento_itens(servicos(nome))')
         .eq('unidade_id', unit.id)
         .eq('data_agendamento', selectedDate)
         .eq('pago', true)
@@ -544,6 +565,19 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {fiscalDraftTransaction && (
+        <FiscalDraftModal
+          supabaseClient={supabaseClient}
+          unit={unit}
+          transaction={fiscalDraftTransaction}
+          userProfile={userProfile}
+          onClose={() => setFiscalDraftTransaction(null)}
+          onCreated={() => {
+            setFiscalDraftTransaction(null);
+            fetchFinancialData();
+          }}
+        />
+      )}
       
       {/* Modal de Ajuste Financeiro (Restrito ao Mestre) */}
       {editingTransaction && (
@@ -671,6 +705,12 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
              onClick={() => setViewMode('auditoria')}
              className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'auditoria' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
            >Auditoria</button>
+           {canViewFiscal && (
+             <button
+               onClick={() => setViewMode('fiscal')}
+               className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'fiscal' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+             >Notas Fiscais</button>
+           )}
         </div>
 
         <div className="flex items-center space-x-3">
@@ -853,6 +893,16 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
                                           <i className="fa-solid fa-pen-to-square text-xs"></i>
                                        </button>
                                     )}
+                                    {canShowFiscalDraftAction(t) && (
+                                       <button
+                                          onClick={() => setFiscalDraftTransaction(t)}
+                                          className="h-8 px-3 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm group-hover:scale-105 font-black text-[9px] uppercase tracking-widest"
+                                          title="Criar rascunho fiscal"
+                                       >
+                                          <i className="fa-solid fa-file-invoice-dollar text-xs"></i>
+                                          <span className="hidden xl:inline">Criar rascunho fiscal</span>
+                                       </button>
+                                    )}
                                  </div>
                               </div>
                            </div>
@@ -866,6 +916,8 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
                    </div>
                  )}
               </div>
+            ) : viewMode === 'fiscal' && canViewFiscal ? (
+              <FiscalHistory supabaseClient={supabaseClient} unit={unit} />
             ) : (
               <div className="space-y-6 animate-in slide-in-from-right duration-500">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -95,6 +95,7 @@ export interface Pet {
   comportamento?: string;
   notas_internas?: string;
   restricoes?: string;
+  foto_url?: string | null;
   created_at?: string;
 }
 
