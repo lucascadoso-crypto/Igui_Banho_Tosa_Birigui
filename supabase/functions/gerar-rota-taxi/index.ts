@@ -11,6 +11,24 @@ const MAX_GOOGLE_INTERMEDIATES = 25;
 
 const cleanPart = (value: unknown) => String(value || "").trim();
 
+const parseAppointmentTime = (value: unknown) => {
+  const raw = cleanPart(value);
+  const match = raw.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+
+  return {
+    label: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`,
+    minutes: hours * 60 + minutes,
+    turno: hours * 60 + minutes < 12 * 60 ? "manha" as Turno : "tarde" as Turno,
+  };
+};
+
 const normalizeStatus = (status: unknown) =>
   String(status || "")
     .normalize("NFD")
@@ -27,7 +45,10 @@ const normalizeAddressKey = (address: string) =>
     .trim()
     .toLowerCase();
 
-const buildClientAddress = (client: any) => {
+const buildClientAddress = (client: any, directAddress?: unknown) => {
+  const direct = cleanPart(directAddress || client?.endereco_completo);
+  if (direct.length >= 10) return direct;
+
   const street = cleanPart(client?.logradouro || client?.endereco);
   const number = cleanPart(client?.numero);
   const complement = cleanPart(client?.complemento);
@@ -140,13 +161,6 @@ serve(async (req) => {
 
   try {
     const googleKey = Deno.env.get("GOOGLE_MAPS_ROUTES_API_KEY");
-    if (!googleKey) {
-      return new Response(JSON.stringify({
-        error: "O otimizador de rotas ainda nao foi configurado. Configure a chave da Google Routes API para gerar a melhor sequencia de paradas.",
-        code: "GOOGLE_ROUTES_KEY_MISSING",
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
-    }
-
     const { unidadeId, data, turno } = await req.json() as {
       unidadeId?: number | string;
       data?: string;
@@ -205,6 +219,7 @@ serve(async (req) => {
         horario_inicio,
         status,
         tem_taxi,
+        endereco_busca,
         pets (
           id,
           nome,
@@ -240,45 +255,85 @@ serve(async (req) => {
     if (appointmentsError) throw appointmentsError;
 
     const ignored: any[] = [];
+    const diagnostico: any[] = [];
     const grouped = new Map<string, any>();
 
     for (const appt of appointments || []) {
       const status = normalizeStatus(appt.status);
-      if (status === "CANCELADO" || status === "CANCELADA") continue;
-
-      const hour = String(appt.horario_inicio || "00:00").substring(0, 5);
-      const isMorning = hour < "12:00";
-      if ((turno === "manha" && !isMorning) || (turno === "tarde" && isMorning)) continue;
-
+      const timeInfo = parseAppointmentTime(appt.horario_inicio);
       const client = appt.clientes || appt.pets?.clientes;
       const pet = appt.pets;
-      if (!client?.id || !pet?.id) {
-        ignored.push({ agendamentoId: appt.id, cliente: client?.nome || "Cliente nao vinculado", pet: pet?.nome || "Pet nao vinculado", motivo: "Cliente ou pet ausente" });
+      const baseDiagnostic = {
+        agendamentoId: appt.id,
+        dataAgendamento: appt.data_agendamento,
+        horario: cleanPart(appt.horario_inicio),
+        status: appt.status,
+        cliente: client?.nome || "Cliente nao vinculado",
+        pet: pet?.nome || "Pet nao vinculado",
+        temTaxi: Boolean(appt.tem_taxi),
+        endereco: "",
+        turnoCalculado: timeInfo?.turno || null,
+      };
+
+      if (status === "CANCELADO" || status === "CANCELADA") {
+        diagnostico.push({ ...baseDiagnostic, motivoExclusao: "Agendamento cancelado" });
         continue;
       }
 
-      const address = buildClientAddress(client);
+      if (!timeInfo) {
+        ignored.push({ agendamentoId: appt.id, cliente: client?.nome || "Cliente nao vinculado", pet: pet?.nome || "Pet nao vinculado", motivo: "Horario ausente ou invalido" });
+        diagnostico.push({ ...baseDiagnostic, motivoExclusao: "Horario ausente ou invalido" });
+        continue;
+      }
+
+      if (timeInfo.turno !== turno) {
+        diagnostico.push({ ...baseDiagnostic, motivoExclusao: `Pertence ao turno ${timeInfo.turno}` });
+        continue;
+      }
+
+      if (!client?.id || !pet?.id) {
+        ignored.push({ agendamentoId: appt.id, cliente: client?.nome || "Cliente nao vinculado", pet: pet?.nome || "Pet nao vinculado", motivo: "Cliente ou pet ausente" });
+        diagnostico.push({ ...baseDiagnostic, motivoExclusao: "Cliente ou pet ausente" });
+        continue;
+      }
+
+      const address = buildClientAddress(client, appt.endereco_busca);
       if (!address) {
-        ignored.push({ agendamentoId: appt.id, cliente: client.nome, pet: pet.nome, horario: hour, motivo: "Endereco ausente ou incompleto" });
+        ignored.push({ agendamentoId: appt.id, cliente: client.nome, pet: pet.nome, horario: timeInfo.label, motivo: "Endereco ausente ou incompleto" });
+        diagnostico.push({ ...baseDiagnostic, motivoExclusao: "Endereco ausente ou incompleto" });
         continue;
       }
 
       const key = normalizeAddressKey(address);
       if (!grouped.has(key)) {
-        grouped.set(key, { endereco: address, clientes: new Set<string>(), pets: [], horarios: [], agendamentos: [] });
+        grouped.set(key, { endereco: address, clientes: new Set<string>(), pets: [], horarios: [], agendamentos: [], sortMinutes: timeInfo.minutes, sortName: client.nome });
       }
 
       const stop = grouped.get(key);
       stop.clientes.add(client.nome);
       stop.pets.push(pet.nome);
-      stop.horarios.push(hour);
-      stop.agendamentos.push({ id: appt.id, cliente: client.nome, pet: pet.nome, horario: hour });
+      stop.horarios.push(timeInfo.label);
+      stop.sortMinutes = Math.min(stop.sortMinutes, timeInfo.minutes);
+      stop.sortName = [stop.sortName, client.nome, pet.nome].filter(Boolean).sort((a, b) => String(a).localeCompare(String(b), "pt-BR"))[0];
+      stop.agendamentos.push({ id: appt.id, cliente: client.nome, pet: pet.nome, horario: timeInfo.label });
+      diagnostico.push({ ...baseDiagnostic, endereco: address, turnoCalculado: timeInfo.turno, motivoExclusao: null });
     }
 
-    const stops = Array.from(grouped.values()).map((stop) => ({
-      ...stop,
-      clientes: Array.from(stop.clientes),
-    }));
+    const stops = Array.from(grouped.values())
+      .map((stop) => ({
+        ...stop,
+        clientes: Array.from(stop.clientes),
+        agendamentos: [...stop.agendamentos].sort((a: any, b: any) =>
+          String(a.horario || "").localeCompare(String(b.horario || "")) ||
+          String(a.cliente || "").localeCompare(String(b.cliente || ""), "pt-BR") ||
+          String(a.pet || "").localeCompare(String(b.pet || ""), "pt-BR")
+        ),
+      }))
+      .sort((a, b) =>
+        Number(a.sortMinutes || 0) - Number(b.sortMinutes || 0) ||
+        String(a.sortName || "").localeCompare(String(b.sortName || ""), "pt-BR") ||
+        String(a.endereco || "").localeCompare(String(b.endereco || ""), "pt-BR")
+      );
 
     if (stops.length === 0) {
       return new Response(JSON.stringify({
@@ -293,19 +348,37 @@ serve(async (req) => {
         duracaoSegundos: 0,
         mapsUrl: null,
         trechos: [],
+        modoOrdenacao: "ordem_por_horario",
+        otimizacaoDisponivel: Boolean(googleKey),
+        aviso: googleKey ? null : "Otimizacao automatica indisponivel. Exibindo paradas por horario.",
+        diagnostico,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
     }
 
-    const orderedStops: any[] = [];
+    let orderedStops: any[] = stops;
     let totalDistanceMeters = 0;
     let totalDurationSeconds = 0;
+    let optimized = false;
+    let optimizationError: string | null = null;
 
-    for (let start = 0; start < stops.length; start += MAX_GOOGLE_INTERMEDIATES) {
-      const batch = stops.slice(start, start + MAX_GOOGLE_INTERMEDIATES);
-      const batchResult = await optimizeStopBatch(googleKey, unitAddress, batch);
-      orderedStops.push(...batchResult.orderedStops);
-      totalDistanceMeters += batchResult.distanceMeters;
-      totalDurationSeconds += batchResult.durationSeconds;
+    if (googleKey) {
+      try {
+        const optimizedStops: any[] = [];
+        for (let start = 0; start < stops.length; start += MAX_GOOGLE_INTERMEDIATES) {
+          const batch = stops.slice(start, start + MAX_GOOGLE_INTERMEDIATES);
+          const batchResult = await optimizeStopBatch(googleKey, unitAddress, batch);
+          optimizedStops.push(...batchResult.orderedStops);
+          totalDistanceMeters += batchResult.distanceMeters;
+          totalDurationSeconds += batchResult.durationSeconds;
+        }
+        orderedStops = optimizedStops;
+        optimized = true;
+      } catch (error) {
+        optimizationError = error instanceof Error ? error.message : "Falha ao otimizar rota.";
+        orderedStops = stops;
+        totalDistanceMeters = 0;
+        totalDurationSeconds = 0;
+      }
     }
 
     const segments = splitRouteSegments(unitAddress, orderedStops);
@@ -323,6 +396,10 @@ serve(async (req) => {
       duracaoSegundos: totalDurationSeconds || null,
       mapsUrl,
       trechos: segments,
+      modoOrdenacao: optimized ? "rota_otimizada" : "ordem_por_horario",
+      otimizacaoDisponivel: Boolean(googleKey),
+      aviso: optimized ? null : (optimizationError || "Otimizacao automatica indisponivel. Exibindo paradas por horario."),
+      diagnostico,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
   } catch (error) {
     console.error("[gerar-rota-taxi] erro:", error);

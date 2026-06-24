@@ -182,14 +182,26 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       .toUpperCase();
   }
 
+  const parseAppointmentTimeForRoute = (value: unknown) => {
+    const match = String(value || '').match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+    return {
+      label: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
+      minutes: hours * 60 + minutes,
+      turno: hours * 60 + minutes < 12 * 60 ? 'manha' as const : 'tarde' as const
+    };
+  };
+
   const getTaxiRouteStopsCount = (turno: 'manha' | 'tarde') => {
     const addresses = new Set<string>();
 
     appointments.forEach((appt: any) => {
       if (!isTaxiAppointment(appt) || isCancelledStatus(appt.status)) return;
-      const hour = String(appt.horario_inicio || '00:00').substring(0, 5);
-      const isMorning = hour < '12:00';
-      if ((turno === 'manha' && !isMorning) || (turno === 'tarde' && isMorning)) return;
+      const timeInfo = parseAppointmentTimeForRoute(appt.horario_inicio);
+      if (!timeInfo || timeInfo.turno !== turno) return;
 
       const client = appt.clientes || appt.pets?.clientes;
       const pet = appt.pets;
@@ -1344,6 +1356,25 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                 </div>
               </div>
 
+              {taxiRoutePreview.aviso && (
+                <div className="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 text-sm font-bold text-amber-800 flex items-start gap-3">
+                  <i className="fa-solid fa-circle-info mt-0.5"></i>
+                  <span>{taxiRoutePreview.aviso}</span>
+                </div>
+              )}
+
+              <div className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Sequência</p>
+                  <p className="text-sm font-black text-slate-800">
+                    {taxiRoutePreview.modoOrdenacao === 'rota_otimizada' ? 'Rota otimizada' : 'Ordem por horário'}
+                  </p>
+                </div>
+                <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${taxiRoutePreview.modoOrdenacao === 'rota_otimizada' ? 'bg-teal-100 text-teal-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {taxiRoutePreview.modoOrdenacao === 'rota_otimizada' ? 'Google Routes' : 'Manual'}
+                </span>
+              </div>
+
               {taxiRoutePreview.quantidadeParadas === 0 ? (
                 <div className="rounded-3xl bg-slate-50 border border-slate-100 p-8 text-center">
                   <i className="fa-solid fa-route text-4xl text-slate-300 mb-3"></i>
@@ -1476,7 +1507,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                   { turno: 'manha' as const, titulo: 'Rota da Manhã', subtitulo: 'ATÉ 12:00', count: taxiMorningStops },
                   { turno: 'tarde' as const, titulo: 'Rota da Tarde', subtitulo: 'APÓS 12:00', count: taxiAfternoonStops }
                 ]).map((item) => {
-                  const disabled = item.count === 0 || loadingTaxiRoute !== null;
+                  const disabled = loadingTaxiRoute !== null;
                   return (
                     <button
                       key={item.turno}
@@ -1494,12 +1525,20 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                           <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{item.subtitulo}</p>
                         </div>
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-teal-600">
-                        {loadingTaxiRoute === item.turno ? 'Calculando...' : item.count > 0 ? `${item.count} paradas` : 'Sem paradas'}
+                      <span className="text-right">
+                        <span className="block text-[10px] font-black uppercase tracking-widest text-teal-600">
+                          {loadingTaxiRoute === item.turno ? 'Calculando...' : item.count > 0 ? `${item.count} paradas` : 'Verificar rota'}
+                        </span>
+                        <span className="block mt-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                          Ordem por horário
+                        </span>
                       </span>
                     </button>
                   );
                 })}
+                <div className="mt-2 rounded-2xl bg-amber-50 border border-amber-100 px-3 py-2 text-[10px] font-bold text-amber-800 leading-relaxed">
+                  Se a otimização automática estiver indisponível, as paradas serão exibidas por horário.
+                </div>
               </div>
             )}
           </div>
