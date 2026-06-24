@@ -16,6 +16,7 @@ insert into public.usuarios_unidades (user_id, unidade_id, perfil, ativo)
 select f.user_id, f.unidade_id, f.cargo, f.ativo
 from public.funcionarios f
 where f.user_id is not null
+  and (f.cargo = 'master' or f.unidade_id is not null)
 on conflict (user_id, unidade_id, perfil) do update
 set ativo = excluded.ativo,
     updated_at = now();
@@ -201,82 +202,7 @@ as $$
     in ('master');
 $$;
 
--- 3. Fiscal: financeiro passa a ser somente leitura.
-create or replace function public.fiscal_profile_for_unidade(target_unidade_id bigint)
-returns public.user_profile
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select public.access_profile_for_unidade(target_unidade_id);
-$$;
-
-create or replace function public.fiscal_can_view_config(target_unidade_id bigint)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select public.access_profile_for_unidade(target_unidade_id)
-    in ('master', 'financeiro');
-$$;
-
-create or replace function public.fiscal_can_manage_config(target_unidade_id bigint)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select public.access_profile_for_unidade(target_unidade_id) = 'master';
-$$;
-
-create or replace function public.fiscal_can_view_note(target_unidade_id bigint)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select public.access_profile_for_unidade(target_unidade_id)
-    in ('master', 'financeiro', 'admin_unidade', 'gerente');
-$$;
-
-create or replace function public.fiscal_can_create_draft(target_unidade_id bigint)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select public.access_profile_for_unidade(target_unidade_id)
-    in ('master', 'admin_unidade', 'gerente');
-$$;
-
-create or replace function public.fiscal_can_edit_draft(target_unidade_id bigint)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select public.access_profile_for_unidade(target_unidade_id)
-    in ('master', 'admin_unidade', 'gerente');
-$$;
-
-create or replace function public.fiscal_can_delete_draft(target_unidade_id bigint)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select public.access_profile_for_unidade(target_unidade_id) = 'master';
-$$;
-
--- 4. Protecao contra escrita direta nos campos de acesso.
+-- 3. Protecao contra escrita direta nos campos de acesso.
 create or replace function public.guard_usuarios_unidades_direct_write()
 returns trigger
 language plpgsql
@@ -325,7 +251,7 @@ create trigger guard_funcionarios_access_columns
 before update on public.funcionarios
 for each row execute function public.guard_funcionarios_access_columns();
 
--- 5. RPC oficial para liberar/revogar acesso.
+-- 4. RPC oficial para liberar/revogar acesso.
 create or replace function public.salvar_acesso_funcionario(
   p_funcionario_id bigint,
   p_auth_user_id uuid,
@@ -496,7 +422,7 @@ $$;
 revoke execute on function public.salvar_acesso_funcionario(bigint, uuid, bigint, public.user_profile, boolean) from public;
 grant execute on function public.salvar_acesso_funcionario(bigint, uuid, bigint, public.user_profile, boolean) to authenticated;
 
--- 6. RPC segura para listar logins pendentes sem expor auth.users diretamente.
+-- 5. RPC segura para listar logins pendentes sem expor auth.users diretamente.
 create or replace function public.listar_logins_pendentes_equipe()
 returns table (
   user_id uuid,
@@ -549,197 +475,26 @@ $$;
 revoke execute on function public.listar_logins_pendentes_equipe() from public;
 grant execute on function public.listar_logins_pendentes_equipe() to authenticated;
 
--- 7. RLS: remover policies amplas e recriar por papel.
-alter table public.usuarios_unidades enable row level security;
-alter table public.funcionarios enable row level security;
-alter table public.unidades enable row level security;
-alter table public.clientes enable row level security;
-alter table public.pets enable row level security;
-alter table public.pacotes enable row level security;
-alter table public.agendamentos enable row level security;
-alter table public.agendamento_itens enable row level security;
-alter table public.despesas enable row level security;
-alter table public.financeiro_movimentos enable row level security;
-alter table public.financeiro_pagamentos enable row level security;
-alter table public.auditoria_logs enable row level security;
-alter table public.servicos_unidade enable row level security;
-alter table public.notas_fiscais enable row level security;
-alter table public.nota_fiscal_itens enable row level security;
-
-drop policy if exists "usuarios_unidades_master_write" on public.usuarios_unidades;
-drop policy if exists "usuarios_unidades_read_allowed" on public.usuarios_unidades;
-drop policy if exists "usuarios_unidades_read_self_or_master" on public.usuarios_unidades;
-
-create policy "usuarios_unidades_select_self_or_master"
-on public.usuarios_unidades for select to authenticated
-using (public.is_master() or user_id = auth.uid());
-
-drop policy if exists "funcionarios_master_write" on public.funcionarios;
-drop policy if exists "funcionarios_read_allowed" on public.funcionarios;
-
-create policy "funcionarios_select_allowed"
-on public.funcionarios for select to authenticated
-using (
-  public.is_master()
-  or user_id = auth.uid()
-  or public.access_can_view_team(unidade_id)
-);
-
-create policy "funcionarios_insert_master"
-on public.funcionarios for insert to authenticated
-with check (public.is_master());
-
-create policy "funcionarios_update_master"
-on public.funcionarios for update to authenticated
-using (public.is_master())
-with check (public.is_master());
-
-create policy "funcionarios_delete_master"
-on public.funcionarios for delete to authenticated
-using (public.is_master());
-
-drop policy if exists "unidades_select_master_or_unit" on public.unidades;
-drop policy if exists "unidades_insert_master" on public.unidades;
-drop policy if exists "unidades_update_master" on public.unidades;
-drop policy if exists "unidades_delete_master" on public.unidades;
-
-create policy "unidades_select_by_access"
-on public.unidades for select to authenticated
-using (public.can_access_unidade(id));
-
-create policy "unidades_insert_master"
-on public.unidades for insert to authenticated
-with check (public.is_master());
-
-create policy "unidades_update_master"
-on public.unidades for update to authenticated
-using (public.is_master())
-with check (public.is_master());
-
-create policy "unidades_delete_master"
-on public.unidades for delete to authenticated
-using (public.is_master());
-
--- Operacional: gerente/admin/master escrevem. Financeiro e tosador leem conforme escopo.
-drop policy if exists "clientes_unit_access" on public.clientes;
-create policy "clientes_select_allowed" on public.clientes for select to authenticated using (public.access_can_read_unit(unidade_id));
-create policy "clientes_insert_operational" on public.clientes for insert to authenticated with check (public.access_can_write_operational(unidade_id));
-create policy "clientes_update_operational" on public.clientes for update to authenticated using (public.access_can_write_operational(unidade_id)) with check (public.access_can_write_operational(unidade_id));
-create policy "clientes_delete_operational" on public.clientes for delete to authenticated using (public.access_can_write_operational(unidade_id));
-
-drop policy if exists "pets_unit_access" on public.pets;
-create policy "pets_select_allowed" on public.pets for select to authenticated using (public.access_can_read_unit(unidade_id));
-create policy "pets_insert_operational" on public.pets for insert to authenticated with check (public.access_can_write_operational(unidade_id));
-create policy "pets_update_operational" on public.pets for update to authenticated using (public.access_can_write_operational(unidade_id)) with check (public.access_can_write_operational(unidade_id));
-create policy "pets_delete_operational" on public.pets for delete to authenticated using (public.access_can_write_operational(unidade_id));
-
-drop policy if exists "pacotes_unit_access" on public.pacotes;
-create policy "pacotes_select_allowed" on public.pacotes for select to authenticated using (public.access_can_read_unit(unidade_id));
-create policy "pacotes_insert_operational" on public.pacotes for insert to authenticated with check (public.access_can_write_operational(unidade_id));
-create policy "pacotes_update_operational" on public.pacotes for update to authenticated using (public.access_can_write_operational(unidade_id)) with check (public.access_can_write_operational(unidade_id));
-create policy "pacotes_delete_operational" on public.pacotes for delete to authenticated using (public.access_can_write_operational(unidade_id));
-
-drop policy if exists "agendamentos_unit_access" on public.agendamentos;
-create policy "agendamentos_select_allowed" on public.agendamentos for select to authenticated using (public.access_can_read_unit(unidade_id));
-create policy "agendamentos_insert_operational" on public.agendamentos for insert to authenticated with check (public.access_can_write_operational(unidade_id));
-create policy "agendamentos_update_operational" on public.agendamentos for update to authenticated using (public.access_can_write_operational(unidade_id)) with check (public.access_can_write_operational(unidade_id));
-create policy "agendamentos_delete_operational" on public.agendamentos for delete to authenticated using (public.access_can_write_operational(unidade_id));
-
-drop policy if exists "agendamento_itens_unit_access" on public.agendamento_itens;
-create policy "agendamento_itens_select_allowed" on public.agendamento_itens for select to authenticated using (public.access_can_read_unit(unidade_id));
-create policy "agendamento_itens_insert_operational" on public.agendamento_itens for insert to authenticated with check (public.access_can_write_operational(unidade_id));
-create policy "agendamento_itens_update_operational" on public.agendamento_itens for update to authenticated using (public.access_can_write_operational(unidade_id)) with check (public.access_can_write_operational(unidade_id));
-create policy "agendamento_itens_delete_operational" on public.agendamento_itens for delete to authenticated using (public.access_can_write_operational(unidade_id));
-
--- Financeiro: financeiro le somente; gerente/admin/master escrevem.
-drop policy if exists "financeiro_movimentos_unit_access" on public.financeiro_movimentos;
-create policy "financeiro_movimentos_select_allowed" on public.financeiro_movimentos for select to authenticated using (public.access_can_read_financial(unidade_id));
-create policy "financeiro_movimentos_insert_allowed" on public.financeiro_movimentos for insert to authenticated with check (public.access_can_write_financial(unidade_id));
-create policy "financeiro_movimentos_update_allowed" on public.financeiro_movimentos for update to authenticated using (public.access_can_write_financial(unidade_id)) with check (public.access_can_write_financial(unidade_id));
-create policy "financeiro_movimentos_delete_allowed" on public.financeiro_movimentos for delete to authenticated using (public.access_can_write_financial(unidade_id));
-
-drop policy if exists "financeiro_pagamentos_unit_access" on public.financeiro_pagamentos;
-create policy "financeiro_pagamentos_select_allowed" on public.financeiro_pagamentos for select to authenticated using (public.access_can_read_financial(unidade_id));
-create policy "financeiro_pagamentos_insert_allowed" on public.financeiro_pagamentos for insert to authenticated with check (public.access_can_write_financial(unidade_id));
-create policy "financeiro_pagamentos_update_allowed" on public.financeiro_pagamentos for update to authenticated using (public.access_can_write_financial(unidade_id)) with check (public.access_can_write_financial(unidade_id));
-create policy "financeiro_pagamentos_delete_allowed" on public.financeiro_pagamentos for delete to authenticated using (public.access_can_write_financial(unidade_id));
-
-drop policy if exists "despesas_unit_access" on public.despesas;
-create policy "despesas_select_allowed" on public.despesas for select to authenticated using (public.access_can_read_financial(unidade_id));
-create policy "despesas_insert_allowed" on public.despesas for insert to authenticated with check (public.access_can_write_financial(unidade_id));
-create policy "despesas_update_allowed" on public.despesas for update to authenticated using (public.access_can_write_financial(unidade_id)) with check (public.access_can_write_financial(unidade_id));
-create policy "despesas_delete_allowed" on public.despesas for delete to authenticated using (public.access_can_write_financial(unidade_id));
-
-drop policy if exists "servicos_unidade_unit_access" on public.servicos_unidade;
-create policy "servicos_unidade_select_allowed" on public.servicos_unidade for select to authenticated using (public.access_can_read_unit(unidade_id));
-create policy "servicos_unidade_write_operational" on public.servicos_unidade for all to authenticated using (public.access_can_write_operational(unidade_id)) with check (public.access_can_write_operational(unidade_id));
-
--- Auditoria: master e financeiro veem. Insercoes continuam para usuarios com acesso a unidade.
-drop policy if exists "auditoria_logs_read_allowed" on public.auditoria_logs;
-drop policy if exists "auditoria_logs_insert_allowed" on public.auditoria_logs;
-create policy "auditoria_logs_select_master_financeiro"
-on public.auditoria_logs for select to authenticated
-using (public.access_can_view_audit(unidade_id));
-
-create policy "auditoria_logs_insert_unit_user"
-on public.auditoria_logs for insert to authenticated
-with check (public.can_access_unidade(unidade_id));
-
--- Fiscal: financeiro somente leitura; gerente/admin/master operam rascunhos.
-drop policy if exists "notas_fiscais_select_allowed" on public.notas_fiscais;
-drop policy if exists "notas_fiscais_update_draft_allowed" on public.notas_fiscais;
-drop policy if exists "notas_fiscais_delete_draft_allowed" on public.notas_fiscais;
-
-create policy "notas_fiscais_select_allowed"
-on public.notas_fiscais for select to authenticated
-using (public.fiscal_can_view_note(unidade_id));
-
-create policy "notas_fiscais_update_draft_allowed"
-on public.notas_fiscais for update to authenticated
-using (status = 'RASCUNHO' and public.fiscal_can_edit_draft(unidade_id))
-with check (status = 'RASCUNHO' and public.fiscal_can_edit_draft(unidade_id));
-
-create policy "notas_fiscais_delete_draft_master"
-on public.notas_fiscais for delete to authenticated
-using (status = 'RASCUNHO' and public.fiscal_can_delete_draft(unidade_id));
-
-drop policy if exists "nota_fiscal_itens_select_allowed" on public.nota_fiscal_itens;
-drop policy if exists "nota_fiscal_itens_update_draft_allowed" on public.nota_fiscal_itens;
-drop policy if exists "nota_fiscal_itens_delete_draft_allowed" on public.nota_fiscal_itens;
-
-create policy "nota_fiscal_itens_select_allowed"
-on public.nota_fiscal_itens for select to authenticated
-using (
-  exists (
-    select 1 from public.notas_fiscais nf
-    where nf.id = nota_fiscal_itens.nota_fiscal_id
-      and public.fiscal_can_view_note(nf.unidade_id)
-  )
-);
-
-create policy "nota_fiscal_itens_update_draft_allowed"
-on public.nota_fiscal_itens for update to authenticated
-using (
-  exists (
-    select 1 from public.notas_fiscais nf
-    where nf.id = nota_fiscal_itens.nota_fiscal_id
-      and nf.status = 'RASCUNHO'
-      and public.fiscal_can_edit_draft(nf.unidade_id)
-  )
+create or replace function public.listar_logins_pendentes()
+returns table (
+  user_id uuid,
+  email text,
+  criado_em timestamptz,
+  funcionario_id bigint,
+  funcionario_nome text,
+  funcionario_unidade_id bigint,
+  funcionario_cargo public.user_profile,
+  status_login text
 )
-with check (
-  exists (
-    select 1 from public.notas_fiscais nf
-    where nf.id = nota_fiscal_itens.nota_fiscal_id
-      and nf.status = 'RASCUNHO'
-      and public.fiscal_can_edit_draft(nf.unidade_id)
-  )
-);
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select * from public.listar_logins_pendentes_equipe();
+$$;
 
--- Grants coerentes com RLS. Sem INSERT direto de notas fiscais.
-revoke insert on public.notas_fiscais from authenticated;
-grant select, update, delete on public.notas_fiscais to authenticated;
-grant select, update on public.nota_fiscal_itens to authenticated;
-revoke delete on public.nota_fiscal_itens from authenticated;
+revoke execute on function public.listar_logins_pendentes() from public;
+grant execute on function public.listar_logins_pendentes() to authenticated;
 
 commit;

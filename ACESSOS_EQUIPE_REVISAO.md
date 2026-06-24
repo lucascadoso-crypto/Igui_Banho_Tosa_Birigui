@@ -156,7 +156,7 @@ Regras implementadas na RPC:
 ### RPC de logins pendentes
 
 ```sql
-public.listar_logins_pendentes_equipe()
+public.listar_logins_pendentes()
 ```
 
 Regras:

@@ -48,7 +48,7 @@ const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole,
 
       if (error) throw error;
       const { data: pendingData, error: pendingError } = isMaster
-        ? await supabaseClient.rpc('listar_logins_pendentes_equipe')
+        ? await supabaseClient.rpc('listar_logins_pendentes')
         : { data: [], error: null };
 
       if (pendingError) {
