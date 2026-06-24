@@ -1788,15 +1788,32 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
                        {/* Informações do Pet e Cliente */}
                        <div className="relative z-[2] flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenDetail(appt)}>
-                          <div className="flex items-center space-x-3 mb-1">
+                          <div className="flex items-center gap-2 pr-10 md:pr-0 mb-1">
                              <h4 className="font-black text-xl text-slate-800 truncate group-hover:text-amber-600 transition-colors">
                                 {appt.pets?.nome}
                              </h4>
                              {appt.pacote_id && (
-                                <span className="bg-indigo-50 text-indigo-500 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter border border-indigo-100">
+                                <span className="shrink-0 bg-indigo-50 text-indigo-500 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter border border-indigo-100">
                                    Sessão {appt.numero_sessao || '?'}/{appt.pacotes?.qtd_sessoes || '?'}
                                 </span>
                              )}
+                          </div>
+                          <div className="md:hidden mb-2 flex items-center gap-2">
+                             <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-sky-50 px-3 py-1.5 text-[11px] font-black text-sky-700 shadow-sm shadow-sky-100/60">
+                                <i className="fa-regular fa-clock text-[10px]"></i>
+                                {String(appt.horario_inicio || '').substring(0, 5) || '--:--'}
+                             </span>
+                             <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest border ${
+                                appt.status === 'Em Andamento'
+                                   ? 'bg-amber-50 text-amber-600 border-amber-100'
+                                   : appt.status === 'Finalizado'
+                                   ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                   : appt.status === 'Cancelado'
+                                   ? 'bg-slate-100 text-slate-500 border-slate-200'
+                                   : 'bg-slate-50 text-slate-600 border-slate-100'
+                             }`}>
+                                {appt.status === 'Agendado' ? 'Pendente' : appt.status}
+                             </span>
                           </div>
                           <p className="text-xs text-slate-400 font-bold truncate flex items-center">
                              <i className="fa-solid fa-user-tag mr-2 opacity-50 text-[10px]"></i> {cardClient.nome}
