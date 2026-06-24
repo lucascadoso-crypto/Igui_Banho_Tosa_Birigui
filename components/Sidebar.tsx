@@ -111,7 +111,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
   const filteredGlobalMenus = globalMenus.filter(menu => menu.roles.includes(userRole));
   const filteredUnitSubMenus = unitSubMenus.filter(sub => sub.roles.includes(userRole));
   const orderedUnits = getOrderedUnits();
-  const activeUnit = orderedUnits.find(unit => unit.id === currentNav.unitId) || orderedUnits[0];
 
   const toggleUnit = (unitId: string) => {
     if (!isMaster) return;
@@ -315,24 +314,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
         </div>
 
         <div className="mt-auto p-3 md:p-2 pb-[max(0.9rem,env(safe-area-inset-bottom))] bg-white border-t border-slate-100 space-y-2.5 md:space-y-1.5 shrink-0">
-          {activeUnit && (
-            <button
-              onClick={() => {
-                if (isMaster) setExpandedUnit(String(activeUnit.id));
-              }}
-              className="w-full md:hidden flex items-center gap-3 px-3 py-3 rounded-[1.15rem] bg-teal-50 text-teal-900 border border-teal-100"
-            >
-              <span className="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0">
-                <i className="fa-solid fa-store text-sm"></i>
-              </span>
-              <span className="text-left min-w-0 flex-1">
-                <span className="text-xs font-black truncate leading-tight block">{activeUnit.name.replace(/^iG\s+/i, '')}</span>
-                <span className="text-[9px] font-black uppercase tracking-widest text-teal-600/80 mt-0.5 block">Unidade atual</span>
-              </span>
-              {isMaster && <i className="fa-solid fa-chevron-up text-[10px] text-teal-600"></i>}
-            </button>
-          )}
-
           <button
             onClick={() => navigateGlobal('Meu Perfil')}
             className={`w-full flex items-center gap-3 px-4 md:px-3 py-3 md:py-2 rounded-[1.05rem] transition-all duration-200 group ${

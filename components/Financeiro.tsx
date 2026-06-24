@@ -696,19 +696,19 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
            </div>
         </div>
 
-        <div className="flex items-center bg-slate-100 p-1.5 rounded-2xl">
+        <div className={`w-full lg:w-auto grid ${canViewFiscal ? 'grid-cols-3' : 'grid-cols-2'} md:flex items-stretch md:items-center bg-slate-100 p-1.5 rounded-2xl gap-1 md:gap-0 overflow-hidden`}>
            <button 
              onClick={() => setViewMode('diaria')}
-             className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'diaria' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+             className={`min-w-0 min-h-[3rem] md:min-h-0 px-1.5 sm:px-2 md:px-6 py-2.5 rounded-xl text-[9px] sm:text-[10px] md:text-xs leading-tight font-black uppercase tracking-[0.08em] md:tracking-widest transition-all text-center flex items-center justify-center whitespace-normal ${viewMode === 'diaria' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
            >Visão Diária</button>
            <button 
              onClick={() => setViewMode('auditoria')}
-             className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'auditoria' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+             className={`min-w-0 min-h-[3rem] md:min-h-0 px-1.5 sm:px-2 md:px-6 py-2.5 rounded-xl text-[9px] sm:text-[10px] md:text-xs leading-tight font-black uppercase tracking-[0.08em] md:tracking-widest transition-all text-center flex items-center justify-center whitespace-normal ${viewMode === 'auditoria' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
            >Auditoria</button>
            {canViewFiscal && (
              <button
                onClick={() => setViewMode('fiscal')}
-               className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'fiscal' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+               className={`min-w-0 min-h-[3rem] md:min-h-0 px-1.5 sm:px-2 md:px-6 py-2.5 rounded-xl text-[9px] sm:text-[10px] md:text-xs leading-tight font-black uppercase tracking-[0.08em] md:tracking-widest transition-all text-center flex items-center justify-center whitespace-normal ${viewMode === 'fiscal' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
              >Notas Fiscais</button>
            )}
         </div>
