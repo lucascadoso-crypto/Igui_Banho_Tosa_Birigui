@@ -531,34 +531,18 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
 
     setLoadingExtra(true);
     try {
-      // 1. Deletar todos os itens extras do agendamento
-      const { error: delErr } = await supabaseClient
-        .from('agendamento_itens')
-        .delete()
-        .eq('agendamento_id', appt.id)
-        .or('eh_extra.eq.true,tipo.eq.extra,tipo.eq.adicional');
-      
-      if (delErr) throw delErr;
+      const { data, error } = await supabaseClient.rpc('remover_todos_extras_agendamento', {
+        p_agendamento_id: appt.id
+      });
 
-      // 2. Atualizar agendamento limpando campos de extras
-      const { error: apptErr } = await supabaseClient
-        .from('agendamentos')
-        .update({
-          status_pagamento_extra: 'NÃO POSSUI',
-          valor_extra_total: 0,
-          forma_pagamento_extra: null,
-          data_pagamento_extra: null,
-          valor_pagamento_extra: 0
-        })
-        .eq('id', appt.id);
-
-      if (apptErr) throw apptErr;
+      if (error) throw error;
+      const result = Array.isArray(data) ? data[0] : data;
 
       registrarAtividade(
         appt.unidade_id,
         userProfile?.email || 'sistema',
         'REMOVER_TODOS_EXTRAS',
-        `Cancelou todos os serviços extras do agendamento de ${appt.pets?.clientes?.nome || 'Cliente'} (Pet: ${appt.pets?.nome || 'Pet'})`,
+        `Cancelou ${result?.extras_removidos ?? extraItems.length} serviços extras do agendamento de ${appt.pets?.clientes?.nome || 'Cliente'} (Pet: ${appt.pets?.nome || 'Pet'})`,
         userProfile?.nome,
         userProfile?.cargo
       );
