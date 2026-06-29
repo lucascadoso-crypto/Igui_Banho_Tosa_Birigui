@@ -11,6 +11,30 @@ interface UnidadeInfo {
   telefone?: string | null;
 }
 
+interface PetDraft {
+  nome: string;
+  genero: string;
+  especie: string;
+  raca: string;
+  porte: string;
+  temAlergia: '' | 'sim' | 'nao';
+  alergiaDescricao: string;
+  comportamento: string[];
+  observacoes: string;
+}
+
+const emptyPet = (): PetDraft => ({
+  nome: '',
+  genero: '',
+  especie: '',
+  raca: '',
+  porte: '',
+  temAlergia: '',
+  alergiaDescricao: '',
+  comportamento: [],
+  observacoes: ''
+});
+
 const BRAND_GREEN = '#0F6E56';
 
 const PORTE_OPTIONS = ['Pequeno', 'Médio', 'Grande', 'Gigante'];
@@ -64,10 +88,11 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
   const [unidadeError, setUnidadeError] = useState(false);
   const [loadingUnidade, setLoadingUnidade] = useState(true);
 
+  // step 1 = tutor, 2 = pet (dados basicos), 3 = pet (saude/comportamento)
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const [successData, setSuccessData] = useState<{ clienteNome: string; petNome: string } | null>(null);
+  const [successData, setSuccessData] = useState<{ clienteNome: string; petNomes: string[] } | null>(null);
   const [buscandoCep, setBuscandoCep] = useState(false);
 
   // Etapa 1 - Tutor
@@ -81,18 +106,9 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
   const [cidade, setCidade] = useState('');
   const [estado, setEstado] = useState('');
 
-  // Etapa 2 - Pet
-  const [petNome, setPetNome] = useState('');
-  const [petGenero, setPetGenero] = useState('');
-  const [petEspecie, setPetEspecie] = useState('');
-  const [petRaca, setPetRaca] = useState('');
-  const [petPorte, setPetPorte] = useState('');
-
-  // Etapa 3 - Saúde
-  const [temAlergia, setTemAlergia] = useState<'' | 'sim' | 'nao'>('');
-  const [alergiaDescricao, setAlergiaDescricao] = useState('');
-  const [comportamento, setComportamento] = useState<string[]>([]);
-  const [observacoes, setObservacoes] = useState('');
+  // Etapas 2/3 - Pets (cada pet tem seus proprios dados e saude)
+  const [pets, setPets] = useState<PetDraft[]>([]);
+  const [currentPet, setCurrentPet] = useState<PetDraft>(emptyPet());
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -146,11 +162,37 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
   };
 
   const toggleComportamento = (opt: string) => {
-    setComportamento(prev => prev.includes(opt) ? prev.filter(o => o !== opt) : [...prev, opt]);
+    setCurrentPet(prev => ({
+      ...prev,
+      comportamento: prev.comportamento.includes(opt)
+        ? prev.comportamento.filter(o => o !== opt)
+        : [...prev.comportamento, opt]
+    }));
+  };
+
+  const removePet = (index: number) => {
+    setPets(prev => prev.filter((_, i) => i !== index));
   };
 
   const canAdvanceStep1 = nome.trim().length > 0 && telefone.replace(/\D/g, '').length >= 10;
-  const canAdvanceStep2 = petNome.trim().length > 0 && petGenero !== '' && petEspecie !== '';
+  const canAdvanceStep2 = currentPet.nome.trim().length > 0 && currentPet.genero !== '' && currentPet.especie !== '';
+
+  const buildPetPayload = (pet: PetDraft) => ({
+    nome: pet.nome,
+    genero: pet.genero,
+    especie: pet.especie,
+    raca: pet.raca,
+    porte: pet.porte,
+    restricoes: pet.temAlergia === 'sim' ? pet.alergiaDescricao.trim() : '',
+    comportamento: pet.comportamento.join(', '),
+    notas_internas: pet.observacoes
+  });
+
+  const handleAddAnotherPet = () => {
+    setPets(prev => [...prev, currentPet]);
+    setCurrentPet(emptyPet());
+    setStep(2);
+  };
 
   const handleSubmit = async () => {
     if (!unidadeId) return;
@@ -158,41 +200,25 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
     setSubmitError('');
 
     try {
-      const restricoesTexto = temAlergia === 'sim' ? alergiaDescricao.trim() : '';
+      const allPets = [...pets, currentPet];
 
-      const { data, error } = await supabaseClient.rpc('cadastro_publico_tutor_pet', {
+      const { data, error } = await supabaseClient.rpc('cadastro_publico_tutor_pets', {
         p_unidade_id: unidadeId,
-        p_nome: nome,
-        p_telefone: telefone,
-        p_cpf: cpf,
-        p_cep: cep,
-        p_logradouro: logradouro,
-        p_numero: numero,
-        p_bairro: bairro,
-        p_cidade: cidade,
-        p_estado: estado,
-        p_pet_nome: petNome,
-        p_pet_genero: petGenero,
-        p_pet_especie: petEspecie,
-        p_pet_raca: petRaca,
-        p_pet_porte: petPorte,
-        p_pet_restricoes: restricoesTexto,
-        p_pet_comportamento: comportamento.join(', '),
-        p_pet_notas: observacoes
+        p_tutor: { nome, telefone, cpf, cep, logradouro, numero, bairro, cidade, estado },
+        p_pets: allPets.map(buildPetPayload)
       });
 
       if (error) throw error;
 
       if (!data?.ok) {
-        if (data?.erro === 'cpf_duplicado') {
-          setSubmitError('Você já tem cadastro conosco! Pode vir na unidade.');
-        } else {
-          setSubmitError('Não foi possível concluir o cadastro. Verifique os dados e tente novamente.');
-        }
+        setSubmitError('Não foi possível concluir o cadastro. Verifique os dados e tente novamente.');
         return;
       }
 
-      setSuccessData({ clienteNome: data.cliente_nome, petNome: data.pet_nome });
+      setSuccessData({
+        clienteNome: data.cliente_nome,
+        petNomes: (data.pets || []).map((p: any) => p.pet_nome)
+      });
     } catch (err) {
       console.error('Erro ao enviar cadastro:', err);
       setSubmitError('Não foi possível concluir o cadastro. Verifique os dados e tente novamente.');
@@ -224,6 +250,7 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
     const whatsappLink = telefoneUnidade
       ? `https://wa.me/55${telefoneUnidade}`
       : null;
+    const petsTexto = successData.petNomes.filter(Boolean).join(', ');
 
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
@@ -232,8 +259,8 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
         </div>
         <h2 className="text-2xl font-black text-slate-800 mb-3">Cadastro recebido!</h2>
         <p className="text-slate-500 font-medium max-w-sm mb-8">
-          <span className="font-bold text-slate-700">{successData.clienteNome}</span>, o cadastro do(a){' '}
-          <span className="font-bold text-slate-700">{successData.petNome}</span> foi concluído com sucesso. Em breve entraremos em contato!
+          <span className="font-bold text-slate-700">{successData.clienteNome}</span>, o cadastro de{' '}
+          <span className="font-bold text-slate-700">{petsTexto}</span> foi concluído com sucesso. Em breve entraremos em contato!
         </p>
         {whatsappLink && (
           <a
@@ -351,39 +378,60 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
 
         {step === 2 && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            <h2 className="text-xl font-black text-slate-800">Dados do pet</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-black text-slate-800">Dados do pet</h2>
+              {pets.length > 0 && (
+                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg" style={{ color: BRAND_GREEN, backgroundColor: `${BRAND_GREEN}14` }}>
+                  Pet {pets.length + 1}
+                </span>
+              )}
+            </div>
+
+            {pets.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {pets.map((p, i) => (
+                  <span key={i} className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600">
+                    <i className="fa-solid fa-paw text-[10px]" style={{ color: BRAND_GREEN }}></i>
+                    {p.nome}
+                    <button type="button" onClick={() => removePet(i)} className="text-slate-400 hover:text-rose-500">
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
 
             <div>
               <FieldLabel>Nome do pet *</FieldLabel>
-              <input type="text" value={petNome} onChange={e => setPetNome(e.target.value)} className={inputClass} placeholder="Ex: Rex" />
+              <input type="text" value={currentPet.nome} onChange={e => setCurrentPet(prev => ({ ...prev, nome: e.target.value }))} className={inputClass} placeholder="Ex: Rex" />
             </div>
 
             <div>
               <FieldLabel>Sexo *</FieldLabel>
               <div className="flex gap-3">
-                <ChipButton active={petGenero === 'Macho'} onClick={() => setPetGenero('Macho')}>Macho</ChipButton>
-                <ChipButton active={petGenero === 'Fêmea'} onClick={() => setPetGenero('Fêmea')}>Fêmea</ChipButton>
+                <ChipButton active={currentPet.genero === 'Macho'} onClick={() => setCurrentPet(prev => ({ ...prev, genero: 'Macho' }))}>Macho</ChipButton>
+                <ChipButton active={currentPet.genero === 'Fêmea'} onClick={() => setCurrentPet(prev => ({ ...prev, genero: 'Fêmea' }))}>Fêmea</ChipButton>
               </div>
             </div>
 
             <div>
               <FieldLabel>Espécie *</FieldLabel>
               <div className="flex gap-3">
-                <ChipButton active={petEspecie === 'Cachorro'} onClick={() => setPetEspecie('Cachorro')}>Cachorro</ChipButton>
-                <ChipButton active={petEspecie === 'Gato'} onClick={() => setPetEspecie('Gato')}>Gato</ChipButton>
+                <ChipButton active={currentPet.especie === 'Cachorro'} onClick={() => setCurrentPet(prev => ({ ...prev, especie: 'Cachorro' }))}>Cachorro</ChipButton>
+                <ChipButton active={currentPet.especie === 'Gato'} onClick={() => setCurrentPet(prev => ({ ...prev, especie: 'Gato' }))}>Gato</ChipButton>
               </div>
             </div>
 
             <div>
               <FieldLabel>Raça</FieldLabel>
-              <input type="text" value={petRaca} onChange={e => setPetRaca(e.target.value)} className={inputClass} placeholder="Ex: SRD, Golden, etc." />
+              <input type="text" value={currentPet.raca} onChange={e => setCurrentPet(prev => ({ ...prev, raca: e.target.value }))} className={inputClass} placeholder="Ex: SRD, Golden, etc." />
             </div>
 
             <div>
               <FieldLabel>Porte</FieldLabel>
               <div className="flex flex-wrap gap-3">
                 {PORTE_OPTIONS.map(opt => (
-                  <ChipButton key={opt} active={petPorte === opt} onClick={() => setPetPorte(opt)}>{opt}</ChipButton>
+                  <ChipButton key={opt} active={currentPet.porte === opt} onClick={() => setCurrentPet(prev => ({ ...prev, porte: opt }))}>{opt}</ChipButton>
                 ))}
               </div>
             </div>
@@ -392,23 +440,23 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
 
         {step === 3 && (
           <div className="space-y-5 animate-in fade-in duration-300">
-            <h2 className="text-xl font-black text-slate-800">Saúde e comportamento</h2>
+            <h2 className="text-xl font-black text-slate-800">Saúde de {currentPet.nome || 'seu pet'}</h2>
 
             <div>
               <FieldLabel>O pet tem alguma alergia?</FieldLabel>
               <div className="flex gap-3">
-                <ChipButton active={temAlergia === 'sim'} onClick={() => setTemAlergia('sim')}>Sim</ChipButton>
-                <ChipButton active={temAlergia === 'nao'} onClick={() => { setTemAlergia('nao'); setAlergiaDescricao(''); }}>Não</ChipButton>
+                <ChipButton active={currentPet.temAlergia === 'sim'} onClick={() => setCurrentPet(prev => ({ ...prev, temAlergia: 'sim' }))}>Sim</ChipButton>
+                <ChipButton active={currentPet.temAlergia === 'nao'} onClick={() => setCurrentPet(prev => ({ ...prev, temAlergia: 'nao', alergiaDescricao: '' }))}>Não</ChipButton>
               </div>
             </div>
 
-            {temAlergia === 'sim' && (
+            {currentPet.temAlergia === 'sim' && (
               <div className="animate-in slide-in-from-top-2 duration-300">
                 <FieldLabel>Descreva a alergia</FieldLabel>
                 <textarea
                   rows={3}
-                  value={alergiaDescricao}
-                  onChange={e => setAlergiaDescricao(e.target.value)}
+                  value={currentPet.alergiaDescricao}
+                  onChange={e => setCurrentPet(prev => ({ ...prev, alergiaDescricao: e.target.value }))}
                   className={`${inputClass} resize-none`}
                   placeholder="Ex: alergia a determinado shampoo, picadas de pulga..."
                 />
@@ -419,7 +467,7 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
               <FieldLabel>Comportamento</FieldLabel>
               <div className="flex flex-wrap gap-3">
                 {COMPORTAMENTO_OPTIONS.map(opt => (
-                  <ChipButton key={opt} active={comportamento.includes(opt)} onClick={() => toggleComportamento(opt)}>{opt}</ChipButton>
+                  <ChipButton key={opt} active={currentPet.comportamento.includes(opt)} onClick={() => toggleComportamento(opt)}>{opt}</ChipButton>
                 ))}
               </div>
             </div>
@@ -428,8 +476,8 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
               <FieldLabel>Observações adicionais</FieldLabel>
               <textarea
                 rows={3}
-                value={observacoes}
-                onChange={e => setObservacoes(e.target.value)}
+                value={currentPet.observacoes}
+                onChange={e => setCurrentPet(prev => ({ ...prev, observacoes: e.target.value }))}
                 className={`${inputClass} resize-none`}
                 placeholder="Alguma informação importante sobre o pet?"
               />
@@ -444,39 +492,54 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 p-4 flex gap-3 max-w-md mx-auto w-full">
-        {step > 1 && (
-          <button
-            type="button"
-            onClick={() => setStep(prev => (prev - 1) as 1 | 2)}
-            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-sm uppercase tracking-wide"
-          >
-            Voltar
-          </button>
-        )}
-
-        {step < 3 ? (
-          <button
-            type="button"
-            disabled={step === 1 ? !canAdvanceStep1 : !canAdvanceStep2}
-            onClick={() => setStep(prev => (prev + 1) as 2 | 3)}
-            className="flex-[2] py-4 rounded-2xl font-black text-sm uppercase tracking-wide text-white shadow-lg disabled:opacity-40 disabled:shadow-none transition-all"
-            style={{ backgroundColor: BRAND_GREEN }}
-          >
-            Continuar
-          </button>
-        ) : (
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 p-4 flex flex-col gap-3 max-w-md mx-auto w-full">
+        {step === 3 && (
           <button
             type="button"
             disabled={submitting}
-            onClick={handleSubmit}
-            className="flex-[2] py-4 rounded-2xl font-black text-sm uppercase tracking-wide text-white shadow-lg disabled:opacity-60 transition-all flex items-center justify-center gap-2"
-            style={{ backgroundColor: BRAND_GREEN }}
+            onClick={handleAddAnotherPet}
+            className="w-full py-3.5 rounded-2xl font-black text-sm uppercase tracking-wide border-2 border-dashed disabled:opacity-50 transition-all"
+            style={{ borderColor: BRAND_GREEN, color: BRAND_GREEN }}
           >
-            {submitting ? <i className="fa-solid fa-circle-notch fa-spin"></i> : null}
-            Finalizar Cadastro
+            <i className="fa-solid fa-plus mr-2"></i>
+            Adicionar outro pet
           </button>
         )}
+
+        <div className="flex gap-3">
+          {step > 1 && (
+            <button
+              type="button"
+              onClick={() => setStep(prev => (prev - 1) as 1 | 2)}
+              className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-sm uppercase tracking-wide"
+            >
+              Voltar
+            </button>
+          )}
+
+          {step < 3 ? (
+            <button
+              type="button"
+              disabled={step === 1 ? !canAdvanceStep1 : !canAdvanceStep2}
+              onClick={() => setStep(prev => (prev + 1) as 2 | 3)}
+              className="flex-[2] py-4 rounded-2xl font-black text-sm uppercase tracking-wide text-white shadow-lg disabled:opacity-40 disabled:shadow-none transition-all"
+              style={{ backgroundColor: BRAND_GREEN }}
+            >
+              Continuar
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={handleSubmit}
+              className="flex-[2] py-4 rounded-2xl font-black text-sm uppercase tracking-wide text-white shadow-lg disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+              style={{ backgroundColor: BRAND_GREEN }}
+            >
+              {submitting ? <i className="fa-solid fa-circle-notch fa-spin"></i> : null}
+              Finalizar Cadastro
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
