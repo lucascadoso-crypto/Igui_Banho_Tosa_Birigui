@@ -21,6 +21,7 @@ import Login from './components/Login';
 import Perfil from './components/Perfil';
 import Auditoria from './components/Auditoria';
 import Marketing from './components/Marketing';
+import CadastroPublico from './components/CadastroPublico';
 
 const AppContent: React.FC = () => {
   const { session, userProfile, userRole, setUserRole, loading, hasError, toast, handleLogout } = useAuth();
@@ -189,6 +190,12 @@ const AppContent: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  // Rota publica de cadastro: verificada antes de qualquer check de sessao,
+  // para que clientes sem login consigam preencher o formulario.
+  if (window.location.pathname === '/cadastro') {
+    return <CadastroPublico supabaseClient={supabase} />;
+  }
+
   return (
     <NavigationProvider>
       <UnitsProvider>
