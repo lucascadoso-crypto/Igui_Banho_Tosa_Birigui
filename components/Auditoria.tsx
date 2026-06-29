@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Unit } from '../types';
+import { Unit, UserProfile } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatarErroWhatsApp } from '../lib/errorParser';
 
 interface AuditoriaProps {
   unit: Unit;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 const Auditoria: React.FC<AuditoriaProps> = ({ unit, supabaseClient, userProfile }) => {

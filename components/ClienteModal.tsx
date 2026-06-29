@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Client, Pet, UiId } from '../types';
+import { Client, Pet, UiId, UserProfile } from '../types';
 import { uploadToImgBB } from '../services/imgbbService';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
@@ -10,7 +10,7 @@ interface ClienteModalProps {
   client?: Partial<Client> | null;
   unitId: UiId;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
   onClose: () => void;
   onSave: (data: { cliente: Client, pet?: Pet }) => void;
   showToast: (text: string, type?: 'success' | 'error') => void;

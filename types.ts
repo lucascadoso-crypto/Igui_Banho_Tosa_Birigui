@@ -27,6 +27,23 @@ export interface Service {
 
 export type UserRole = 'master' | 'admin_unidade' | 'gerente' | 'financeiro' | 'atendente' | 'tosador' | 'somente_leitura' | 'comum' | 'administrador';
 
+// Espelha a tabela public.funcionarios. cargo aceita 'pendente' porque
+// App.tsx usa esse valor como fallback quando o login não tem funcionario
+// vinculado ainda (ver fetchProfile em App.tsx).
+export interface UserProfile {
+  id?: BusinessId;
+  user_id?: string;
+  unidade_id?: BusinessId;
+  nome: string;
+  email?: string;
+  telefone?: string;
+  cargo: UserRole | 'pendente';
+  ativo: boolean;
+  foto_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Package {
   id: BusinessId;
   cliente_id: BusinessId;

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Service, SystemConfig, Unit } from '../types';
+import { Service, SystemConfig, Unit, UserProfile } from '../types';
 import { getLastImgBBUploadError, uploadToImgBB } from '../services/imgbbService';
 import { registrarAtividade } from '../services/logger';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,7 +11,7 @@ interface SettingsProps {
   supabaseClient: any;
   units: Unit[];
   refreshUnits: () => void;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits, userProfile }) => {

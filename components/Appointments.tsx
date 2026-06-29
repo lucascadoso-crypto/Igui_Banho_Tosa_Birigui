@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Unit, Client, Pet, Employee, Service, Appointment } from '../types';
+import { Unit, Client, Pet, Employee, Service, Appointment, UserProfile } from '../types';
 import ClienteModal from './ClienteModal';
 import AgendamentoDetalhesModal from './AgendamentoDetalhesModal'; // TEST
 import CadastroPet from './CadastroPet';
@@ -11,7 +11,7 @@ import { calculateAppointmentTotals } from '../services/pricing';
 interface AppointmentsProps {
   unit: Unit;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userProfile }) => {

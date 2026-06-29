@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Unit, Client, Pet, Service, Package, UiId } from '../types';
+import { Unit, Client, Pet, Service, Package, UiId, UserProfile } from '../types';
 import PacoteDetalhesModal from './PacoteDetalhesModal';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
@@ -8,7 +8,7 @@ import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 interface PacotesProps {
   unit: Unit;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) => {

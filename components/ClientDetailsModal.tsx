@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Client, Pet, UiId } from '../types';
+import { Client, Pet, UiId, UserProfile } from '../types';
 import ClienteModal from './ClienteModal';
 import PetFormModal from './PetFormModal';
 import { registrarAtividade } from '../services/logger';
@@ -12,7 +12,7 @@ interface ClientDetailsModalProps {
   unitId: UiId;
   onClose: () => void;
   onOpenNewPet: (clientId: UiId, clientName: string) => void;
-  userProfile?: any;
+  userProfile?: UserProfile;
   focusPetId?: UiId;
   zBoost?: number;
 }

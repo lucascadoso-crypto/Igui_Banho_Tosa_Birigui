@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Pet, UiId } from '../types';
+import { Pet, UiId, UserProfile } from '../types';
 import { registrarAtividade } from '../services/logger';
 import { getLastImgBBUploadError, uploadToImgBB } from '../services/imgbbService';
 
@@ -10,7 +10,7 @@ interface PetFormModalProps {
   clientName: string;
   unitId: UiId;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
   onClose: () => void;
   onSaved: (pet: Pet) => void;
   showToast: (text: string, type?: 'success' | 'error') => void;

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Client, Pet } from '../types';
+import { Client, Pet, UserProfile } from '../types';
 import ClienteModal from './ClienteModal';
 import ClientDetailsModal from './ClientDetailsModal';
 import PetFormModal from './PetFormModal';
@@ -9,7 +9,7 @@ interface AgendamentoTutorPetPanelProps {
   appt: any;
   client: Partial<Client> | null;
   pet: Partial<Pet> | null;
-  userProfile?: any;
+  userProfile?: UserProfile;
   supabaseClient: any;
   onRefresh: () => void;
   showToast: (mensagem: string, tipo?: 'sucesso' | 'erro' | 'carregando') => void;

@@ -1,12 +1,13 @@
 
 import React, { useState, useRef } from 'react';
+import { UserProfile } from '../types';
 import { uploadToImgBB } from '../services/imgbbService';
 import { registrarAtividade } from '../services/logger';
 
 interface GastosModalProps {
   unitId: string;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
   initialDate?: string;
   onClose: () => void;
   onRefresh: () => void;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Unit, NavigationState, SubView, GlobalView, UserRole } from '../types';
+import { Unit, NavigationState, SubView, GlobalView, UserRole, UserProfile } from '../types';
 
 interface SidebarProps {
   units: Unit[];
@@ -8,7 +8,7 @@ interface SidebarProps {
   userRole: UserRole;
   setUserRole: (role: UserRole) => void;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
   isOpen?: boolean;
   onClose?: () => void;
 }

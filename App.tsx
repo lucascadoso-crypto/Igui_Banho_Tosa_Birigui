@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Unit, NavigationState, UserRole } from './types';
+import { Unit, NavigationState, UserRole, UserProfile } from './types';
 import { supabase } from './services/supabaseClient';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -22,7 +22,7 @@ import Marketing from './components/Marketing';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
   const [userRole, setUserRole] = useState<UserRole>('comum');
   const [navState, setNavState] = useState<NavigationState>({ 

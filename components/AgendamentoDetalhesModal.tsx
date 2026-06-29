@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Appointment, Client, Pet } from '../types';
+import { Appointment, Client, Pet, UserProfile } from '../types';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import AgendamentoTutorPetPanel from './AgendamentoTutorPetPanel';
@@ -8,7 +8,7 @@ import { calculateAppointmentTotals } from '../services/pricing';
 
 interface AgendamentoDetalhesModalProps {
   appt: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
   onClose: () => void;
   onEdit: (appt: any) => void;
   onFinalize: (appt: any) => void;

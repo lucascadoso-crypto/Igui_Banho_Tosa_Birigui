@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Unit, Client } from '../types';
+import { Unit, Client, UserProfile } from '../types';
 import CadastroPet from './CadastroPet';
 import ClientDetailsModal from './ClientDetailsModal';
 import ClienteModal from './ClienteModal';
@@ -9,7 +9,7 @@ import { registrarAtividade } from '../services/logger';
 interface ClientsProps {
   unit: Unit;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) => {
