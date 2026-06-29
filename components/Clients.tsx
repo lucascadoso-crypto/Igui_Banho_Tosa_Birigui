@@ -210,10 +210,12 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
     setActiveMenuId(null);
   };
 
-  const filteredClients = clients.filter(c => 
-    c.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.telefone.includes(searchTerm)
-  );
+  const searchDigits = searchTerm.replace(/\D/g, '');
+  const filteredClients = clients.filter(c => {
+    const matchNome = c.nome.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchTelefone = searchDigits.length > 0 && (c.telefone || '').replace(/\D/g, '').includes(searchDigits);
+    return matchNome || matchTelefone;
+  });
 
   const groupedClients = filteredClients.reduce((groups, client) => {
     const letter = client.nome.charAt(0).toUpperCase();
@@ -309,7 +311,14 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
                         </div>
                         
                         <div className="min-w-0 cursor-pointer" onClick={() => setSelectedClientDetails(client)}>
-                          <h4 className="font-bold text-slate-800 text-lg truncate group-hover:text-[#00BFA5] transition-colors">{client.nome}</h4>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-slate-800 text-lg truncate group-hover:text-[#00BFA5] transition-colors">{client.nome}</h4>
+                            {client.origem_id === 'cadastro_publico' && (
+                              <span title="Cadastrado pelo link público" className="shrink-0 bg-indigo-50 text-indigo-600 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter border border-indigo-100">
+                                <i className="fa-solid fa-link mr-1"></i>Via Link
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center space-x-4 mt-1">
                             <span className="text-sm text-slate-500 font-medium flex items-center">
                               <i className="fa-brands fa-whatsapp mr-1.5 text-emerald-500"></i>

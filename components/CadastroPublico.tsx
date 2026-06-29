@@ -55,6 +55,21 @@ const maskCpf = (value: string) => {
   return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
 };
 
+const isValidCpf = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(digits)) return false;
+
+  const calcDigit = (length: number) => {
+    let sum = 0;
+    for (let i = 0; i < length; i++) sum += parseInt(digits[i], 10) * (length + 1 - i);
+    const rest = (sum * 10) % 11;
+    return rest === 10 ? 0 : rest;
+  };
+
+  return calcDigit(9) === parseInt(digits[9], 10) && calcDigit(10) === parseInt(digits[10], 10);
+};
+
 const maskCep = (value: string) => {
   const digits = value.replace(/\D/g, '').slice(0, 8);
   if (digits.length <= 5) return digits;
@@ -174,7 +189,8 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
     setPets(prev => prev.filter((_, i) => i !== index));
   };
 
-  const canAdvanceStep1 = nome.trim().length > 0 && telefone.replace(/\D/g, '').length >= 10;
+  const cpfPreenchidoEInvalido = cpf.replace(/\D/g, '').length > 0 && !isValidCpf(cpf);
+  const canAdvanceStep1 = nome.trim().length > 0 && telefone.replace(/\D/g, '').length >= 10 && !cpfPreenchidoEInvalido;
   const canAdvanceStep2 = currentPet.nome.trim().length > 0 && currentPet.genero !== '' && currentPet.especie !== '';
 
   const buildPetPayload = (pet: PetDraft) => ({
@@ -211,7 +227,11 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
       if (error) throw error;
 
       if (!data?.ok) {
-        setSubmitError('Não foi possível concluir o cadastro. Verifique os dados e tente novamente.');
+        if (data?.erro === 'cpf_invalido') {
+          setSubmitError('O CPF informado é inválido. Volte na primeira etapa e confira os números.');
+        } else {
+          setSubmitError('Não foi possível concluir o cadastro. Verifique os dados e tente novamente.');
+        }
         return;
       }
 
@@ -330,6 +350,9 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
                 className={inputClass}
                 placeholder="000.000.000-00"
               />
+              {cpfPreenchidoEInvalido && (
+                <p className="text-xs font-bold text-rose-500 mt-1.5 ml-1">CPF inválido. Confira os números ou deixe em branco.</p>
+              )}
             </div>
 
             <div>

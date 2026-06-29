@@ -94,8 +94,9 @@ export interface Client {
   complemento?: string;
   cidade?: string;
   estado?: string;
-  unidade_preferencial_id: BusinessId; 
+  unidade_preferencial_id: BusinessId;
   unidade_id?: BusinessId;
+  origem_id?: string;
   created_at?: string;
 }
 
