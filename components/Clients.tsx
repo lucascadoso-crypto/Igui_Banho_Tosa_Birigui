@@ -37,6 +37,11 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    window.addEventListener('refreshClientes', fetchClients);
+    return () => window.removeEventListener('refreshClientes', fetchClients);
+  }, [unit.id]);
+
   const fetchClients = async () => {
     if (!supabaseClient) return;
     setLoading(true);

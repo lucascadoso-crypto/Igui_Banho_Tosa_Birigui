@@ -32,6 +32,9 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
   
   const [selectedServiceIds, setSelectedServiceIds] = useState<UiId[]>([]);
   const [packageTotalValue, setPackageTotalValue] = useState<number>(0);
+  const [valorDesconto, setValorDesconto] = useState<number>(0);
+  const [catalogPackages, setCatalogPackages] = useState<any[]>([]);
+  const [selectedCatalogId, setSelectedCatalogId] = useState<UiId | ''>('');
   const getTodayBR = () => {
     const dataLocalBR = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     const [dia, mes, ano] = dataLocalBR.split('/');
@@ -91,6 +94,15 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
     try {
       const { data: srvData } = await supabaseClient.from('servicos').select('*').order('nome');
       setServices(srvData || []);
+
+      const { data: catalogData } = await supabaseClient
+        .from('catalogo_pacotes')
+        .select('*, catalogo_pacotes_unidade!inner(unidade_id, ativo)')
+        .eq('ativo', true)
+        .eq('catalogo_pacotes_unidade.unidade_id', unit.id)
+        .eq('catalogo_pacotes_unidade.ativo', true)
+        .order('nome');
+      setCatalogPackages(catalogData || []);
 
       const { data: packData, error: packError } = await supabaseClient
         .from('pacotes')
@@ -305,10 +317,11 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
       const petName = petCheck.nome || 'Pet';
       const freqText = interval === 'Weekly' ? 'Semanal' : 'Quinzenal';
       const nomeAutomatico = `Pacote ${freqText} - ${petName}`;
+      const valorPacoteComDesconto = Math.max(0, packageTotalValue - valorDesconto);
 
       if (editingPackageId) {
         // Lógica de UPDATE
-        const finalTotal = packageTotalValue + (isPetTaxi ? valorTransportePacote : 0);
+        const finalTotal = valorPacoteComDesconto + (isPetTaxi ? valorTransportePacote : 0);
         const taxiVal = isPetTaxi ? valorTransportePacote : 0;
 
         const { error: pErr } = await supabaseClient
@@ -319,8 +332,9 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
             cliente_id: selectedClient?.id,
             pet_id: selectedPetId, 
             qtd_sessoes: sessionCount,
-            valor_total: finalTotal, 
+            valor_total: finalTotal,
             valor_transporte: taxiVal,
+            valor_desconto: valorDesconto,
             renovacao_automatica: renovacaoAutomatica
           })
           .eq('id', editingPackageId);
@@ -359,7 +373,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
               current.setDate(current.getDate() + step);
             }
 
-            const totalWithTaxi = packageTotalValue + (isPetTaxi ? valorTransportePacote : 0);
+            const totalWithTaxi = valorPacoteComDesconto + (isPetTaxi ? valorTransportePacote : 0);
             const pricePerSession = totalWithTaxi / sessionCount;
             const taxiPerSession = isPetTaxi ? (valorTransportePacote / sessionCount) : 0;
 
@@ -407,7 +421,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
             const futureIds = futureAppts.map((a: any) => a.id);
 
             // 2. Atualizar flag de táxi, pet_id e valor_total (caso tenha mudado)
-            const totalWithTaxi = packageTotalValue + (isPetTaxi ? valorTransportePacote : 0);
+            const totalWithTaxi = valorPacoteComDesconto + (isPetTaxi ? valorTransportePacote : 0);
             const pricePerSession = totalWithTaxi / sessionCount;
             const taxiPerSession = isPetTaxi ? (valorTransportePacote / sessionCount) : 0;
 
@@ -460,7 +474,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
         );
       } else {
         // Lógica de INSERT (Original)
-        const finalTotal = packageTotalValue + (isPetTaxi ? valorTransportePacote : 0);
+        const finalTotal = valorPacoteComDesconto + (isPetTaxi ? valorTransportePacote : 0);
         const taxiVal = isPetTaxi ? valorTransportePacote : 0;
 
         const { data: pack, error: pErr } = await supabaseClient
@@ -472,8 +486,10 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
             pet_id: selectedPetId, 
             unidade_id: unit.id, 
             qtd_sessoes: sessionCount,
-            valor_total: finalTotal, 
+            valor_total: finalTotal,
             valor_transporte: taxiVal,
+            valor_desconto: valorDesconto,
+            catalogo_pacote_id: selectedCatalogId || null,
             ativo: true,
             renovacao_automatica: renovacaoAutomatica
           }])
@@ -538,12 +554,24 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
     setSelectedServiceIds([]);
     setSelectedPetId('');
     setPackageTotalValue(0);
+    setValorDesconto(0);
+    setSelectedCatalogId('');
     setSessionCount(4);
     setIsPetTaxi(false);
     setRenovacaoAutomatica(false);
     setValorTransportePacote(0);
     setShowQuickAdd(false);
     setQuickAddData({ nome: '', telefone: '', petNome: '' });
+  };
+
+  const applyCatalogPackage = (id: UiId | '') => {
+    setSelectedCatalogId(id);
+    if (!id) return;
+    const tpl = catalogPackages.find(c => String(c.id) === String(id));
+    if (!tpl) return;
+    handleIntervalChange(tpl.frequencia);
+    setSessionCount(tpl.qtd_sessoes);
+    setPackageTotalValue(Number(tpl.valor_base));
   };
 
   const toggleService = (id: number | string) => {
@@ -579,8 +607,10 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
     
     const taxiVal = Number(p.valor_transporte || 0);
     setValorTransportePacote(taxiVal);
-    setPackageTotalValue(Number(p.valor_total) - taxiVal);
-    
+    setValorDesconto(Number(p.valor_desconto || 0));
+    setPackageTotalValue(Number(p.valor_total) - taxiVal + Number(p.valor_desconto || 0));
+    setSelectedCatalogId('');
+
     setRenovacaoAutomatica(p.renovacao_automatica || false);
     setInterval(p.qtd_sessoes === 4 ? 'Weekly' : 'Bi-weekly');
 
@@ -1364,6 +1394,21 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
                      </div>
                   </div>
                   <div className="space-y-6">
+                      {catalogPackages.length > 0 && (
+                        <div className="space-y-2">
+                           <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Modelo de Pacote</label>
+                           <select
+                             value={selectedCatalogId}
+                             onChange={(e) => applyCatalogPackage(e.target.value)}
+                             className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none"
+                           >
+                              <option value="">Personalizado</option>
+                              {catalogPackages.map(c => (
+                                <option key={c.id} value={c.id}>{c.nome}</option>
+                              ))}
+                           </select>
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2"><label className="text-xs font-black text-slate-400 uppercase tracking-widest">Frequência</label><select value={interval} onChange={(e) => handleIntervalChange(e.target.value as any)} className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none"><option value="Weekly">Semanal (4 sessões)</option><option value="Bi-weekly">Quinzenal (2 sessões)</option></select></div>
                         <div className="space-y-2"><label className="text-xs font-black text-slate-400 uppercase tracking-widest">Qtd de Sessões</label><input type="number" value={sessionCount} onChange={(e) => setSessionCount(Number(e.target.value))} className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold" /></div>
@@ -1419,13 +1464,19 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
                            <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-teal-400">R$</span>
                            <input type="number" value={packageTotalValue} onChange={(e) => setPackageTotalValue(Number(e.target.value))} className="w-full pl-20 pr-6 py-5 bg-white border border-teal-200 rounded-[1.5rem] text-4xl font-black text-teal-700 outline-none text-center" placeholder="0.00"/>
                         </div>
-                        
-                        {isPetTaxi && (
-                           <div className="pt-3 border-t border-teal-100 text-center">
-                              <p className="text-[10px] font-black text-teal-500 uppercase tracking-widest">Total do Pacote + Transporte:</p>
-                              <p className="text-2xl font-black text-slate-800">R$ {(packageTotalValue + Number(valorTransportePacote)).toFixed(2)}</p>
+
+                        <div className="space-y-1">
+                           <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest block text-center">Desconto</label>
+                           <div className="relative">
+                              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-orange-400 font-bold">R$</span>
+                              <input type="number" min={0} value={valorDesconto} onChange={(e) => setValorDesconto(Math.max(0, Number(e.target.value) || 0))} className="w-full pl-12 pr-4 py-3 bg-white border border-orange-200 rounded-2xl font-bold text-orange-600 outline-none text-center" placeholder="0.00"/>
                            </div>
-                        )}
+                        </div>
+
+                        <div className="pt-3 border-t border-teal-100 text-center">
+                           <p className="text-[10px] font-black text-teal-500 uppercase tracking-widest">Total {isPetTaxi ? 'do Pacote + Transporte' : 'do Pacote'}:</p>
+                           <p className="text-2xl font-black text-slate-800">R$ {(Math.max(0, packageTotalValue - valorDesconto) + (isPetTaxi ? Number(valorTransportePacote) : 0)).toFixed(2)}</p>
+                        </div>
                      </div>
                   </div>
                </div>

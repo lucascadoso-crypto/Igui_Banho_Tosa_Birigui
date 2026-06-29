@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { Appointment, Client, Pet } from '../types';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
+import AgendamentoTutorPetPanel from './AgendamentoTutorPetPanel';
+import { calculateAppointmentTotals } from '../services/pricing';
 
 interface AgendamentoDetalhesModalProps {
   appt: any;
@@ -68,19 +70,19 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   const extraItems = services.filter(isExtraItem);
   const valorTransporte = Number(appt.valor_transporte || 0);
   const valorDesconto = Number(appt.valor_desconto || appt.desconto || 0);
-  const totalExtraItens = extraItems.reduce((acc: number, item: any) => acc + getItemValue(item), 0);
-  const totalExtra = extraItems.length > 0 ? totalExtraItens : 0;
   const totalBaseAgendamento = Number(appt.valor_total || 0);
   const totalMainItems = mainItems.reduce((acc: number, item: any) => acc + getItemValue(item), 0);
   const valorServicosSalvo = Number(appt.valor_servicos || 0);
-  const valorServicosCalculado = Math.max(0, totalBaseAgendamento - valorTransporte - totalExtra + valorDesconto);
-  const valorServicosDireto = valorServicosSalvo > 0 ? valorServicosSalvo : totalMainItems;
-  const totalDireto = valorServicosDireto + valorTransporte + totalExtra - valorDesconto;
-  const deveUsarFallbackDoTotal = totalBaseAgendamento > 0 && (valorServicosDireto <= 0 || Math.abs(totalDireto - totalBaseAgendamento) > 0.01);
-  const valorServicos = appt.pacote_id
-    ? Math.max(0, valorServicosDireto || totalBaseAgendamento)
-    : (deveUsarFallbackDoTotal ? valorServicosCalculado : Math.max(0, valorServicosDireto));
-  const totalGeral = appt.pacote_id ? totalBaseAgendamento : Math.max(0, valorServicos + valorTransporte + totalExtra - valorDesconto);
+  const totals = calculateAppointmentTotals({
+    mainItemValues: mainItems.map(getItemValue),
+    extraItemValues: extraItems.map(getItemValue),
+    valorTransporte,
+    valorDesconto,
+    isPacote: !!appt.pacote_id,
+    valorTotalSalvo: totalBaseAgendamento,
+    valorServicosSalvo
+  });
+  const { valorServicos, totalExtra, totalGeral } = totals;
   const isSomaValida = !isDividirPagamento || (Math.abs((valor1 + valor2) - totalGeral) < 0.01);
   const client = appt.clientes || appt.pets?.clientes;
   const pet = appt.pets;
@@ -771,23 +773,42 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
             {/* Seção Recibo */}
             <div className="space-y-4">
                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Recibo</h3>
+
+               {appt.pacote_id && (
+                  <div className="grid grid-cols-2 gap-3">
+                     <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 shadow-sm">
+                        <p className="text-[9px] font-black text-indigo-400 uppercase mb-1">Valor do Pacote</p>
+                        <p className="font-black text-indigo-700">R$ {Number(appt.pacotes?.valor_total || 0).toFixed(2)}</p>
+                        <p className="text-[8px] font-bold text-indigo-400 uppercase mt-1">Informativo, não cobrado novamente hoje</p>
+                     </div>
+                     <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Sessão Atual</p>
+                        <p className="font-black text-slate-800">Sessão {appt.numero_sessao || '?'}/{appt.pacotes?.qtd_sessoes || '?'}</p>
+                     </div>
+                  </div>
+               )}
+
                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                     <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Serviços</p>
+                     <p className="text-[9px] font-black text-slate-400 uppercase mb-1">{appt.pacote_id ? 'Valor de Referência da Sessão' : 'Serviços'}</p>
                      <p className="font-black text-slate-800">R$ {valorServicos.toFixed(2)}</p>
                   </div>
                   <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                     <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Extras</p>
+                     <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Total Extras a Pagar</p>
                      <p className={`font-black ${totalExtra > 0 ? 'text-amber-600' : 'text-slate-800'}`}>R$ {totalExtra.toFixed(2)}</p>
                   </div>
-                  <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                     <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Pet Táxi</p>
-                     <p className="font-black text-slate-800">R$ {valorTransporte.toFixed(2)}</p>
-                  </div>
-                  <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                     <p className="text-[9px] font-black text-orange-500 uppercase mb-1">Desconto</p>
-                     <p className="font-black text-orange-500">R$ {valorDesconto.toFixed(2)}</p>
-                  </div>
+                  {valorTransporte > 0 && (
+                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                       <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Pet Táxi</p>
+                       <p className="font-black text-slate-800">R$ {valorTransporte.toFixed(2)}</p>
+                    </div>
+                  )}
+                  {valorDesconto > 0 && (
+                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                       <p className="text-[9px] font-black text-orange-500 uppercase mb-1">Desconto</p>
+                       <p className="font-black text-orange-500">R$ {valorDesconto.toFixed(2)}</p>
+                    </div>
+                  )}
                </div>
 
                <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-100 shadow-sm border-l-4 border-l-orange-500">
@@ -1008,78 +1029,16 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
             </div>
           </div>
 
-          <div className="space-y-8">
-            <div className="space-y-4">
-               <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Agendamento</label>
-                  <p className="text-sm font-black text-slate-700">
-                    {formatDateBR(appt.data_agendamento)} • {String(appt.horario_inicio).substring(0, 5)} - {String(appt.horario_fim || '00:00').substring(0, 5)}
-                  </p>
-               </div>
-               <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Vencimento</label>
-                  <p className="text-sm font-black text-slate-700">{formatDateBR(appt.data_agendamento)}</p>
-               </div>
-
-               {(appt.data_inicio_real || appt.data_fim_real) && (
-                 <div className="pt-3 border-t border-slate-100 mt-2 space-y-2">
-                    <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block">Cronometragem Real</label>
-                    <div className="grid grid-cols-2 gap-4">
-                      {appt.data_inicio_real && (
-                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <p className="text-[8px] font-black text-slate-400 uppercase">Início</p>
-                          <p className="text-sm font-black text-slate-700">{new Date(appt.data_inicio_real).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                        </div>
-                      )}
-                      {appt.data_fim_real && (
-                        <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-100">
-                          <p className="text-[8px] font-black text-emerald-600 uppercase">Fim</p>
-                          <p className="text-sm font-black text-emerald-700">{new Date(appt.data_fim_real).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-                        </div>
-                      )}
-                    </div>
-                 </div>
-               )}
-            </div>
-
-            <div className="space-y-1">
-               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Responsável</label>
-               <p className="text-sm font-black text-slate-600">
-                 {appt.funcionarios?.nome || 'Nenhum responsável selecionado'}
-               </p>
-            </div>
-
-            <div className="space-y-2">
-               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Cliente</label>
-               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-sm">
-                    {client?.nome?.charAt(0) || 'C'}
-                  </div>
-                  <div className="min-w-0">
-                     <p className="font-black text-slate-800 text-sm truncate">{client?.nome || 'Não identificado'}</p>
-                     <p className="text-[9px] font-bold text-slate-400 uppercase">{client?.telefone}</p>
-                  </div>
-               </div>
-            </div>
-
-            <div className="space-y-2">
-               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Pet</label>
-               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                  <div className="flex items-center space-x-3 mb-3">
-                     <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-300 text-xl border-2 border-white shadow-sm overflow-hidden">
-                        {pet?.foto_url ? <img src={pet.foto_url} className="w-full h-full object-cover" /> : <i className="fa-solid fa-paw"></i>}
-                     </div>
-                     <div className="flex-1 min-w-0">
-                        <p className="font-black text-slate-800 text-base truncate leading-none mb-1">{pet?.nome}</p>
-                        <span className="bg-emerald-50 text-emerald-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-emerald-100">Ativo</span>
-                     </div>
-                  </div>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">
-                    Pet criado em {pet?.created_at ? formatDateBR(pet.created_at.split('T')[0]) : '--/--/----'}
-                  </p>
-               </div>
-            </div>
-
+          <div className="space-y-4">
+            <AgendamentoTutorPetPanel
+              appt={appt}
+              client={client}
+              pet={pet}
+              userProfile={userProfile}
+              supabaseClient={supabaseClient}
+              onRefresh={onRefresh}
+              showToast={showToast}
+            />
           </div>
         </div>
 

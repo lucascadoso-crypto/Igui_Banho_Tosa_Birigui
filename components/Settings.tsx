@@ -16,7 +16,7 @@ interface SettingsProps {
 
 const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits, userProfile }) => {
   const isReadOnly = userProfile?.cargo === 'financeiro';
-  const [activeTab, setActiveTab] = useState<'identity' | 'units' | 'services' | 'fiscal' | 'whatsapp_logs'>('identity');
+  const [activeTab, setActiveTab] = useState<'identity' | 'units' | 'services' | 'packages' | 'fiscal' | 'whatsapp_logs'>('identity');
   const [loading, setLoading] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
@@ -42,6 +42,11 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
   const [serviceAvailabilities, setServiceAvailabilities] = useState<any[]>([]); // servicos_unidade
   const [editingService, setEditingService] = useState<any | null>(null);
 
+  // Tab 3b: Catálogo de Pacotes
+  const [catalogPackages, setCatalogPackages] = useState<any[]>([]);
+  const [catalogAvailabilities, setCatalogAvailabilities] = useState<any[]>([]); // catalogo_pacotes_unidade
+  const [editingCatalogPackage, setEditingCatalogPackage] = useState<any | null>(null);
+
   // Tab 4: WhatsApp Logs
   const [whatsappLogs, setWhatsappLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -52,6 +57,7 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
   useEffect(() => {
     fetchConfig();
     fetchServices();
+    fetchCatalogPackages();
   }, []);
 
   useEffect(() => {
@@ -165,6 +171,118 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
       console.error("Erro ao buscar serviços:", err);
       showMsg("Falha ao carregar catálogo: " + err.message, "error");
     }
+  };
+
+  const fetchCatalogPackages = async () => {
+    if (!supabaseClient) return;
+    try {
+      const { data: pkgData, error: pkgError } = await supabaseClient.from('catalogo_pacotes').select('*').order('nome');
+      const { data: availData, error: availError } = await supabaseClient.from('catalogo_pacotes_unidade').select('*');
+
+      if (pkgError) throw pkgError;
+      if (availError) throw availError;
+
+      if (pkgData) setCatalogPackages(pkgData);
+      if (availData) setCatalogAvailabilities(availData);
+    } catch (err: any) {
+      console.error("Erro ao buscar catálogo de pacotes:", err);
+      showMsg("Falha ao carregar catálogo de pacotes: " + err.message, "error");
+    }
+  };
+
+  const isCatalogPackageActiveInUnit = (pkgId: number | string, unitId: number | string) => {
+    return catalogAvailabilities.some(a => a.catalogo_pacote_id === pkgId && a.unidade_id === unitId && a.ativo);
+  };
+
+  const saveCatalogPackage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCatalogPackage) return;
+    setLoading(true);
+
+    try {
+      const payload = {
+        nome: editingCatalogPackage.nome,
+        frequencia: editingCatalogPackage.frequencia,
+        qtd_sessoes: Number(editingCatalogPackage.qtd_sessoes),
+        valor_base: parseFloat(editingCatalogPackage.valor_base)
+      };
+
+      let pkgId = editingCatalogPackage.id;
+      let logAcao = '';
+      let logDesc = '';
+
+      if (pkgId) {
+        const { error: upError } = await supabaseClient.from('catalogo_pacotes').update(payload).eq('id', pkgId);
+        if (upError) throw upError;
+        logAcao = 'EDICAO_MODELO_PACOTE';
+        logDesc = `Editou o modelo de pacote ${payload.nome} (R$ ${payload.valor_base.toFixed(2)})`;
+      } else {
+        const { data, error: insError } = await supabaseClient.from('catalogo_pacotes').insert([payload]).select().single();
+        if (insError) throw insError;
+        pkgId = data.id;
+        logAcao = 'NOVO_MODELO_PACOTE';
+        logDesc = `Criou o modelo de pacote ${payload.nome} (R$ ${payload.valor_base.toFixed(2)})`;
+      }
+
+      await supabaseClient.from('catalogo_pacotes_unidade').delete().eq('catalogo_pacote_id', pkgId);
+
+      const newAvails = units
+        .filter(u => editingCatalogPackage.availabilities?.[u.id])
+        .map(u => ({
+          catalogo_pacote_id: pkgId,
+          unidade_id: u.id,
+          ativo: true
+        }));
+
+      if (newAvails.length > 0) {
+        const { error: availError } = await supabaseClient.from('catalogo_pacotes_unidade').insert(newAvails);
+        if (availError) throw availError;
+      }
+
+      registrarAtividade(
+        units[0]?.id || 'rede',
+        userProfile?.email || 'sistema',
+        logAcao,
+        logDesc,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+
+      showMsg('Modelo de pacote salvo!');
+      await fetchCatalogPackages();
+      setEditingCatalogPackage(null);
+    } catch (err: any) {
+      console.error("Erro ao salvar modelo de pacote:", err);
+      showMsg('Erro ao salvar modelo de pacote: ' + (err.message || ''), 'error');
+    }
+    setLoading(false);
+  };
+
+  const deleteCatalogPackage = async (id: number | string, nome: string) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o modelo "${nome}"? Esta ação não pode ser desfeita.`)) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabaseClient.from('catalogo_pacotes').delete().eq('id', id);
+      if (error) throw error;
+
+      registrarAtividade(
+        units[0]?.id || 'rede',
+        userProfile?.email || 'sistema',
+        'EXCLUIR_MODELO_PACOTE',
+        `Excluiu o modelo de pacote ${nome}`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+
+      showMsg("Modelo de pacote removido com sucesso!");
+      await fetchCatalogPackages();
+      if (editingCatalogPackage?.id === id) setEditingCatalogPackage(null);
+    } catch (err: any) {
+      console.error("Erro ao excluir modelo de pacote:", err);
+      showMsg("Erro ao excluir: " + err.message, "error");
+    }
+    setLoading(false);
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -443,6 +561,13 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
         >
           <i className="fa-solid fa-tags"></i>
           <span>Serviços</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('packages')}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 ${activeTab === 'packages' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
+        >
+          <i className="fa-solid fa-box-open"></i>
+          <span>Pacotes</span>
         </button>
         <button
           onClick={() => setActiveTab('fiscal')}
@@ -759,6 +884,202 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
                 </div>
                 <h5 className="text-slate-800 font-bold">Gestão de Itens</h5>
                 <p className="text-slate-400 text-sm mt-2 max-w-[200px] mx-auto">Selecione um serviço na lista or crie um novo para definir preços e lojas.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Conteúdo Aba: Catálogo de Pacotes */}
+      {activeTab === 'packages' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
+          {/* Lado Esquerdo: Lista */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-slate-800">Catálogo de Pacotes</h3>
+              <button
+                onClick={() => setEditingCatalogPackage({ nome: '', frequencia: 'Weekly', qtd_sessoes: 4, valor_base: 0, availabilities: {} })}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100"
+              >
+                <i className="fa-solid fa-plus mr-2"></i> Novo Modelo
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              {catalogPackages.map(pkg => (
+                <div key={pkg.id} className="bg-white p-5 rounded-2xl border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-indigo-100 transition-all shadow-sm hover:shadow-md">
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-slate-50 w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-colors shrink-0">
+                      <i className="fa-solid fa-box-open"></i>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-800 truncate">{pkg.nome}</p>
+                      <p className="text-xs text-slate-400 font-bold">
+                        {pkg.frequencia === 'Weekly' ? 'Semanal' : 'Quinzenal'} • {pkg.qtd_sessoes} sessões
+                      </p>
+                      <p className="text-xs text-indigo-600 font-bold">R$ {Number(pkg.valor_base).toFixed(2)}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end space-x-3 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-50">
+                    <div className="flex -space-x-1">
+                      {units.map(u => (
+                        <div
+                          key={u.id}
+                          title={`${u.name}: ${isCatalogPackageActiveInUnit(pkg.id, u.id) ? 'Habilitado' : 'Desabilitado'}`}
+                          className={`w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[9px] font-bold shadow-sm shrink-0 ${isCatalogPackageActiveInUnit(pkg.id, u.id) ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}
+                        >
+                          {u.name[0]}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        title="Editar"
+                        onClick={() => {
+                          const avails: Record<string, boolean> = {};
+                          units.forEach(u => avails[u.id] = isCatalogPackageActiveInUnit(pkg.id, u.id));
+                          setEditingCatalogPackage({ ...pkg, availabilities: avails });
+                        }}
+                        className="text-slate-400 hover:text-indigo-600 p-2 transition-colors"
+                      >
+                        <i className="fa-solid fa-sliders"></i>
+                      </button>
+                      <button
+                        title="Excluir"
+                        onClick={() => deleteCatalogPackage(pkg.id, pkg.nome)}
+                        className="text-slate-300 hover:text-rose-500 p-2 transition-colors"
+                      >
+                        <i className="fa-solid fa-trash-can"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {catalogPackages.length === 0 && (
+                <div className="text-center p-12 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl">
+                   <p className="text-slate-400 font-medium">Nenhum modelo de pacote cadastrado ainda.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Lado Direito: Editor de Modelo */}
+          <div className="lg:col-span-1">
+            {editingCatalogPackage ? (
+              <div className="bg-white p-8 rounded-3xl border border-indigo-100 shadow-xl shadow-indigo-100/50 sticky top-24 animate-in slide-in-from-right duration-500">
+                <h4 className="font-bold text-slate-800 mb-6 flex justify-between items-center">
+                  <span className="flex items-center">
+                    <i className="fa-solid fa-circle-plus mr-2 text-indigo-500"></i>
+                    {editingCatalogPackage.id ? 'Editar Modelo' : 'Novo Modelo'}
+                  </span>
+                  <button onClick={() => setEditingCatalogPackage(null)} className="text-slate-300 hover:text-rose-500 p-1"><i className="fa-solid fa-xmark"></i></button>
+                </h4>
+
+                <form onSubmit={saveCatalogPackage} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Nome do Modelo</label>
+                    <input
+                      required
+                      type="text"
+                      value={editingCatalogPackage.nome}
+                      onChange={(e) => setEditingCatalogPackage({...editingCatalogPackage, nome: e.target.value})}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
+                      placeholder="Ex: Semanal R$160"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Frequência</label>
+                      <select
+                        value={editingCatalogPackage.frequencia}
+                        onChange={(e) => {
+                          const freq = e.target.value;
+                          setEditingCatalogPackage({
+                            ...editingCatalogPackage,
+                            frequencia: freq,
+                            qtd_sessoes: freq === 'Weekly' ? 4 : 2
+                          });
+                        }}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold"
+                      >
+                        <option value="Weekly">Semanal</option>
+                        <option value="Bi-weekly">Quinzenal</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Qtd Sessões</label>
+                      <input
+                        required
+                        type="number"
+                        min={1}
+                        value={editingCatalogPackage.qtd_sessoes}
+                        onChange={(e) => setEditingCatalogPackage({...editingCatalogPackage, qtd_sessoes: e.target.value})}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Valor Base (R$)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                      <input
+                        required
+                        type="number" step="0.01"
+                        value={editingCatalogPackage.valor_base}
+                        onChange={(e) => setEditingCatalogPackage({...editingCatalogPackage, valor_base: e.target.value})}
+                        className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Disponibilidade por Unidade</label>
+                    <div className="space-y-2">
+                      {units.map(unit => (
+                        <div key={unit.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer group" onClick={() => {
+                          const newAvails = { ...editingCatalogPackage.availabilities, [unit.id]: !(editingCatalogPackage.availabilities?.[unit.id] ?? false) };
+                          setEditingCatalogPackage({...editingCatalogPackage, availabilities: newAvails});
+                        }}>
+                          <span className="text-sm font-bold text-slate-700">{unit.name}</span>
+                          <label className="relative inline-flex items-center cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              className="sr-only peer"
+                              checked={editingCatalogPackage.availabilities?.[unit.id] ?? false}
+                              onChange={(e) => {
+                                const newAvails = { ...editingCatalogPackage.availabilities, [unit.id]: e.target.checked };
+                                setEditingCatalogPackage({...editingCatalogPackage, availabilities: newAvails});
+                              }}
+                            />
+                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {!isReadOnly && (
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 disabled:opacity-50"
+                    >
+                      {loading ? 'Salvando...' : 'Confirmar e Salvar no Supabase'}
+                    </button>
+                  )}
+                </form>
+              </div>
+            ) : (
+              <div className="bg-slate-100/30 border-2 border-dashed border-slate-200 rounded-3xl p-10 text-center flex flex-col items-center justify-center min-h-[400px]">
+                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
+                   <i className="fa-solid fa-arrow-left text-2xl text-slate-300"></i>
+                </div>
+                <h5 className="text-slate-800 font-bold">Modelos de Pacote</h5>
+                <p className="text-slate-400 text-sm mt-2 max-w-[200px] mx-auto">Selecione um modelo na lista ou crie um novo para usar na criação rápida de pacotes.</p>
               </div>
             )}
           </div>
