@@ -22,6 +22,7 @@ import Perfil from './components/Perfil';
 import Auditoria from './components/Auditoria';
 import Marketing from './components/Marketing';
 import CadastroPublico from './components/CadastroPublico';
+import TermosServico from './components/TermosServico';
 
 const AppContent: React.FC = () => {
   const { session, userProfile, userRole, setUserRole, loading, hasError, toast, handleLogout } = useAuth();
@@ -194,6 +195,10 @@ const App: React.FC = () => {
   // para que clientes sem login consigam preencher o formulario.
   if (window.location.pathname === '/cadastro') {
     return <CadastroPublico supabaseClient={supabase} />;
+  }
+
+  if (window.location.pathname === '/termos') {
+    return <TermosServico />;
   }
 
   return (

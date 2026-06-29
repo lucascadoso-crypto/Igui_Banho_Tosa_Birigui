@@ -109,6 +109,7 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
   const [submitError, setSubmitError] = useState('');
   const [successData, setSuccessData] = useState<{ clienteNome: string; petNomes: string[] } | null>(null);
   const [buscandoCep, setBuscandoCep] = useState(false);
+  const [aceitouTermos, setAceitouTermos] = useState(false);
 
   // Etapa 1 - Tutor
   const [nome, setNome] = useState('');
@@ -190,7 +191,18 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
   };
 
   const cpfPreenchidoEInvalido = cpf.replace(/\D/g, '').length > 0 && !isValidCpf(cpf);
-  const canAdvanceStep1 = nome.trim().length > 0 && telefone.replace(/\D/g, '').length >= 10 && !cpfPreenchidoEInvalido;
+  const cpfValido = cpf.replace(/\D/g, '').length === 11 && isValidCpf(cpf);
+  const canAdvanceStep1 = (
+    nome.trim().length > 0 &&
+    telefone.replace(/\D/g, '').length >= 10 &&
+    cpfValido &&
+    cep.replace(/\D/g, '').length === 8 &&
+    logradouro.trim().length > 0 &&
+    numero.trim().length > 0 &&
+    bairro.trim().length > 0 &&
+    cidade.trim().length > 0 &&
+    estado.trim().length > 0
+  );
   const canAdvanceStep2 = currentPet.nome.trim().length > 0 && currentPet.genero !== '' && currentPet.especie !== '';
 
   const buildPetPayload = (pet: PetDraft) => ({
@@ -342,7 +354,7 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
             </div>
 
             <div>
-              <FieldLabel>CPF</FieldLabel>
+              <FieldLabel>CPF *</FieldLabel>
               <input
                 type="text"
                 value={cpf}
@@ -351,12 +363,12 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
                 placeholder="000.000.000-00"
               />
               {cpfPreenchidoEInvalido && (
-                <p className="text-xs font-bold text-rose-500 mt-1.5 ml-1">CPF inválido. Confira os números ou deixe em branco.</p>
+                <p className="text-xs font-bold text-rose-500 mt-1.5 ml-1">CPF inválido. Confira os números digitados.</p>
               )}
             </div>
 
             <div>
-              <FieldLabel>CEP</FieldLabel>
+              <FieldLabel>CEP *</FieldLabel>
               <div className="relative">
                 <input
                   type="text"
@@ -372,27 +384,27 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
 
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
-                <FieldLabel>Logradouro</FieldLabel>
+                <FieldLabel>Logradouro *</FieldLabel>
                 <input type="text" value={logradouro} onChange={e => setLogradouro(e.target.value)} className={inputClass} />
               </div>
               <div>
-                <FieldLabel>Número</FieldLabel>
+                <FieldLabel>Número *</FieldLabel>
                 <input type="text" value={numero} onChange={e => setNumero(e.target.value)} className={inputClass} />
               </div>
             </div>
 
             <div>
-              <FieldLabel>Bairro</FieldLabel>
+              <FieldLabel>Bairro *</FieldLabel>
               <input type="text" value={bairro} onChange={e => setBairro(e.target.value)} className={inputClass} />
             </div>
 
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
-                <FieldLabel>Cidade</FieldLabel>
+                <FieldLabel>Cidade *</FieldLabel>
                 <input type="text" value={cidade} onChange={e => setCidade(e.target.value)} className={inputClass} />
               </div>
               <div>
-                <FieldLabel>UF</FieldLabel>
+                <FieldLabel>UF *</FieldLabel>
                 <input type="text" value={estado} onChange={e => setEstado(e.target.value.toUpperCase().slice(0, 2))} className={inputClass} />
               </div>
             </div>
@@ -506,6 +518,30 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
               />
             </div>
 
+            <label className="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={aceitouTermos}
+                onChange={e => setAceitouTermos(e.target.checked)}
+                className="mt-0.5 w-5 h-5 shrink-0 accent-current"
+                style={{ color: BRAND_GREEN }}
+              />
+              <span className="text-sm font-bold text-slate-700">
+                Li e concordo com os{' '}
+                <a
+                  href="/termos"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                  style={{ color: BRAND_GREEN }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  Termos de Serviço
+                </a>
+                . *
+              </span>
+            </label>
+
             {submitError && (
               <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4">
                 <p className="text-sm font-bold text-rose-600">{submitError}</p>
@@ -553,9 +589,9 @@ const CadastroPublico: React.FC<CadastroPublicoProps> = ({ supabaseClient }) => 
           ) : (
             <button
               type="button"
-              disabled={submitting}
+              disabled={submitting || !aceitouTermos}
               onClick={handleSubmit}
-              className="flex-[2] py-4 rounded-2xl font-black text-sm uppercase tracking-wide text-white shadow-lg disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+              className="flex-[2] py-4 rounded-2xl font-black text-sm uppercase tracking-wide text-white shadow-lg disabled:opacity-40 disabled:shadow-none transition-all flex items-center justify-center gap-2"
               style={{ backgroundColor: BRAND_GREEN }}
             >
               {submitting ? <i className="fa-solid fa-circle-notch fa-spin"></i> : null}
