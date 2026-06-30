@@ -1,16 +1,17 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Unit, Client, Pet, Employee, Service, Appointment } from '../types';
+import { Unit, Client, Pet, Employee, Service, Appointment, UserProfile } from '../types';
 import ClienteModal from './ClienteModal';
 import AgendamentoDetalhesModal from './AgendamentoDetalhesModal'; // TEST
 import CadastroPet from './CadastroPet';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
+import { calculateAppointmentTotals } from '../services/pricing';
 
 interface AppointmentsProps {
   unit: Unit;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userProfile }) => {
@@ -333,13 +334,24 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const [appointmentTime, setAppointmentTime] = useState('09:00');
   
   const [selectedServiceIds, setSelectedServiceIds] = useState<Array<number | string>>([]);
-  const [manualTotalValue, setManualTotalValue] = useState<number>(0);
-  
+  const [valorDesconto, setValorDesconto] = useState<number>(0);
+
   const [paymentMethod, setPaymentMethod] = useState('');
   const [isPaidModal, setIsPaidModal] = useState(false);
   const [isPetTaxi, setIsPetTaxi] = useState(false);
   const [petTaxiEndereco, setPetTaxiEndereco] = useState('');
   const [valorTransporte, setValorTransporte] = useState<number>(0);
+
+  const mainItemValuesForm = selectedServiceIds.map(id => Number(services.find(s => s.id === id)?.preco_base || 0));
+  const appointmentTotals = calculateAppointmentTotals({
+    mainItemValues: mainItemValuesForm,
+    extraItemValues: [],
+    valorTransporte: isPetTaxi ? valorTransporte : 0,
+    valorDesconto,
+    isPacote: false,
+    valorTotalSalvo: 0,
+    valorServicosSalvo: 0
+  });
 
   // Estados para Busca e Filtros (Client-side)
   const [termoBusca, setTermoBusca] = useState('');
@@ -505,7 +517,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     setAppointmentDate(selectedDate);
     setAppointmentTime('09:00');
     setSelectedServiceIds([]);
-    setManualTotalValue(0);
+    setValorDesconto(0);
     setPaymentMethod('');
     setIsPaidModal(false);
     setIsPetTaxi(false);
@@ -545,17 +557,16 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       .filter((it: any) => !it.eh_extra && it.tipo !== 'adicional')
       .map((it: any) => it.servico_id);
     setSelectedServiceIds(initialServiceIds);
-    setManualTotalValue(Number(target.valor_total));
-    
+    setValorDesconto(Number(target.valor_desconto || 0));
+
     setPaymentMethod(target.forma_pagamento || '');
     setIsPaidModal(target.pago || false);
     setIsPetTaxi(target.tem_taxi || target.pet_taxi || false);
     setPetTaxiEndereco(target.endereco_busca || target.pet_taxi_endereco || '');
-    
+
     const taxiVal = Number(target.valor_transporte || 0);
     setValorTransporte(taxiVal);
-    setManualTotalValue(Number(target.valor_total) - taxiVal);
-    
+
     setIsDetailModalOpen(false);
     setIsModalOpen(true);
   };
@@ -1064,7 +1075,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
         throw new Error("Ocorreu um erro de segurança: Este pet não está vinculado ao cliente selecionado. O administrador foi notificado.");
       }
 
-      const finalTotal = manualTotalValue + (isPetTaxi ? valorTransporte : 0);
+      const finalTotal = appointmentTotals.totalGeral;
       const taxiVal = isPetTaxi ? valorTransporte : 0;
 
       // Ajuste de nomes das chaves para snake_case conforme esperado pelo Supabase
@@ -1075,6 +1086,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
         data_agendamento: appointmentDate,
         horario_inicio: appointmentTime,
         valor_total: finalTotal,
+        valor_servicos: appointmentTotals.valorServicos,
+        valor_desconto: valorDesconto,
         valor_transporte: taxiVal,
         tem_taxi: isPetTaxi,
         endereco_busca: isPetTaxi ? petTaxiEndereco : null,
@@ -1099,7 +1112,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
           unit.id, 
           userProfile?.email || 'sistema', 
           'Edição de Agendamento', 
-          `Pet: ${petName} - Editou agendamento ${apptId}. Valor Total: R$ ${finalTotal.toFixed(2)} (Serviços: R$ ${manualTotalValue.toFixed(2)} + Táxi: R$ ${taxiVal.toFixed(2)})`,
+          `Pet: ${petName} - Editou agendamento ${apptId}. Valor Total: R$ ${finalTotal.toFixed(2)} (Serviços: R$ ${appointmentTotals.valorServicos.toFixed(2)} + Táxi: R$ ${taxiVal.toFixed(2)})`,
           userProfile?.nome,
           userProfile?.cargo
         );
@@ -1121,7 +1134,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
           unit.id, 
           userProfile?.email || 'sistema', 
           'Novo Agendamento', 
-          `Pet: ${petName} - Criou novo agendamento ${apptId}. Valor Total: R$ ${finalTotal.toFixed(2)} (Serviços: R$ ${manualTotalValue.toFixed(2)} + Táxi: R$ ${taxiVal.toFixed(2)})`,
+          `Pet: ${petName} - Criou novo agendamento ${apptId}. Valor Total: R$ ${finalTotal.toFixed(2)} (Serviços: R$ ${appointmentTotals.valorServicos.toFixed(2)} + Táxi: R$ ${taxiVal.toFixed(2)})`,
           userProfile?.nome,
           userProfile?.cargo
         );
@@ -1788,13 +1801,23 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
                        {/* Informações do Pet e Cliente */}
                        <div className="relative z-[2] flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenDetail(appt)}>
-                          <div className="flex items-center gap-2 pr-10 md:pr-0 mb-1">
+                          <div className="flex flex-wrap items-center gap-2 pr-10 md:pr-0 mb-1">
                              <h4 className="font-black text-xl text-slate-800 truncate group-hover:text-amber-600 transition-colors">
                                 {appt.pets?.nome}
                              </h4>
                              {appt.pacote_id && (
                                 <span className="shrink-0 bg-indigo-50 text-indigo-500 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter border border-indigo-100">
                                    Sessão {appt.numero_sessao || '?'}/{appt.pacotes?.qtd_sessoes || '?'}
+                                </span>
+                             )}
+                             {appt.pacote_id && Number(appt.pacotes?.valor_total) > 0 && (
+                                <span className="shrink-0 bg-violet-50 text-violet-600 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter border border-violet-100">
+                                   Pacote R$ {Number(appt.pacotes.valor_total).toFixed(2)}
+                                </span>
+                             )}
+                             {Number(appt.valor_transporte) > 0 && (
+                                <span className="shrink-0 bg-amber-50 text-amber-600 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter border border-amber-100">
+                                   Táxi R$ {Number(appt.valor_transporte).toFixed(2)}
                                 </span>
                              )}
                           </div>
@@ -2157,26 +2180,48 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                         </label>
                      ))}
                   </div>
-                  <div className="mt-8 p-6 md:p-8 bg-amber-50 rounded-[2.5rem] border border-amber-100 flex flex-col md:flex-row items-center justify-between gap-6">
-                     <div className="relative w-full md:max-w-xs">
-                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-amber-300">R$</span>
-                        <input type="number" value={manualTotalValue} onChange={(e) => setManualTotalValue(Number(e.target.value))} className="w-full pl-20 pr-6 py-5 bg-white border border-amber-200 rounded-[1.8rem] text-4xl font-black text-amber-600 outline-none" placeholder="0.00"/>
-                     </div>
-                     
-                     {isPetTaxi && (
-                        <div className="text-center md:text-right">
-                           <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Total dos Serviços + Transporte:</p>
-                           <p className="text-2xl font-black text-slate-800">R$ {(manualTotalValue + Number(valorTransporte)).toFixed(2)}</p>
+                  <div className="mt-8 p-6 md:p-8 bg-amber-50 rounded-[2.5rem] border border-amber-100 space-y-6">
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="bg-white p-4 rounded-2xl border border-amber-100">
+                           <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Serviços</p>
+                           <p className="font-black text-slate-800 text-lg">R$ {mainItemValuesForm.reduce((a, b) => a + b, 0).toFixed(2)}</p>
                         </div>
-                     )}
+                        {isPetTaxi && (
+                          <div className="bg-white p-4 rounded-2xl border border-amber-100">
+                             <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Pet Táxi</p>
+                             <p className="font-black text-slate-800 text-lg">R$ {Number(valorTransporte || 0).toFixed(2)}</p>
+                          </div>
+                        )}
+                        <div className="bg-white p-4 rounded-2xl border border-amber-100">
+                           <label className="text-[9px] font-black text-orange-500 uppercase mb-1 block">Desconto</label>
+                           <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-orange-400 font-black text-sm">R$</span>
+                              <input
+                                type="number"
+                                min={0}
+                                value={valorDesconto}
+                                onChange={(e) => setValorDesconto(Math.max(0, Number(e.target.value) || 0))}
+                                className="w-full pl-7 pr-1 py-0.5 bg-transparent outline-none font-black text-orange-600 text-lg"
+                                placeholder="0.00"
+                              />
+                           </div>
+                        </div>
+                     </div>
 
-                     <div className="flex flex-wrap md:flex-nowrap gap-2 w-full md:w-auto">
-                        {['Pix', 'Dinheiro', 'Cartão'].map(m => (
-                          <button key={m} onClick={() => setPaymentMethod(m)} className={`flex-1 md:flex-none px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${paymentMethod === m ? 'bg-amber-500 text-white' : 'bg-white text-slate-400 border border-slate-100'}`}>{m}</button>
-                        ))}
+                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="text-center md:text-left">
+                           <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Total Geral</p>
+                           <p className="text-4xl font-black text-amber-600">R$ {appointmentTotals.totalGeral.toFixed(2)}</p>
+                        </div>
+
+                        <div className="flex flex-wrap md:flex-nowrap gap-2 w-full md:w-auto">
+                          {['Pix', 'Dinheiro', 'Cartão'].map(m => (
+                            <button key={m} onClick={() => setPaymentMethod(m)} className={`flex-1 md:flex-none px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${paymentMethod === m ? 'bg-amber-500 text-white' : 'bg-white text-slate-400 border border-slate-100'}`}>{m}</button>
+                          ))}
                      </div>
                   </div>
                </div>
+            </div>
             </div>
             <footer className="app-modal-footer p-4 md:p-8 bg-slate-50 border-t border-slate-100 flex flex-row justify-end gap-2 md:gap-4">
                <button onClick={() => setIsModalOpen(false)} className="flex-1 md:flex-none px-4 py-3 md:px-8 md:py-4 bg-white text-slate-500 rounded-2xl font-black border border-slate-200 hover:bg-slate-100 text-[10px] md:text-xs uppercase tracking-widest">Cancelar</button>

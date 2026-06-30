@@ -1,7 +1,9 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Unit, NavigationState, UserRole } from './types';
+import React from 'react';
 import { supabase } from './services/supabaseClient';
+import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
+import { UnitsProvider, useUnits } from './contexts/UnitsContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Appointments from './components/Appointments';
@@ -19,271 +21,13 @@ import Login from './components/Login';
 import Perfil from './components/Perfil';
 import Auditoria from './components/Auditoria';
 import Marketing from './components/Marketing';
+import CadastroPublico from './components/CadastroPublico';
+import TermosServico from './components/TermosServico';
 
-const App: React.FC = () => {
-  const [session, setSession] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [units, setUnits] = useState<Unit[]>([]);
-  const [userRole, setUserRole] = useState<UserRole>('comum');
-  const [navState, setNavState] = useState<NavigationState>({ 
-    mode: 'global', 
-    view: 'Painel Geral' 
-  });
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-  const [toast, setToast] = useState<{ message: string, type: 'error' | 'success' } | null>(null);
-  const [mobileBrand, setMobileBrand] = useState({ nome: 'IGUI BANHO E TOSA BIRIGUI', logo_url: '' });
-  const lastEmailRef = useRef<string | null>(null);
-
-  // --- LOGOUT BLINDADO (HARD REFRESH) ---
-  const handleLogout = useCallback(async () => {
-    localStorage.clear();
-    sessionStorage.clear();
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      // Ignora erros de sessão
-    }
-    window.location.href = '/';
-  }, []);
-
-  // Global safety timeout: No loading screen can last more than 6 seconds
-  useEffect(() => {
-    if (loading) {
-      const timer = setTimeout(() => {
-        setLoading(false);
-        console.warn("Loading safety timeout reached. Releasing UI.");
-      }, 6000);
-      return () => clearTimeout(timer);
-    }
-  }, [loading]);
-
-  const showToast = (message: string, type: 'error' | 'success' = 'error') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 5000);
-  };
-
-  const normalizeRole = (role?: string): UserRole => {
-    switch (role) {
-      case 'atendente':
-      case 'tosador':
-      case 'somente_leitura':
-      case 'admin_unidade':
-      case 'gerente':
-      case 'financeiro':
-      case 'master':
-        return role;
-      default:
-        return (role || 'comum') as UserRole;
-    }
-  };
-
-  // Busca unidades - Dependência zero para evitar recriação
-  const fetchUnits = useCallback(async () => {
-    try {
-      const { data, error: sbError } = await supabase.from('unidades').select('*');
-      if (sbError) throw sbError;
-      
-      if (data) {
-        const mappedUnits = data.map(u => ({ 
-          id: u.id, 
-          name: u.nome, 
-          endereco_completo: u.endereco_completo, 
-          phone: u.telefone,
-          whatsapp_nome_instancia: u.whatsapp_nome_instancia,
-          whatsapp_token: u.whatsapp_token,
-          whatsapp_url_servidor: u.whatsapp_url_servidor,
-          whatsapp_ativo: u.whatsapp_ativo
-        }));
-        setUnits(mappedUnits);
-        return mappedUnits;
-      }
-      return [];
-    } catch (err: any) {
-      console.error("ERRO AO CARREGAR UNIDADES:", err);
-      // Permitimos renderização degradada (sem unidades) em vez de travar tudo
-      return [];
-    }
-  }, []);
-
-  // Busca perfil - Removido 'units' das dependências para quebrar o loop
-  const fetchProfile = useCallback(async (authUser: any, currentUnits: Unit[]) => {
-    try {
-const { data, error: profileError } = await supabase
-        .from('funcionarios')
-        .select('*')
-        .eq('user_id', authUser.id)
-        .maybeSingle();
-
-      if (profileError) throw profileError;
-      
-      if (data) {
-        const normalizedProfile = { ...data, ativo: data.ativo ?? false };
-        const normalizedRole = normalizeRole(data.cargo);
-        setUserProfile(normalizedProfile);
-        setUserRole(normalizedRole);
-        
-        // Se o usuário não for master nem financeiro, trava ele na unidade dele
-        if (normalizedRole !== 'master' && data.unidade_id) {
-          const userUnit = currentUnits.find(u => u.id === data.unidade_id);
-          setNavState({
-            mode: 'unit',
-            view: 'Agendamento',
-            unitId: data.unidade_id,
-            unitName: userUnit?.name || 'Sua Unidade'
-          });
-        }
-      } else {
-        console.warn("Login sem acesso liberado na tabela de funcionarios.");
-        setUserProfile({
-          cargo: 'pendente',
-          ativo: false,
-          email: authUser.email,
-          nome: authUser.user_metadata?.name || authUser.email
-        });
-        setUserRole('comum');
-      }
-    } catch (err) {
-      console.error("ERRO AO CARREGAR PERFIL:", err);
-      setHasError(true);
-      throw err; // Re-throw para o initializeApp capturar
-    }
-  }, [handleLogout]);
-
-  const initializeApp = useCallback(async (authUser: any) => {
-    // Se já inicializamos para este email, não fazemos de novo
-    if (lastEmailRef.current === authUser.email && userProfile) {
-      setLoading(false);
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const loadedUnits = await fetchUnits();
-      await fetchProfile(authUser, loadedUnits);
-      lastEmailRef.current = authUser.email;
-      setHasError(false);
-    } catch (err) {
-      console.error("FALHA NA INICIALIZAÇÃO DO APP:", err);
-      setHasError(true);
-      showToast('Erro de conexão. Algumas funções podem estar limitadas.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchUnits, fetchProfile, userProfile]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const init = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          // Se o token de refresh falhar, limpamos tudo para forçar novo login
-          if (error.message.includes('Refresh Token Not Found') || error.message.includes('invalid_refresh_token')) {
-            console.warn("Sessão expirada ou token inválido. Limpando cache...");
-            await handleLogout();
-            return;
-          }
-          throw error;
-        }
-
-        if (!mounted) return;
-        setSession(session);
-        if (session?.user?.email) {
-          await initializeApp(session.user);
-        }
-      } catch (err: any) {
-        console.error("Erro ao buscar sessão:", err);
-        // Se for erro de rede, não desloga, apenas avisa
-        if (err.message !== 'Failed to fetch') {
-          showToast('Sessão expirada. Por favor, faça login novamente.', 'error');
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    init();
-
-    // Escuta mudanças de auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-
-      // Tratamento de erro de refresh token no evento
-      if (event === 'SIGNED_OUT') {
-        setSession(null);
-        setUserProfile(null);
-        lastEmailRef.current = null;
-        localStorage.clear();
-        return;
-      }
-
-      // Armadura contra disparos repetitivos de foco de aba
-      if ((event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && lastEmailRef.current === session?.user?.email && userProfile) {
-        return;
-      }
-
-      setSession(session);
-
-      try {
-        if (session?.user?.email) {
-          // Só dispara inicialização se for um novo email ou se ainda não temos o perfil
-          if (lastEmailRef.current !== session.user.email || !userProfile) {
-            await initializeApp(session.user);
-          }
-        } else {
-          // Se não há sessão, limpa tudo (Logout)
-          lastEmailRef.current = null;
-          setUnits([]);
-          setUserProfile(null);
-        }
-      } catch (err) {
-        console.error("Erro no listener de auth:", err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [initializeApp]);
-
-  useEffect(() => {
-    if (!session) return;
-
-    let mounted = true;
-    const fetchMobileBrand = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('config_sistema')
-          .select('nome_fantasia, logo_url')
-          .eq('id', 1)
-          .maybeSingle();
-
-        if (!mounted || error || !data) return;
-
-        setMobileBrand({
-          nome: (data.nome_fantasia || 'IGUI BANHO E TOSA BIRIGUI').toUpperCase(),
-          logo_url: data.logo_url || ''
-        });
-      } catch (err) {
-        console.error("Erro ao carregar identidade mobile:", err);
-      }
-    };
-
-    fetchMobileBrand();
-    const handleUpdate = () => fetchMobileBrand();
-    window.addEventListener('dadosGlobaisAtualizados', handleUpdate);
-    return () => {
-      mounted = false;
-      window.removeEventListener('dadosGlobaisAtualizados', handleUpdate);
-    };
-  }, [session]);
+const AppContent: React.FC = () => {
+  const { session, userProfile, userRole, setUserRole, loading, hasError, toast, handleLogout } = useAuth();
+  const { units, fetchUnits, mobileBrand } = useUnits();
+  const { navState, setNavState, isMobileMenuOpen, setIsMobileMenuOpen } = useNavigation();
 
   if (!session && !loading) {
     return <Login supabaseClient={supabase} onLoginSuccess={() => {}} />;
@@ -402,7 +146,7 @@ const { data, error: profileError } = await supabase
             <p className="text-[10px] font-semibold text-slate-400 leading-tight truncate">{mobileUserName}</p>
           </div>
         </div>
-        <button 
+        <button
           onClick={() => setIsMobileMenuOpen(true)}
           className="w-11 h-11 bg-teal-50 rounded-2xl flex items-center justify-center text-teal-700 hover:bg-teal-100 active:scale-95 transition-all shrink-0 ml-3 border border-teal-100"
           aria-label="Abrir menu"
@@ -411,10 +155,10 @@ const { data, error: profileError } = await supabase
         </button>
       </header>
 
-      <Sidebar 
-        units={units} 
-        currentNav={navState} 
-        onNavigate={setNavState} 
+      <Sidebar
+        units={units}
+        currentNav={navState}
+        onNavigate={setNavState}
         userRole={effectiveUserRole}
         setUserRole={setUserRole}
         supabaseClient={supabase}
@@ -422,7 +166,7 @@ const { data, error: profileError } = await supabase
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
       />
-      
+
       <main className="app-mobile-main flex-1 min-h-screen md:ml-60 pt-[76px] md:pt-0 overflow-y-visible md:overflow-y-auto relative hide-scrollbar">
         {hasError && (
           <div className="bg-rose-50 border-b border-rose-100 px-10 py-3 flex items-center justify-between">
@@ -430,7 +174,7 @@ const { data, error: profileError } = await supabase
               <i className="fa-solid fa-triangle-exclamation"></i>
               <span>Modo Offline/Degradado: Falha ao sincronizar dados em tempo real.</span>
             </div>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="text-[10px] font-black uppercase tracking-widest bg-rose-600 text-white px-4 py-2 rounded-lg hover:bg-rose-700 transition-all"
             >
@@ -443,6 +187,28 @@ const { data, error: profileError } = await supabase
         </div>
       </main>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  // Rota publica de cadastro: verificada antes de qualquer check de sessao,
+  // para que clientes sem login consigam preencher o formulario.
+  if (window.location.pathname === '/cadastro') {
+    return <CadastroPublico supabaseClient={supabase} />;
+  }
+
+  if (window.location.pathname === '/termos') {
+    return <TermosServico />;
+  }
+
+  return (
+    <NavigationProvider>
+      <UnitsProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </UnitsProvider>
+    </NavigationProvider>
   );
 };
 

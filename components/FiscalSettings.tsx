@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Unit } from '../types';
+import { Unit, UserProfile } from '../types';
 import { registrarAtividade } from '../services/logger';
 
 interface FiscalSettingsProps {
   supabaseClient: any;
   units: Unit[];
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 const emptyConfig = {

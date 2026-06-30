@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Unit } from '../types';
+import { Unit, UserProfile } from '../types';
 import { registrarAtividade } from '../services/logger';
 import FiscalDraftModal from './FiscalDraftModal';
 import FiscalHistory from './FiscalHistory';
@@ -8,7 +8,7 @@ import FiscalHistory from './FiscalHistory';
 interface FinanceiroProps {
   unit: Unit;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfile }) => {

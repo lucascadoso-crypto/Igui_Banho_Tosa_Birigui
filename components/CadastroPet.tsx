@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Pet, UiId } from '../types';
+import { Pet, UiId, UserProfile } from '../types';
 import { uploadToImgBB } from '../services/imgbbService';
 import { registrarAtividade } from '../services/logger';
 
@@ -9,7 +9,7 @@ interface CadastroPetProps {
   clientName: string;
   supabaseClient: any;
   unitId?: UiId;
-  userProfile?: any;
+  userProfile?: UserProfile;
   onClose: () => void;
   onSave?: (pet: Pet) => void;
   onSaveAndSchedule?: () => void;

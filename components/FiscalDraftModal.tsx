@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Unit } from '../types';
+import { Unit, UserProfile } from '../types';
 
 interface FiscalDraftModalProps {
   supabaseClient: any;
   unit: Unit;
   transaction: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
   onClose: () => void;
   onCreated: () => void;
 }

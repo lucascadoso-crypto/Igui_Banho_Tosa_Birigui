@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Unit, UserRole } from '../types';
+import { Unit, UserRole, UserProfile } from '../types';
 import { uploadToImgBB } from '../services/imgbbService';
 import { registrarAtividade } from '../services/logger';
 
@@ -8,7 +8,7 @@ interface EquipeProps {
   units: Unit[];
   supabaseClient: any;
   currentUserRole: UserRole;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 const Equipe: React.FC<EquipeProps> = ({ units, supabaseClient, currentUserRole, userProfile }) => {

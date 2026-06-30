@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Pet, Client, Service, Unit } from '../types';
+import { Pet, Client, Service, Unit, UserProfile } from '../types';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import { registrarAtividade } from '../services/logger';
 import jsPDF from 'jspdf';
@@ -10,7 +10,7 @@ interface PacoteDetalhesModalProps {
   pack: any;
   unit: Unit;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
   onClose: () => void;
   onRefresh: () => void;
   onEdit: (pack: any) => void;

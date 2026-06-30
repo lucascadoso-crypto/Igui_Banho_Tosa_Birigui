@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Client, Pet, UiId } from '../types';
+import { Client, Pet, UiId, UserProfile } from '../types';
 import { uploadToImgBB } from '../services/imgbbService';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
@@ -10,21 +10,25 @@ interface ClienteModalProps {
   client?: Partial<Client> | null;
   unitId: UiId;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
   onClose: () => void;
   onSave: (data: { cliente: Client, pet?: Pet }) => void;
   showToast: (text: string, type?: 'success' | 'error') => void;
+  hidePetTab?: boolean;
+  zBoost?: number;
 }
 
-const ClienteModal: React.FC<ClienteModalProps> = ({ 
-  modo = 'completo', 
-  client, 
-  unitId, 
-  supabaseClient, 
+const ClienteModal: React.FC<ClienteModalProps> = ({
+  modo = 'completo',
+  client,
+  unitId,
+  supabaseClient,
   userProfile,
-  onClose, 
+  onClose,
   onSave,
-  showToast 
+  showToast,
+  hidePetTab = false,
+  zBoost = 0
 }) => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'tutor' | 'pet'>('tutor');
@@ -237,6 +241,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
         finalPet = petData;
       }
 
+      window.dispatchEvent(new Event('refreshClientes'));
       showToast(isUpdate ? "Dados atualizados!" : "Cadastro realizado com sucesso!");
 
       // --- GATILHO WHATSAPP BOAS-VINDAS (NÃO-BLOQUEANTE) ---
@@ -265,7 +270,7 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
   const headerColor = modo === 'completo' ? 'bg-[#00BFA5]' : 'bg-indigo-600';
 
   return (
-    <div className="app-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+    <div className={`app-modal-overlay fixed inset-0 z-[${100 + zBoost}] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto`}>
       <div className={`app-modal-panel bg-white w-[95%] mx-auto ${modo === 'completo' ? 'md:max-w-5xl' : 'md:max-w-md'} md:w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]`}>
         
         <header className={`app-modal-header ${headerColor} p-4 md:p-8 text-white flex justify-between items-center shrink-0`}>
@@ -284,20 +289,22 @@ const ClienteModal: React.FC<ClienteModalProps> = ({
 
         {modo === 'completo' && (
           <nav className="flex flex-wrap bg-slate-50 border-b border-slate-100 shrink-0 px-4 md:px-8 gap-2">
-             <button 
+             <button
                onClick={() => setActiveTab('tutor')}
                className={`py-4 md:py-5 px-4 md:px-6 text-[10px] md:text-xs font-black uppercase tracking-widest transition-all relative whitespace-nowrap ${activeTab === 'tutor' ? 'text-[#00BFA5]' : 'text-slate-400 hover:text-slate-600'}`}
              >
                 <i className="fa-solid fa-user mr-2"></i> Tutor
                 {activeTab === 'tutor' && <div className="absolute bottom-0 left-0 w-full h-1 bg-[#00BFA5] rounded-t-full"></div>}
              </button>
-             <button 
-               onClick={() => setActiveTab('pet')}
-               className={`py-4 md:py-5 px-4 md:px-6 text-[10px] md:text-xs font-black uppercase tracking-widest transition-all relative whitespace-nowrap ${activeTab === 'pet' ? 'text-[#00BFA5]' : 'text-slate-400 hover:text-slate-600'}`}
-             >
-                <i className="fa-solid fa-paw mr-2"></i> Pet
-                {activeTab === 'pet' && <div className="absolute bottom-0 left-0 w-full h-1 bg-[#00BFA5] rounded-t-full"></div>}
-             </button>
+             {!hidePetTab && (
+               <button
+                 onClick={() => setActiveTab('pet')}
+                 className={`py-4 md:py-5 px-4 md:px-6 text-[10px] md:text-xs font-black uppercase tracking-widest transition-all relative whitespace-nowrap ${activeTab === 'pet' ? 'text-[#00BFA5]' : 'text-slate-400 hover:text-slate-600'}`}
+               >
+                  <i className="fa-solid fa-paw mr-2"></i> Pet
+                  {activeTab === 'pet' && <div className="absolute bottom-0 left-0 w-full h-1 bg-[#00BFA5] rounded-t-full"></div>}
+               </button>
+             )}
           </nav>
         )}
 

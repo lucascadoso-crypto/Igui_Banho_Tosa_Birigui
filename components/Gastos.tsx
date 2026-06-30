@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Unit } from '../types';
+import { Unit, UserProfile } from '../types';
 import GastosModal from './GastosModal';
 import { registrarAtividade } from '../services/logger';
 
 interface GastosProps {
   unit: Unit;
   supabaseClient: any;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 const Gastos: React.FC<GastosProps> = ({ unit, supabaseClient, userProfile }) => {
