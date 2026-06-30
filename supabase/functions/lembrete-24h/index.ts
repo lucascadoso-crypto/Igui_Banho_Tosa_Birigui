@@ -160,7 +160,7 @@ function buildManualMessage(agendamento: any, tipo: MessageTipo) {
       "",
       `Seu atendimento para *${nomePet}* foi agendado para *${dataFormatada} às ${horario}*.`,
       hasTaxi
-        ? `🚕 Nosso motorista passará para buscar o(a) ${nomePet}.`
+        ? `🚕 Nosso motorista passará para buscar o(a) *${nomePet}* com segurança.`
         : "🛁 Aguardamos você no horário combinado.",
     ];
 
@@ -178,7 +178,7 @@ function buildManualMessage(agendamento: any, tipo: MessageTipo) {
       `O(A) *${nomePet}* já terminou o banho e está cheirosinho(a)!`,
       "",
       hasTaxi
-        ? "🚕 Nosso motorista fará a entrega com segurança."
+        ? `🚕 Nosso motorista entregará o(a) *${nomePet}* pertinho de você com muito carinho e segurança! 💙`
         : "🛁 Já pode vir buscá-lo(a)!",
     ].join("\n");
   }
@@ -199,7 +199,7 @@ function buildAutomaticReminderMessage(agendamento: any, janela: AutomaticJanela
     "",
     `Passando para lembrar do banho do(a) *${nomePet}* ${quando} às *${horario}*.`,
     "",
-    hasTaxi ? "🚕 Nosso motorista passará para buscar." : "🛁 Contamos com você!",
+    hasTaxi ? `🚕 Nosso motorista passará para buscar o(a) *${nomePet}* com segurança.` : "🛁 Contamos com você!",
   ];
 
   if (agendamento.pacote_id) {
@@ -442,9 +442,6 @@ async function processAutomatic(supabase: any, janelaInput: unknown, origem: unk
 }
 
 async function processManual(supabase: any, req: Request, body: any, agendamentoId: number | string) {
-  const tipo = normalizeTipo(body?.tipo);
-  const logTipo = getLogTipo(tipo, "manual", undefined, body?.tipo, body?.origem);
-
   const authHeader = req.headers.get("Authorization") || "";
   const jwt = authHeader.replace("Bearer ", "");
   const { data: authData } = jwt ? await supabase.auth.getUser(jwt) : { data: null };
@@ -459,6 +456,22 @@ async function processManual(supabase: any, req: Request, body: any, agendamento
   if (error || !agendamento) {
     throw new Error(`Agendamento ${agendamentoId} nao encontrado.`);
   }
+
+  // Deduzir tipo baseado em status quando o chamador nao especifica
+  // (ou cai no default "lembrete" do normalizeTipo).
+  let tipo = normalizeTipo(body?.tipo);
+
+  if (!body?.tipo || tipo === "lembrete") {
+    if (normalizeStatus(agendamento.status) === "FINALIZADO") {
+      tipo = "pronto";
+    } else if (isAutomaticEligibleStatus(agendamento.status)) {
+      tipo = "confirmacao";
+    } else {
+      tipo = "confirmacao";
+    }
+  }
+
+  const logTipo = getLogTipo(tipo, "manual", undefined, body?.tipo, body?.origem);
 
   if (tipo === "confirmacao" && isCanceled(agendamento.status)) {
     return jsonResponse({
