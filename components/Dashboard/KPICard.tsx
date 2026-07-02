@@ -21,6 +21,14 @@ interface KPICardProps {
   fullWidth?: boolean;
 }
 
+const getValueFontSizeClass = (value: string | number) => {
+  const length = String(value).length;
+  if (length > 14) return 'text-lg sm:text-xl';
+  if (length > 11) return 'text-xl sm:text-2xl';
+  if (length > 8) return 'text-2xl sm:text-3xl';
+  return 'text-3xl sm:text-4xl';
+};
+
 const colorClasses: Record<KPICardColor, { bg: string; text: string; ring: string }> = {
   slate: { bg: 'bg-slate-50', text: 'text-slate-500', ring: 'group-hover:border-slate-200' },
   amber: { bg: 'bg-amber-50', text: 'text-amber-500', ring: 'group-hover:border-amber-100' },
@@ -72,7 +80,7 @@ const KPICard: React.FC<KPICardProps> = ({
         {loading ? (
           <div className="h-9 w-2/3 bg-slate-100 rounded-lg animate-pulse"></div>
         ) : (
-          <p className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tighter truncate">{value}</p>
+          <p className={`font-black text-slate-900 tracking-tighter leading-tight break-words ${getValueFontSizeClass(value)}`}>{value}</p>
         )}
         {subtext && !loading && <p className="text-xs font-bold text-slate-400 mt-2">{subtext}</p>}
         {trend?.label && !loading && (

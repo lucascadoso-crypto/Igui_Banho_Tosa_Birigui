@@ -13,7 +13,6 @@ import Clients from './components/Clients';
 import Pacotes from './components/Pacotes';
 import Financeiro from './components/Financeiro';
 import Gastos from './components/Gastos';
-import PainelGeral from './components/PainelGeral';
 import DashboardGerencial from './components/DashboardGerencial';
 import FinanceiroGlobal from './components/FinanceiroGlobal';
 import Equipe from './components/Equipe';
@@ -21,7 +20,6 @@ import ReciboView from './components/ReciboView';
 import Login from './components/Login';
 import Perfil from './components/Perfil';
 import Auditoria from './components/Auditoria';
-import Marketing from './components/Marketing';
 import CadastroPublico from './components/CadastroPublico';
 import TermosServico from './components/TermosServico';
 
@@ -88,12 +86,8 @@ const AppContent: React.FC = () => {
     switch (navState.view) {
       case 'Dashboard':
         return <DashboardGerencial units={units} supabaseClient={supabase} />;
-      case 'Painel Geral':
-        return <PainelGeral units={units} supabaseClient={supabase} />;
       case 'Financeiro Geral':
         return <FinanceiroGlobal units={units} supabaseClient={supabase} />;
-      case 'Marketing':
-        return <Marketing />;
       case 'Equipe':
         return <Equipe units={units} supabaseClient={supabase} currentUserRole={effectiveUserRole} userProfile={effectiveUserProfile} />;
       case 'Meu Perfil':

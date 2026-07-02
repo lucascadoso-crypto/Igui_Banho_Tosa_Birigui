@@ -65,7 +65,7 @@ export interface Package {
 }
 
 export type SubView = 'Agendamento' | 'Clientes' | 'Pacotes' | 'Financeiro' | 'Gastos' | 'Auditoria';
-export type GlobalView = 'Dashboard' | 'Painel Geral' | 'Financeiro Geral' | 'Marketing' | 'Configurações' | 'Equipe' | 'Meu Perfil';
+export type GlobalView = 'Dashboard' | 'Financeiro Geral' | 'Configurações' | 'Equipe' | 'Meu Perfil';
 
 export interface NavigationState {
   mode: 'global' | 'unit';

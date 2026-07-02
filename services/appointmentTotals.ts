@@ -3,7 +3,7 @@ export const toCurrencyNumber = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-export const formatCurrencyBR = (value: unknown) => `R$ ${toCurrencyNumber(value).toFixed(2)}`;
+export const formatCurrencyBR = (value: unknown) => `R$ ${toCurrencyNumber(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const isExtraAppointmentItem = (item: any) =>
   item?.eh_extra === true || item?.tipo === 'adicional' || item?.tipo === 'extra';

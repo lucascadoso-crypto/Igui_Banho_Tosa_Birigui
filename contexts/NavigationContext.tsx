@@ -14,7 +14,7 @@ const NavigationContext = createContext<NavigationContextValue | undefined>(unde
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [navState, setNavState] = useState<NavigationState>({
     mode: 'global',
-    view: 'Painel Geral'
+    view: 'Dashboard'
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
