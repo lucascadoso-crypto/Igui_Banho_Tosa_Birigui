@@ -106,7 +106,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
 
       const { data: packData, error: packError } = await supabaseClient
         .from('pacotes')
-        .select('*, pets(*), clientes(*), agendamentos(id, status, data_agendamento, horario_inicio, tem_taxi, valor_total, agendamento_itens(id, tipo, eh_extra, descricao, servicos(nome)))')
+        .select('*, pets(*), clientes(*), agendamentos(id, status, data_agendamento, data_fim_real, horario_inicio, tem_taxi, valor_total, agendamento_itens(id, tipo, eh_extra, descricao, servicos(nome)))')
         .eq('unidade_id', unit.id)
         .order('created_at', { ascending: false });
       
@@ -128,7 +128,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
     const total = p.qtd_sessoes || 0;
 
     // Ordenar agendamentos por data para encontrar o índice correto
-    const sortedAppts = [...(p.agendamentos || [])].sort((a, b) => a.data_agendamento.localeCompare(b.data_agendamento));
+    const sortedAppts = [...(p.agendamentos || [])].sort((a, b) => (a.data_agendamento || '').localeCompare(b.data_agendamento || ''));
     
     // Encontrar o próximo agendamento (futuro ou hoje)
     const today = getTodayBR();
@@ -663,9 +663,12 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
   const isCancelledAppt = (status: any) => ['cancelado', 'cancelada'].includes(normalizeText(status));
   const getCompletedCount = (p: any) => getSortedAppointments(p).filter((a: any) => isFinalizedAppt(a.status)).length;
   const getNextSession = (p: any) => getSortedAppointments(p).find((a: any) => !isFinalizedAppt(a.status) && !isCancelledAppt(a.status) && a.data_agendamento >= today);
+  // Usa a data de finalizacao real (data_fim_real) para ordenar/exibir o ultimo
+  // banho. Registros antigos sem data_fim_real caem no fallback data_agendamento.
+  const getBathDisplayDate = (a: any) => (a.data_fim_real ? String(a.data_fim_real).substring(0, 10) : (a.data_agendamento || ''));
   const getLastBath = (p: any) => [...(p.agendamentos || [])]
     .filter((a: any) => isFinalizedAppt(a.status))
-    .sort((a: any, b: any) => `${b.data_agendamento || ''} ${b.horario_inicio || ''}`.localeCompare(`${a.data_agendamento || ''} ${a.horario_inicio || ''}`))[0];
+    .sort((a: any, b: any) => `${getBathDisplayDate(b)} ${b.horario_inicio || ''}`.localeCompare(`${getBathDisplayDate(a)} ${a.horario_inicio || ''}`))[0];
   const getRemainingSessions = (p: any) => Math.max(0, (p.qtd_sessoes || 0) - getCompletedCount(p));
   const getProgress = (p: any) => {
     const total = p.qtd_sessoes || 0;
@@ -1073,7 +1076,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-slate-400 font-bold flex items-center gap-2"><i className="fa-solid fa-shower"></i>Último banho</span>
-                    <span className="font-black text-slate-800 text-right">{lastBath ? formatDateBR(lastBath.data_agendamento) : '--/--/--'}</span>
+                    <span className="font-black text-slate-800 text-right">{lastBath ? formatDateBR(getBathDisplayDate(lastBath)) : '--/--/--'}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-slate-400 font-bold flex items-center gap-2"><i className="fa-solid fa-wallet"></i>Valor do pacote</span>
@@ -1209,8 +1212,8 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
           const concluded = (p.agendamentos || []).filter((a: any) => a.status === 'Finalizado').length;
           const progress = (concluded / total) * 100;
           const createdDate = p.created_at ? p.created_at.split('T')[0] : '--';
-          const firstAppt = (p.agendamentos || []).sort((a:any, b:any) => a.data_agendamento.localeCompare(b.data_agendamento))[0]?.data_agendamento;
-          const lastAppt = (p.agendamentos || []).sort((a:any, b:any) => b.data_agendamento.localeCompare(a.data_agendamento))[0]?.data_agendamento;
+          const firstAppt = (p.agendamentos || []).sort((a:any, b:any) => (a.data_agendamento || '').localeCompare(b.data_agendamento || ''))[0]?.data_agendamento;
+          const lastAppt = (p.agendamentos || []).sort((a:any, b:any) => (b.data_agendamento || '').localeCompare(a.data_agendamento || ''))[0]?.data_agendamento;
 
           return (
             <div key={p.id} className="bg-white rounded-[1.8rem] shadow-sm border border-slate-100 overflow-hidden group hover:shadow-md transition-all">

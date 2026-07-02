@@ -479,15 +479,22 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
             petObservacoes: getCleanObservation(appt.pets?.notas_internas, appt.pets?.restricoes)
           };
 
+          // Numeracao da sessao e apenas cosmetica: qualquer falha aqui (ex.: dado
+          // legado malformado em uma sessao irma do mesmo pacote) nao pode derrubar
+          // o agendamento inteiro da listagem do dia.
           if (appt.pacote_id && appt.pacotes?.agendamentos) {
-            const sortedPackageAppts = [...appt.pacotes.agendamentos].sort((a, b) => {
-              const dateCompare = a.data_agendamento.localeCompare(b.data_agendamento);
-              if (dateCompare !== 0) return dateCompare;
-              return (a.horario_inicio || '').localeCompare(b.horario_inicio || '');
-            });
-            const index = sortedPackageAppts.findIndex(a => a.id === appt.id);
-            if (index !== -1) {
-              return { ...normalizedAppt, numero_sessao: index + 1 };
+            try {
+              const sortedPackageAppts = [...appt.pacotes.agendamentos].sort((a, b) => {
+                const dateCompare = (a.data_agendamento || '').localeCompare(b.data_agendamento || '');
+                if (dateCompare !== 0) return dateCompare;
+                return (a.horario_inicio || '').localeCompare(b.horario_inicio || '');
+              });
+              const index = sortedPackageAppts.findIndex(a => a.id === appt.id);
+              if (index !== -1) {
+                return { ...normalizedAppt, numero_sessao: index + 1 };
+              }
+            } catch (numeroSessaoErr) {
+              console.error('Erro ao calcular numero da sessao do pacote (nao bloqueante):', numeroSessaoErr, appt.id);
             }
           }
           return normalizedAppt;
@@ -1079,7 +1086,10 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       const taxiVal = isPetTaxi ? valorTransporte : 0;
 
       // Ajuste de nomes das chaves para snake_case conforme esperado pelo Supabase
-      const apptPayload = {
+      // Observacao: 'status' so entra no payload na criacao. Em edicao, o status
+      // (Finalizado/Em Andamento/Cancelado/etc) e preservado - remarcar data/hora
+      // pela tela de Agendamentos nao pode reverter o status de um atendimento.
+      const apptPayload: Record<string, any> = {
         pet_id: selectedPetId,
         cliente_id: selectedClient?.id,
         unidade_id: unit.id,
@@ -1092,9 +1102,12 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
         tem_taxi: isPetTaxi,
         endereco_busca: isPetTaxi ? petTaxiEndereco : null,
         forma_pagamento: paymentMethod,
-        pago: isPaidModal,
-        status: 'Agendado'
+        pago: isPaidModal
       };
+
+      if (!isEditing) {
+        apptPayload.status = 'Agendado';
+      }
 
       // Trava de Segurança Final: Garantir cliente_id no Payload
       if (!apptPayload.cliente_id) {

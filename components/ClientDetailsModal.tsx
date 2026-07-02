@@ -89,8 +89,10 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
         .select(`
           id,
           data_agendamento,
+          data_fim_real,
           horario_inicio,
           status,
+          pacote_id,
           pets!inner(nome, cliente_id),
           agendamento_itens(servicos(nome))
         `)
@@ -99,11 +101,16 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
         .order('horario_inicio', { ascending: false });
 
       if (error) throw error;
-      
-      // Garantir IDs únicos prefixando, caso haja algum overlap inesperado
+
+      // Garantir IDs únicos prefixando, caso haja algum overlap inesperado.
+      // dataExibicao: usa a data de finalizacao real (data_fim_real) sempre que
+      // existir, para nao mostrar a data agendada quando o atendimento foi
+      // remarcado ou concluido em outro dia. Registros antigos, finalizados antes
+      // de existir data_fim_real, caem no fallback data_agendamento.
       const processedHistory = (data || []).map(item => ({
         ...item,
-        uniqueId: `hist-${item.id}`
+        uniqueId: `hist-${item.id}`,
+        dataExibicao: item.data_fim_real ? item.data_fim_real.substring(0, 10) : item.data_agendamento
       }));
       
       setHistory(processedHistory);
@@ -520,7 +527,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                                 </div>
                                 <div className="min-w-0">
                                    <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                                      <span className="text-sm font-black text-slate-800">{formatDate(item.data_agendamento)}</span>
+                                      <span className="text-sm font-black text-slate-800">{formatDate(item.dataExibicao)}</span>
                                       <span className="px-2 py-0.5 bg-[#00BFA5]/10 text-[#00BFA5] text-[9px] font-black uppercase tracking-widest rounded-md">
                                          {item.pets?.nome}
                                       </span>
