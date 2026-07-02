@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Pet, Client, Service, Unit, UserProfile } from '../types';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import { registrarAtividade } from '../services/logger';
+import { registrarPagamentoPacote } from '../services/pacotePayments';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -225,47 +226,27 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
 
   const handleRegisterPayment = async () => {
     setLoading(true);
-    
+
     // Se não for retroativo, força a data de hoje (Brasília)
     const finalDate = isRetroactiveMode ? paymentDate : getTodayBR();
-    
-    const payload: any = {
-      pago: true,
-      data_pagamento: finalDate,
-      forma_pagamento: paymentMethod,
-      valor_total: valor1 // Na coluna original salvamos o valor principal se houver divisão
-    };
-
-    if (isDividirPagamento) {
-      payload.forma_pagamento_2 = paymentMethod2;
-      payload.valor_pagamento_2 = valor2;
-      // O valor total do pacote permanece o mesmo, mas podemos registrar no log a divisão
-    } else {
-      payload.forma_pagamento_2 = null;
-      payload.valor_pagamento_2 = 0;
-    }
 
     try {
-      const { error } = await supabaseClient
-        .from('pacotes')
-        .update(payload)
-        .eq('id', pack.id);
-
-      if (error) throw error;
-      
-      // Log de Auditoria
-      const logMsg = isDividirPagamento 
-        ? `Pet: ${pack.pets?.nome} - Pagamento Dividido para Pacote ${pack.nome_pacote || pack.id}, V1: ${valor1} (${paymentMethod}), V2: ${valor2} (${paymentMethod2})`
-        : `Pet: ${pack.pets?.nome} - Pagamento Registrado para Pacote ${pack.nome_pacote || pack.id}, Método: ${paymentMethod}`;
-
-      registrarAtividade(
-        unit.id,
-        userProfile?.email || 'sistema',
-        'Alteração de Pagamento',
-        logMsg,
-        userProfile?.nome,
-        userProfile?.cargo
-      );
+      await registrarPagamentoPacote({
+        supabaseClient,
+        unitId: unit.id,
+        pacoteId: pack.id,
+        nomePacote: pack.nome_pacote || pack.nome,
+        petNome: pack.pets?.nome,
+        metodo1: paymentMethod,
+        valor1,
+        dividirPagamento: isDividirPagamento,
+        metodo2: paymentMethod2,
+        valor2,
+        dataPagamento: finalDate,
+        userEmail: userProfile?.email,
+        userNome: userProfile?.nome,
+        userCargo: userProfile?.cargo
+      });
 
       setIsPaying(false);
       await fetchSessionDetails();

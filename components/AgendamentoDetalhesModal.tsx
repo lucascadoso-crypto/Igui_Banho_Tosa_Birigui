@@ -17,21 +17,24 @@ interface AgendamentoDetalhesModalProps {
   onReactivate?: (appt: any) => void;
   onCancel: (appt: any) => void;
   onQuickReceive: (data: { method1: string, val1: number, method2?: string, val2?: number }) => void;
+  /** Recebe o pacote inteiro (nao apenas a sessao atual). So chamado quando appt.pacote_id existe. */
+  onQuickReceivePacote?: (data: { method1: string, val1: number, method2?: string, val2?: number }) => void;
   supabaseClient: any;
   onRefresh: () => void;
 }
 
-const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({ 
-  appt, 
+const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
+  appt,
   userProfile,
-  onClose, 
-  onEdit, 
-  onFinalize, 
+  onClose,
+  onEdit,
+  onFinalize,
   onFinalizeNoNotice,
   onStartAtendimento,
   onReactivate,
   onCancel,
   onQuickReceive,
+  onQuickReceivePacote,
   supabaseClient,
   onRefresh
 }) => {
@@ -56,8 +59,11 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   const [showConfirmDeleteAll, setShowConfirmDeleteAll] = useState(false);
 
   // Estados para Pagamento Dividido
+  // Sessao de pacote: o valor a cobrar e o TOTAL do pacote, nao a referencia da sessao.
   const [isDividirPagamento, setIsDividirPagamento] = useState(false);
-  const [valor1, setValor1] = useState(parseFloat(appt.valor_total) || 0);
+  const [valor1, setValor1] = useState(
+    appt.pacote_id ? Number(appt.pacotes?.valor_total || 0) : (parseFloat(appt.valor_total) || 0)
+  );
   const [valor2, setValor2] = useState(0);
   const [formaPagamento2, setFormaPagamento2] = useState('Dinheiro');
 
@@ -83,7 +89,12 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
     valorServicosSalvo
   });
   const { valorServicos, totalExtra, totalGeral } = totals;
-  const isSomaValida = !isDividirPagamento || (Math.abs((valor1 + valor2) - totalGeral) < 0.01);
+  // Para sessao de pacote, o que se cobra no "Confirmar" e o valor TOTAL do
+  // pacote (fonte unica: pacotes.valor_total), nao a referencia da sessao.
+  const packageTotal = Number(appt.pacotes?.valor_total || 0);
+  const isPacotePago = Boolean(appt.pacote_id && appt.pacotes?.pago);
+  const totalACobrar = appt.pacote_id ? packageTotal : totalGeral;
+  const isSomaValida = !isDividirPagamento || (Math.abs((valor1 + valor2) - totalACobrar) < 0.01);
   const client = appt.clientes || appt.pets?.clientes;
   const pet = appt.pets;
   const normalizedStatus = String(appt.status || '')
@@ -778,8 +789,10 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                   <div className="grid grid-cols-2 gap-3">
                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 shadow-sm">
                         <p className="text-[9px] font-black text-indigo-400 uppercase mb-1">Valor do Pacote</p>
-                        <p className="font-black text-indigo-700">R$ {Number(appt.pacotes?.valor_total || 0).toFixed(2)}</p>
-                        <p className="text-[8px] font-bold text-indigo-400 uppercase mt-1">Informativo, não cobrado novamente hoje</p>
+                        <p className="font-black text-indigo-700">R$ {packageTotal.toFixed(2)}</p>
+                        <p className="text-[8px] font-bold text-indigo-400 uppercase mt-1">
+                           {isPacotePago ? 'Pacote já quitado' : 'Recebível abaixo em "Receber Pacote"'}
+                        </p>
                      </div>
                      <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                         <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Sessão Atual</p>
@@ -814,7 +827,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-100 shadow-sm border-l-4 border-l-orange-500">
                   <span className="text-sm font-black text-slate-400 uppercase">Total {appt.pacote_id ? '(Pacote)' : 'Geral'}</span>
                   <div className="text-right">
-                    <p className="text-2xl font-black text-slate-900 tracking-tighter">R$ {totalGeral.toFixed(2)}</p>
+                    <p className="text-2xl font-black text-slate-900 tracking-tighter">R$ {totalACobrar.toFixed(2)}</p>
                   </div>
                </div>
 
@@ -901,11 +914,11 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                   {(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? (
                     <div className="flex flex-col items-end space-y-2">
                        <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-100">
-                          {appt.pacote_id && appt.pacotes?.pago 
-                            ? `PAGO (PACOTE) via ${appt.pacotes.forma_pagamento} em ${formatDateBR(appt.pacotes.data_pagamento)}` 
+                          {appt.pacote_id && appt.pacotes?.pago
+                            ? `PAGO (PACOTE) via ${appt.pacotes.forma_pagamento} em ${formatDateBR(appt.pacotes.data_pagamento)}`
                             : `Pago via ${appt.forma_pagamento} em ${formatDateBR(appt.data_agendamento)}`}
                        </p>
-                       <button 
+                       <button
                         onClick={handleOpenRecibo}
                         className="bg-cyan-500 hover:bg-cyan-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-cyan-500/20 transition-all flex items-center"
                       >
@@ -914,9 +927,17 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                     </div>
                   ) : (
                     <div className="flex flex-col space-y-3 w-full max-w-md bg-slate-100/50 p-4 rounded-2xl border border-slate-200">
+                       {appt.pacote_id && (
+                         <div className="flex items-center gap-2 bg-violet-50 border border-violet-100 rounded-xl px-3 py-2">
+                            <i className="fa-solid fa-layer-group text-violet-500 text-xs"></i>
+                            <p className="text-[10px] font-black text-violet-700 uppercase tracking-widest">
+                               Receber Pacote — quita as {appt.pacotes?.qtd_sessoes || '?'} sessões
+                            </p>
+                         </div>
+                       )}
                        {!isDividirPagamento ? (
                          <div className="flex items-center space-x-3 w-full">
-                           <select 
+                           <select
                              value={formaPagamento}
                              onChange={(e) => setFormaPagamento(e.target.value)}
                              className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 text-xs outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
@@ -926,11 +947,18 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                              <option value="Crédito">Crédito</option>
                              <option value="Débito">Débito</option>
                            </select>
-                           <button 
-                             onClick={() => onQuickReceive({ method1: formaPagamento, val1: totalGeral })}
-                             className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-green-500/20 transition-all flex items-center active:scale-95 whitespace-nowrap"
+                           <button
+                             disabled={appt.pacote_id ? (!onQuickReceivePacote || packageTotal <= 0) : false}
+                             onClick={() => {
+                               if (appt.pacote_id) {
+                                 onQuickReceivePacote?.({ method1: formaPagamento, val1: totalACobrar });
+                               } else {
+                                 onQuickReceive({ method1: formaPagamento, val1: totalACobrar });
+                               }
+                             }}
+                             className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-green-500/20 transition-all flex items-center active:scale-95 whitespace-nowrap"
                            >
-                             <i className="fa-solid fa-check mr-2 text-sm"></i> CONFIRMAR
+                             <i className="fa-solid fa-check mr-2 text-sm"></i> {appt.pacote_id ? 'CONFIRMAR PACOTE' : 'CONFIRMAR'}
                            </button>
                          </div>
                        ) : (
@@ -938,20 +966,20 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                             <div className="grid grid-cols-2 gap-3">
                                <div className="space-y-1">
                                   <label className="text-[9px] font-black text-slate-400 uppercase ml-2 tracking-widest">Valor 1</label>
-                                  <input 
-                                    type="number" 
+                                  <input
+                                    type="number"
                                     value={valor1}
                                     onChange={(e) => {
                                       const v = parseFloat(e.target.value) || 0;
                                       setValor1(v);
-                                      setValor2(Math.max(0, totalGeral - v));
+                                      setValor2(Math.max(0, totalACobrar - v));
                                     }}
                                     className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 text-xs"
                                   />
                                </div>
                                <div className="space-y-1">
                                   <label className="text-[9px] font-black text-slate-400 uppercase ml-2 tracking-widest">Método 1</label>
-                                  <select 
+                                  <select
                                     value={formaPagamento}
                                     onChange={(e) => setFormaPagamento(e.target.value)}
                                     className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 text-xs"
@@ -967,20 +995,20 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                             <div className="grid grid-cols-2 gap-3">
                                <div className="space-y-1">
                                   <label className="text-[9px] font-black text-slate-400 uppercase ml-2 tracking-widest">Valor 2</label>
-                                  <input 
-                                    type="number" 
+                                  <input
+                                    type="number"
                                     value={valor2}
                                     onChange={(e) => {
                                       const v = parseFloat(e.target.value) || 0;
                                       setValor2(v);
-                                      setValor1(Math.max(0, totalGeral - v));
+                                      setValor1(Math.max(0, totalACobrar - v));
                                     }}
                                     className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 text-xs"
                                   />
                                </div>
                                <div className="space-y-1">
                                   <label className="text-[9px] font-black text-slate-400 uppercase ml-2 tracking-widest">Método 2</label>
-                                  <select 
+                                  <select
                                     value={formaPagamento2}
                                     onChange={(e) => setFormaPagamento2(e.target.value)}
                                     className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 text-xs"
@@ -992,30 +1020,36 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                                   </select>
                                </div>
                             </div>
-                            
+
                             {!isSomaValida && (
-                              <p className="text-[10px] font-bold text-rose-500 text-center uppercase tracking-widest">A soma ({valor1 + valor2}) deve ser {totalGeral.toFixed(2)}</p>
+                              <p className="text-[10px] font-bold text-rose-500 text-center uppercase tracking-widest">A soma ({valor1 + valor2}) deve ser {totalACobrar.toFixed(2)}</p>
                             )}
 
-                            <button 
-                              disabled={!isSomaValida}
-                              onClick={() => onQuickReceive({ method1: formaPagamento, val1: valor1, method2: formaPagamento2, val2: valor2 })}
+                            <button
+                              disabled={!isSomaValida || (appt.pacote_id ? (!onQuickReceivePacote || packageTotal <= 0) : false)}
+                              onClick={() => {
+                                if (appt.pacote_id) {
+                                  onQuickReceivePacote?.({ method1: formaPagamento, val1: valor1, method2: formaPagamento2, val2: valor2 });
+                                } else {
+                                  onQuickReceive({ method1: formaPagamento, val1: valor1, method2: formaPagamento2, val2: valor2 });
+                                }
+                              }}
                               className={`w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg transition-all flex items-center justify-center ${isSomaValida ? 'bg-green-600 text-white shadow-green-500/20 hover:bg-green-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}`}
                             >
-                               <i className="fa-solid fa-check mr-2 text-sm"></i> CONFIRMAR DIVIDIDO
+                               <i className="fa-solid fa-check mr-2 text-sm"></i> {appt.pacote_id ? 'CONFIRMAR PACOTE DIVIDIDO' : 'CONFIRMAR DIVIDIDO'}
                             </button>
                          </div>
                        )}
 
-                       <button 
+                       <button
                          onClick={() => {
                             const newState = !isDividirPagamento;
                             setIsDividirPagamento(newState);
                             if (newState) {
-                               setValor1(totalGeral / 2);
-                               setValor2(totalGeral / 2);
+                               setValor1(totalACobrar / 2);
+                               setValor2(totalACobrar / 2);
                             } else {
-                               setValor1(totalGeral);
+                               setValor1(totalACobrar);
                                setValor2(0);
                             }
                          }}

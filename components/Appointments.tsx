@@ -7,6 +7,7 @@ import CadastroPet from './CadastroPet';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import { calculateAppointmentTotals } from '../services/pricing';
+import { registrarPagamentoPacote } from '../services/pacotePayments';
 
 interface AppointmentsProps {
   unit: Unit;
@@ -622,6 +623,40 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       await fetchData();
     } catch (err) {
       console.error("Erro ao receber pagamento:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Recebe o PACOTE inteiro a partir do modal de detalhes de uma sessao de
+  // pacote. Usa o mesmo servico (registrarPagamentoPacote) chamado pela tela
+  // de Pacotes, para nunca divergir do fluxo la existente.
+  const handleQuickReceivePacote = async (data: { method1: string, val1: number, method2?: string, val2?: number }) => {
+    if (!viewingAppt?.pacote_id || !viewingAppt?.pacotes || loading) return;
+    setLoading(true);
+    try {
+      await registrarPagamentoPacote({
+        supabaseClient,
+        unitId: unit.id,
+        pacoteId: viewingAppt.pacote_id,
+        nomePacote: viewingAppt.pacotes.nome_pacote || viewingAppt.pacotes.nome,
+        petNome: viewingAppt.pets?.nome,
+        metodo1: data.method1,
+        valor1: data.val1,
+        dividirPagamento: Boolean(data.method2),
+        metodo2: data.method2,
+        valor2: data.val2,
+        userEmail: userProfile?.email,
+        userNome: userProfile?.nome,
+        userCargo: userProfile?.cargo
+      });
+
+      setShowPaymentSelector(false);
+      await fetchData();
+      showToast('Pacote recebido com sucesso.', 'sucesso');
+    } catch (err: any) {
+      console.error('Erro ao receber pagamento do pacote:', err);
+      showToast(`Falha ao receber pacote: ${err?.message || 'erro desconhecido.'}`, 'erro');
     } finally {
       setLoading(false);
     }
@@ -2293,6 +2328,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
           onFinalizeNoNotice={(appt) => performFinalizeAppointment(appt, false)}
           onCancel={(appt) => performCancelAppointment(appt)}
           onQuickReceive={(data) => handleQuickReceive(data)}
+          onQuickReceivePacote={(data) => handleQuickReceivePacote(data)}
           supabaseClient={supabaseClient}
           onRefresh={() => fetchData()}
         />
