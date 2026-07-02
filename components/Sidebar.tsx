@@ -92,6 +92,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
   };
 
   const globalMenus: { id: GlobalView; label: string; icon: string; roles: UserRole[] }[] = [
+    { id: 'Dashboard', label: 'Dashboard', icon: 'fa-gauge-high', roles: ['master', 'admin_unidade', 'gerente', 'financeiro'] },
     { id: 'Painel Geral', label: 'Painel Geral', icon: 'fa-chart-pie', roles: ['master'] },
     { id: 'Financeiro Geral', label: 'Financeiro Geral', icon: 'fa-sack-dollar', roles: ['master'] },
     { id: 'Marketing', label: 'Marketing', icon: 'fa-bullhorn', roles: ['master', 'admin_unidade', 'gerente'] },
@@ -165,6 +166,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
 
   const getGlobalIconColor = (id: GlobalView) => {
     switch (id) {
+      case 'Dashboard': return 'text-sky-600 bg-sky-50';
       case 'Financeiro Geral': return 'text-violet-600 bg-violet-50';
       case 'Marketing': return 'text-emerald-600 bg-emerald-50';
       case 'Configurações': return 'text-teal-600 bg-teal-50';

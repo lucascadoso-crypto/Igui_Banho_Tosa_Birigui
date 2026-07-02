@@ -14,6 +14,7 @@ import Pacotes from './components/Pacotes';
 import Financeiro from './components/Financeiro';
 import Gastos from './components/Gastos';
 import PainelGeral from './components/PainelGeral';
+import DashboardGerencial from './components/DashboardGerencial';
 import FinanceiroGlobal from './components/FinanceiroGlobal';
 import Equipe from './components/Equipe';
 import ReciboView from './components/ReciboView';
@@ -85,6 +86,8 @@ const AppContent: React.FC = () => {
     const activeUnit = units.find(u => u.id === navState.unitId);
 
     switch (navState.view) {
+      case 'Dashboard':
+        return <DashboardGerencial units={units} supabaseClient={supabase} />;
       case 'Painel Geral':
         return <PainelGeral units={units} supabaseClient={supabase} />;
       case 'Financeiro Geral':
