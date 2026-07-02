@@ -4,6 +4,7 @@ import { Unit, Client, Pet, Employee, Service, Appointment, UserProfile } from '
 import ClienteModal from './ClienteModal';
 import AgendamentoDetalhesModal from './AgendamentoDetalhesModal'; // TEST
 import CadastroPet from './CadastroPet';
+import PacoteFormModal from './PacoteFormModal';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import { calculateAppointmentTotals } from '../services/pricing';
@@ -33,6 +34,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const [showTaxiRouteMenu, setShowTaxiRouteMenu] = useState(false);
   const [loadingTaxiRoute, setLoadingTaxiRoute] = useState<'manha' | 'tarde' | null>(null);
   const [taxiRoutePreview, setTaxiRoutePreview] = useState<any | null>(null);
+  const [isPacoteModalOpen, setIsPacoteModalOpen] = useState(false);
   const [finalizingAppointmentId, setFinalizingAppointmentId] = useState<number | string | null>(null);
   const [notifyingAppointmentId, setNotifyingAppointmentId] = useState<number | string | null>(null);
 
@@ -1605,12 +1607,28 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
           </div>
 
           {!isReadOnly && (
+            <button onClick={() => setIsPacoteModalOpen(true)} className="bg-[#7C3AED] hover:opacity-90 text-white px-8 py-3 rounded-2xl font-black flex items-center justify-center shadow-lg shadow-violet-500/20 active:scale-95 transition-all">
+              <i className="fa-solid fa-plus mr-2"></i> NOVO PACOTE
+            </button>
+          )}
+
+          {!isReadOnly && (
             <button onClick={handleOpenNew} className="bg-[#F59E0B] hover:opacity-90 text-white px-8 py-3 rounded-2xl font-black flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
               <i className="fa-solid fa-plus mr-2"></i> NOVO BANHO
             </button>
           )}
         </div>
       </div>
+
+      {isPacoteModalOpen && (
+        <PacoteFormModal
+          unit={unit}
+          supabaseClient={supabaseClient}
+          userProfile={userProfile}
+          onClose={() => setIsPacoteModalOpen(false)}
+          onSaved={fetchData}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Lado Esquerdo: Calendário */}
