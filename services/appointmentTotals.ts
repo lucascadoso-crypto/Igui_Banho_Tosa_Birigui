@@ -5,6 +5,9 @@ export const toCurrencyNumber = (value: unknown) => {
 
 export const formatCurrencyBR = (value: unknown) => `R$ ${toCurrencyNumber(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+export const formatDecimalBR = (value: unknown, decimals = 1) =>
+  toCurrencyNumber(value).toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
 export const isExtraAppointmentItem = (item: any) =>
   item?.eh_extra === true || item?.tipo === 'adicional' || item?.tipo === 'extra';
 

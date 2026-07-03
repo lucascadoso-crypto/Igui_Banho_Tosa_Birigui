@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { formatDecimalBR } from '../../services/appointmentTotals';
 
 export type KPICardColor = 'slate' | 'amber' | 'emerald' | 'rose' | 'indigo' | 'blue' | 'purple' | 'orange';
 
@@ -63,30 +64,25 @@ const KPICard: React.FC<KPICardProps> = ({
         onClick ? 'cursor-pointer hover:shadow-xl' : ''
       } ${fullWidth ? 'col-span-full' : ''}`}
     >
-      <div className="flex items-center justify-between mb-6">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg shrink-0 ${palette.bg} ${palette.text}`}>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pt-2">{label}</p>
+        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-base shrink-0 ${palette.bg} ${palette.text}`}>
           <i className={`fa-solid ${icon}`}></i>
         </div>
-        {trend && !loading && (
-          <div className={`flex items-center space-x-1 text-[10px] font-black uppercase tracking-widest ${trendColor}`}>
-            <i className={`fa-solid ${trendIcon}`}></i>
-            <span>{Math.abs(trend.value)}%</span>
-          </div>
-        )}
       </div>
 
-      <div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{label}</p>
-        {loading ? (
-          <div className="h-9 w-2/3 bg-slate-100 rounded-lg animate-pulse"></div>
-        ) : (
-          <p className={`font-black text-slate-900 tracking-tighter leading-tight break-words ${getValueFontSizeClass(value)}`}>{value}</p>
-        )}
-        {subtext && !loading && <p className="text-xs font-bold text-slate-400 mt-2">{subtext}</p>}
-        {trend?.label && !loading && (
-          <p className={`text-[10px] font-bold mt-2 ${trendColor}`}>{trend.label}</p>
-        )}
-      </div>
+      {loading ? (
+        <div className="h-9 w-2/3 bg-slate-100 rounded-lg animate-pulse"></div>
+      ) : (
+        <p className={`font-black text-slate-900 tracking-tighter leading-tight break-words ${getValueFontSizeClass(value)}`}>{value}</p>
+      )}
+      {subtext && !loading && <p className="text-xs font-bold text-slate-400 mt-2">{subtext}</p>}
+      {trend && !loading && (
+        <div className={`flex items-center gap-1.5 text-[11px] font-bold mt-3 ${trendColor}`}>
+          <i className={`fa-solid ${trendIcon} text-[10px]`}></i>
+          <span>{formatDecimalBR(Math.abs(trend.value))}%{trend.label ? ` ${trend.label}` : ''}</span>
+        </div>
+      )}
     </div>
   );
 };

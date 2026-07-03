@@ -139,6 +139,28 @@ export const fetchFaturamentoUnidade = async (
 
 export interface FormaPagamento { forma: string; valor: number; }
 
+/**
+ * Normaliza grafias diferentes do mesmo metodo de pagamento (ex.: "Cartão Crédito"
+ * e "Crédito") num rotulo canonico. Mesma regra de normalizePaymentMethod() em
+ * components/Financeiro.tsx, aplicada aqui no client para nao depender do estado
+ * de deploy da normalizacao equivalente no banco (fn_normaliza_forma_pagamento).
+ */
+export const normalizarFormaPagamento = (raw: string): string => {
+  const semAcento = String(raw || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim()
+    .toLowerCase();
+
+  if (!semAcento) return 'Não informado';
+  if (semAcento.includes('pix')) return 'Pix';
+  if (semAcento.includes('dinheiro')) return 'Dinheiro';
+  if (semAcento.includes('debito')) return 'Débito';
+  if (semAcento.includes('credito')) return 'Crédito';
+  if (semAcento.includes('transferencia')) return 'Transferência';
+  return 'Outro';
+};
+
 export const fetchFormasPagamento = async (supabaseClient: any, filtros: DashboardFiltros): Promise<FormaPagamento[]> => {
   const { data, error } = await supabaseClient.rpc('fn_dashboard_formas_pagamento', {
     p_unidade_id: filtros.unidadeId,
@@ -147,7 +169,15 @@ export const fetchFormasPagamento = async (supabaseClient: any, filtros: Dashboa
     p_transporte: filtros.transporte
   });
   if (error) throw error;
-  return (data || []).map((row: any) => ({ forma: row.forma_pagamento, valor: toCurrencyNumber(row.valor) }));
+
+  const agrupado = new Map<string, number>();
+  for (const row of data || []) {
+    const forma = normalizarFormaPagamento(row.forma_pagamento);
+    agrupado.set(forma, (agrupado.get(forma) || 0) + toCurrencyNumber(row.valor));
+  }
+  return Array.from(agrupado.entries())
+    .map(([forma, valor]) => ({ forma, valor }))
+    .sort((a, b) => b.valor - a.valor);
 };
 
 export interface CustoServicoPacote { servico: string; qtd: number; custoUnitario: number; custoTotal: number; }
@@ -227,6 +257,9 @@ export interface ProximoAgendamento {
   horario: string;
   petNome: string;
   petRaca: string;
+  clienteNome: string;
+  unidadeNome: string;
+  valor: number;
   servicos: string;
   temTaxi: boolean;
   numeroSessao: number | null;
@@ -241,7 +274,7 @@ export const fetchProximosAgendamentos = async (
   const hoje = getTodayBR();
   let query = supabaseClient
     .from('agendamentos')
-    .select('id, data_agendamento, horario_inicio, tem_taxi, numero_sessao, status, unidade_id, pets(nome, raca), agendamento_itens(tipo, servicos(nome))')
+    .select('id, data_agendamento, horario_inicio, tem_taxi, numero_sessao, status, unidade_id, valor_total, pets(nome, raca), clientes(nome), unidades(nome), agendamento_itens(tipo, servicos(nome))')
     .in('status', ['Agendado', 'Em Andamento'])
     .gte('data_agendamento', hoje)
     .order('data_agendamento', { ascending: true })
@@ -260,6 +293,9 @@ export const fetchProximosAgendamentos = async (
     horario: `${a.data_agendamento.split('-').reverse().join('/')} ${String(a.horario_inicio || '').substring(0, 5)}`,
     petNome: a.pets?.nome || 'Pet',
     petRaca: a.pets?.raca || '',
+    clienteNome: a.clientes?.nome || '',
+    unidadeNome: a.unidades?.nome || '',
+    valor: toCurrencyNumber(a.valor_total),
     servicos: (a.agendamento_itens || [])
       .filter((it: any) => it.tipo === 'principal')
       .map((it: any) => it.servicos?.nome)

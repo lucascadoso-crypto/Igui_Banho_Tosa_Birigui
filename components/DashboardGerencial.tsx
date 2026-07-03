@@ -1,10 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Unit } from '../types';
-import { formatCurrencyBR } from '../services/appointmentTotals';
+import { formatCurrencyBR, formatDecimalBR } from '../services/appointmentTotals';
 import KPICard from './Dashboard/KPICard';
+import DashboardHeader from './Dashboard/DashboardHeader';
+import RevenueLineChart from './Dashboard/RevenueLineChart';
+import UnitBarChart from './Dashboard/UnitBarChart';
+import InsightsCard from './Dashboard/InsightsCard';
 import {
   DashboardFiltros,
-  TransporteFiltro,
   Granularidade,
   DashboardKpis,
   FaturamentoPontoPeriodo,
@@ -46,19 +49,19 @@ const CATEGORIA_LABEL: Record<string, string> = {
 const CATEGORIA_COR: Record<string, string> = {
   banho: '#0EA5E9',
   tosa: '#F59E0B',
-  pacote: '#8B5CF6',
+  pacote: '#7C3AED',
   adicional: '#10B981',
   outro: '#94A3B8'
 };
 
 const FORMA_PAGAMENTO_COR: Record<string, string> = {
-  Pix: '#0EA5E9',
-  Dinheiro: '#10B981',
-  Debito: '#8B5CF6',
-  Credito: '#F59E0B',
-  Transferencia: '#EC4899',
+  Pix: '#10B981',
+  Dinheiro: '#0EA5E9',
+  Débito: '#7C3AED',
+  Crédito: '#F59E0B',
+  Transferência: '#EC4899',
   Outro: '#94A3B8',
-  'Não Informado': '#CBD5E1'
+  'Não informado': '#CBD5E1'
 };
 
 const CardSkeleton: React.FC<{ height?: number }> = ({ height = 280 }) => (
@@ -68,15 +71,10 @@ const CardSkeleton: React.FC<{ height?: number }> = ({ height = 280 }) => (
   </div>
 );
 
-const SectionTitle: React.FC<{ icon: string; color: string; title: string; subtitle?: string }> = ({ icon, color, title, subtitle }) => (
-  <div className="flex items-center gap-3 mb-2">
-    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${color}`}>
-      <i className={`fa-solid ${icon}`}></i>
-    </div>
-    <div>
-      <h3 className="text-base font-black text-slate-800 leading-tight">{title}</h3>
-      {subtitle && <p className="text-[11px] font-bold text-slate-400">{subtitle}</p>}
-    </div>
+const SectionTitle: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
+  <div className="mb-2">
+    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide leading-tight">{title}</h3>
+    {subtitle && <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">{subtitle}</p>}
   </div>
 );
 
@@ -98,8 +96,8 @@ const SimpleDonut: React.FC<{
     );
   }
 
-  const radius = 70;
-  const stroke = 26;
+  const radius = 68;
+  const stroke = 30;
   const circumference = 2 * Math.PI * radius;
   let acc = 0;
 
@@ -150,62 +148,15 @@ const SimpleDonut: React.FC<{
   );
 };
 
-const SimpleAreaChart: React.FC<{ data: FaturamentoPontoPeriodo[]; loading?: boolean }> = ({ data, loading }) => {
-  if (loading) return <CardSkeleton height={260} />;
+const thClass = 'py-2 pr-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left';
+const thClassRight = 'py-2 pr-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right';
 
-  if (!data.length || data.every(d => d.valor === 0)) {
-    return (
-      <div className="flex flex-col items-center justify-center py-10 text-slate-300">
-        <i className="fa-solid fa-chart-area text-5xl mb-3 opacity-30"></i>
-        <p className="font-bold text-sm">Sem faturamento no período.</p>
-      </div>
-    );
-  }
-
-  const max = Math.max(...data.map(d => d.valor), 1);
-  const width = 640;
-  const height = 220;
-  const padX = 8;
-  const stepX = data.length > 1 ? (width - padX * 2) / (data.length - 1) : 0;
-  const points = data.map((d, idx) => {
-    const x = padX + stepX * idx;
-    const y = height - (d.valor / max) * (height - 20) - 4;
-    return { x, y, ...d };
-  });
-  const linePath = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-  const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${height} L ${points[0].x.toFixed(1)} ${height} Z`;
-
-  const formatBucketLabel = (bucket: string) => {
-    const parts = bucket.split('-');
-    if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
-    return bucket;
-  };
-
-  return (
-    <div className="w-full overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height + 30}`} className="w-full" style={{ minWidth: 480 }}>
-        <defs>
-          <linearGradient id="dashFaturamentoGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#0EA5E9" stopOpacity={0.35} />
-            <stop offset="100%" stopColor="#0EA5E9" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <path d={areaPath} fill="url(#dashFaturamentoGradient)" stroke="none" />
-        <path d={linePath} fill="none" stroke="#0EA5E9" strokeWidth={2.5} />
-        {points.map((p, idx) => (
-          <circle key={idx} cx={p.x} cy={p.y} r={3} fill="#0EA5E9" />
-        ))}
-        {points.map((p, idx) => (
-          (idx === 0 || idx === points.length - 1 || idx % Math.ceil(points.length / 8 || 1) === 0) && (
-            <text key={`lbl-${idx}`} x={p.x} y={height + 18} fontSize={10} fill="#94a3b8" textAnchor="middle" fontWeight={700}>
-              {formatBucketLabel(p.bucket)}
-            </text>
-          )
-        ))}
-      </svg>
-    </div>
-  );
-};
+const StatTile: React.FC<{ label: string; value: React.ReactNode; tone?: 'neutral' | 'rose' | 'violet' }> = ({ label, value, tone = 'neutral' }) => (
+  <div className="bg-slate-50 rounded-2xl p-5">
+    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
+    <p className={`text-xl font-black ${tone === 'rose' ? 'text-rose-600' : tone === 'violet' ? 'text-violet-600' : 'text-slate-800'}`}>{value}</p>
+  </div>
+);
 
 const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabaseClient }) => {
   const defaultPeriodo = getDefaultPeriodo();
@@ -355,101 +306,42 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
     label: 'vs período anterior'
   });
 
-  const faturamentoTotalPeriodo = faturamentoCategoria.reduce((s, c) => s + c.valor, 0);
-  const custoTotalPacotes = custosPacotes.reduce((s, c) => s + c.custoTotal, 0);
+  const custoTotalGeralPacotes = custosPacotes.reduce((s, c) => s + c.custoTotal, 0);
   const banhosViaPacote = custosPacotes.reduce((s, c) => s + c.qtd, 0);
   const faturamentoPacoteCategoria = faturamentoCategoria.find(c => c.categoria === 'pacote')?.valor || 0;
-  const pctCustoSobreFaturamentoPacote = faturamentoPacoteCategoria > 0 ? (custoTotalPacotes / faturamentoPacoteCategoria) * 100 : 0;
-  const custoMedioPorBanho = banhosViaPacote > 0 ? custoTotalPacotes / banhosViaPacote : 0;
-  const custoTotalGeralPacotes = custosPacotes.reduce((s, c) => s + c.custoTotal, 0);
+  const pctCustoSobreFaturamentoPacote = faturamentoPacoteCategoria > 0 ? (custoTotalGeralPacotes / faturamentoPacoteCategoria) * 100 : 0;
+  const custoMedioPorBanho = banhosViaPacote > 0 ? custoTotalGeralPacotes / banhosViaPacote : 0;
+
+  const unidadeFiltradaNome = filtros.unidadeId !== null ? (units.find((u) => u.id === filtros.unidadeId)?.name ?? 'Unidade selecionada') : 'Todas as unidades';
+
+  const variacaoFaturamento = kpis ? calcularVariacao(kpis.faturamentoAtual, kpis.faturamentoAnterior) : null;
+  const topCategoria = faturamentoCategoria.length > 0 ? [...faturamentoCategoria].sort((a, b) => b.valor - a.valor)[0] : null;
+  const topCategoriaLabel = topCategoria ? (CATEGORIA_LABEL[topCategoria.categoria] || topCategoria.categoria) : null;
+  const topUnidade = faturamentoUnidade.length > 0 ? [...faturamentoUnidade].sort((a, b) => b.valor - a.valor)[0] : null;
+  const insightsLoading = kpisLoading || faturamentoCategoriaLoading || faturamentoUnidadeLoading;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Header + Filtros */}
-      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-5">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-sky-50 text-sky-600 rounded-2xl flex items-center justify-center shrink-0">
-              <i className="fa-solid fa-gauge-high text-2xl"></i>
-            </div>
-            <div>
-              <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Visão Geral da Operação</h2>
-              <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Dashboard Gerencial</p>
-            </div>
-          </div>
-          <button
-            onClick={openCostModal}
-            className="px-4 py-3 rounded-2xl bg-slate-50 border border-slate-100 text-slate-600 hover:bg-slate-100 text-[11px] font-black uppercase tracking-widest flex items-center gap-2"
-          >
-            <i className="fa-solid fa-sliders"></i> Configurar custos de serviço
-          </button>
+      <DashboardHeader units={units} filtros={filtros} onChangeFiltros={setFiltros} onOpenCostModal={openCostModal} />
+
+      {kpisError && (
+        <div className="bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold px-4 py-3 rounded-xl flex items-center gap-2">
+          <i className="fa-solid fa-triangle-exclamation"></i> {kpisError}
         </div>
+      )}
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <label className="space-y-1.5">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data início</span>
-            <input
-              type="date"
-              value={filtros.dataInicio}
-              onChange={(e) => setFiltros((f) => ({ ...f, dataInicio: e.target.value }))}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-sm outline-none"
-            />
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data fim</span>
-            <input
-              type="date"
-              value={filtros.dataFim}
-              onChange={(e) => setFiltros((f) => ({ ...f, dataFim: e.target.value }))}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-sm outline-none"
-            />
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade</span>
-            <select
-              value={filtros.unidadeId ?? 'todas'}
-              onChange={(e) => setFiltros((f) => ({ ...f, unidadeId: e.target.value === 'todas' ? null : Number(e.target.value) }))}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-sm outline-none"
-            >
-              <option value="todas">Todas</option>
-              {units.map((u) => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transporte</span>
-            <select
-              value={filtros.transporte}
-              onChange={(e) => setFiltros((f) => ({ ...f, transporte: e.target.value as TransporteFiltro }))}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-sm outline-none"
-            >
-              <option value="todos">Todos</option>
-              <option value="com">Com transporte</option>
-              <option value="sem">Sem transporte</option>
-            </select>
-          </label>
-        </div>
-
-        {kpisError && (
-          <div className="bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold px-4 py-3 rounded-xl flex items-center gap-2">
-            <i className="fa-solid fa-triangle-exclamation"></i> {kpisError}
-          </div>
-        )}
-      </div>
-
-      {/* Linha 1: KPIs */}
+      {/* Linha: KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
         <KPICard
-          label="Faturamento total"
+          label="Faturamento"
           value={formatCurrencyBR(kpis?.faturamentoAtual ?? 0)}
           icon="fa-sack-dollar"
-          color="emerald"
+          color="purple"
           loading={kpisLoading}
           trend={kpis ? trendFrom(kpis.faturamentoAtual, kpis.faturamentoAnterior) : undefined}
         />
         <KPICard
-          label="Banhos realizados"
+          label="Banhos"
           value={kpis?.banhosAtual ?? 0}
           icon="fa-shower"
           color="blue"
@@ -457,10 +349,10 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
           trend={kpis ? trendFrom(kpis.banhosAtual, kpis.banhosAnterior) : undefined}
         />
         <KPICard
-          label="Tosas realizadas"
+          label="Tosas"
           value={kpis?.tosasAtual ?? 0}
           icon="fa-scissors"
-          color="amber"
+          color="rose"
           loading={kpisLoading}
           trend={kpis ? trendFrom(kpis.tosasAtual, kpis.tosasAnterior) : undefined}
         />
@@ -468,171 +360,132 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
           label="Pacotes ativos"
           value={kpis?.pacotesAtivosAtual ?? 0}
           icon="fa-layer-group"
-          color="purple"
+          color="amber"
           loading={kpisLoading}
           trend={kpis ? trendFrom(kpis.pacotesAtivosAtual, kpis.pacotesAtivosAnterior) : undefined}
         />
         <KPICard
-          label="Novos clientes"
+          label="Clientes"
           value={kpis?.novosClientesAtual ?? 0}
           icon="fa-user-plus"
-          color="rose"
+          color="emerald"
           loading={kpisLoading}
           trend={kpis ? trendFrom(kpis.novosClientesAtual, kpis.novosClientesAnterior) : undefined}
         />
       </div>
 
-      {/* Linha 2: Gráficos de faturamento */}
+      {/* Linha: Faturamento diário + Faturamento da unidade */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div className="xl:col-span-2 bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-            <SectionTitle icon="fa-chart-area" color="bg-sky-50 text-sky-600" title="Faturamento por dia" />
-            <div className="flex gap-1 bg-slate-50 p-1 rounded-xl">
-              {(['dia', 'semana', 'mes'] as Granularidade[]).map((g) => (
-                <button
-                  key={g}
-                  onClick={() => setGranularidade(g)}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${granularidade === g ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-400'}`}
-                >
-                  {g === 'dia' ? 'Por dia' : g === 'semana' ? 'Por semana' : 'Por mês'}
-                </button>
-              ))}
+          <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
+            <SectionTitle title="Faturamento Diário" subtitle="Histórico de entradas financeiras consolidadas" />
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1.5 rounded-full bg-violet-50 text-violet-700 text-[9px] font-black uppercase tracking-widest whitespace-nowrap">Evolução Período</span>
+              <div className="flex gap-1 bg-slate-50 p-1 rounded-xl">
+                {(['dia', 'semana', 'mes'] as Granularidade[]).map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => setGranularidade(g)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${granularidade === g ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-400'}`}
+                  >
+                    {g === 'dia' ? 'Dia' : g === 'semana' ? 'Semana' : 'Mês'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          <SimpleAreaChart data={faturamentoPeriodo} loading={faturamentoPeriodoLoading} />
+          {faturamentoPeriodoLoading ? <CardSkeleton height={260} /> : <RevenueLineChart data={faturamentoPeriodo} />}
         </div>
 
         <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-          <SectionTitle icon="fa-chart-pie" color="bg-violet-50 text-violet-600" title="Faturamento por tipo de serviço" />
+          <SectionTitle title="Faturamento da Unidade" subtitle={filtros.unidadeId !== null ? 'Faturamento total desta unidade' : 'Faturamento total por unidade'} />
           <div className="mt-4">
-            <SimpleDonut
-              loading={faturamentoCategoriaLoading}
-              data={faturamentoCategoria.map((c) => ({ label: CATEGORIA_LABEL[c.categoria] || c.categoria, valor: c.valor, cor: CATEGORIA_COR[c.categoria] || '#94A3B8' }))}
-            />
+            {faturamentoUnidadeLoading ? <CardSkeleton height={220} /> : <UnitBarChart data={faturamentoUnidade} />}
           </div>
         </div>
       </div>
 
-      <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-        <SectionTitle icon="fa-store" color="bg-teal-50 text-teal-600" title="Faturamento por unidade" />
-        <div className="mt-4 space-y-3">
-          {faturamentoUnidadeLoading ? (
-            <CardSkeleton height={100} />
+      {/* Linha: Custos de pacotes + Transporte */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
+          <SectionTitle title="Custos com Serviços de Pacotes" subtitle="Margem de lucro e custo dos pacotes de fidelidade" />
+          <div className="grid grid-cols-2 gap-4">
+            <StatTile label="Custo total" value={custosPacotesLoading ? '—' : formatCurrencyBR(custoTotalGeralPacotes)} tone="rose" />
+            <StatTile label="% do faturamento de pacotes" value={custosPacotesLoading ? '—' : `${formatDecimalBR(pctCustoSobreFaturamentoPacote)}%`} tone="violet" />
+          </div>
+
+          {custosPacotesLoading ? (
+            <CardSkeleton height={160} />
+          ) : custosPacotes.length === 0 ? (
+            <p className="text-center text-slate-300 font-bold italic py-8">
+              Nenhum custo cadastrado ainda para os serviços realizados neste período. Use o botão de configuração no cabeçalho.
+            </p>
           ) : (
-            faturamentoUnidade.map((u) => {
-              const max = Math.max(...faturamentoUnidade.map((x) => x.valor), 1);
-              return (
-                <div key={u.unidadeId} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-600">
-                    <span>{u.unidadeNome}</span>
-                    <span className="font-black text-slate-800">{formatCurrencyBR(u.valor)}</span>
-                  </div>
-                  <div className="w-full h-3 bg-slate-50 rounded-full overflow-hidden">
-                    <div className="h-full bg-teal-500 rounded-full transition-all duration-700" style={{ width: `${(u.valor / max) * 100}%` }}></div>
-                  </div>
-                </div>
-              );
-            })
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className={thClass}>Serviço do pacote</th>
+                    <th className={thClassRight}>Sessões</th>
+                    <th className={thClassRight}>Custo unitário</th>
+                    <th className={thClassRight}>Custo estimado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {custosPacotes.map((c) => (
+                    <tr key={c.servico} className="border-b border-slate-50">
+                      <td className="py-3 pr-4 font-bold text-slate-700">{c.servico}</td>
+                      <td className="py-3 pr-4 text-right font-bold text-slate-600">{c.qtd}</td>
+                      <td className="py-3 pr-4 text-right font-bold text-slate-600">{formatCurrencyBR(c.custoUnitario)}</td>
+                      <td className="py-3 text-right font-black text-rose-600">{formatCurrencyBR(c.custoTotal)}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td className="py-3 pr-4 font-black text-slate-900 uppercase text-xs">Total</td>
+                    <td className="py-3 pr-4 text-right font-black text-slate-900">{banhosViaPacote}</td>
+                    <td className="py-3 pr-4 text-right font-black text-slate-500 text-xs">Custo méd./banho {formatCurrencyBR(custoMedioPorBanho)}</td>
+                    <td className="py-3 text-right font-black text-rose-600">{formatCurrencyBR(custoTotalGeralPacotes)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
+          <SectionTitle title="Serviço de Transporte (Táxi)" subtitle="Balanço financeiro do leva-e-traz" />
+          {transporteLoading ? (
+            <CardSkeleton height={140} />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className={thClass}>Unidade</th>
+                    <th className={thClassRight}>Viagens</th>
+                    <th className={thClassRight}>Receita táxi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="py-3 pr-4 font-bold text-slate-700">{unidadeFiltradaNome}</td>
+                    <td className="py-3 pr-4 text-right font-bold text-slate-600">{transporteResumo?.petsTransportados ?? 0}</td>
+                    <td className="py-3 text-right font-black text-emerald-600">{formatCurrencyBR(transporteResumo?.faturamentoTransporte ?? 0)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="text-[10px] text-slate-300 font-bold mt-4 italic">
+                Custo de combustível por viagem ainda não é cadastrado no sistema.
+              </p>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Bloco: Custos com serviços de pacotes */}
-      <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
-        <SectionTitle
-          icon="fa-hand-holding-dollar"
-          color="bg-orange-50 text-orange-600"
-          title="Custos com Serviços de Pacotes"
-          subtitle="Baseado no custo padrão cadastrado por serviço"
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="bg-slate-50 rounded-2xl p-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Custo total</p>
-            <p className="text-xl font-black text-slate-800">{custosPacotesLoading ? '—' : formatCurrencyBR(custoTotalGeralPacotes)}</p>
-          </div>
-          <div className="bg-slate-50 rounded-2xl p-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Custo médio por banho</p>
-            <p className="text-xl font-black text-slate-800">{custosPacotesLoading ? '—' : formatCurrencyBR(custoMedioPorBanho)}</p>
-          </div>
-          <div className="bg-slate-50 rounded-2xl p-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Banhos via pacote</p>
-            <p className="text-xl font-black text-slate-800">{custosPacotesLoading ? '—' : banhosViaPacote}</p>
-          </div>
-          <div className="bg-slate-50 rounded-2xl p-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">% do faturamento de pacotes</p>
-            <p className="text-xl font-black text-slate-800">{custosPacotesLoading ? '—' : `${pctCustoSobreFaturamentoPacote.toFixed(1)}%`}</p>
-          </div>
-        </div>
-
-        {custosPacotesLoading ? (
-          <CardSkeleton height={160} />
-        ) : custosPacotes.length === 0 ? (
-          <p className="text-center text-slate-300 font-bold italic py-8">
-            Nenhum custo cadastrado ainda para os serviços realizados neste período. Use "Configurar custos de serviço" acima.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                  <th className="py-2 pr-4">Tipo</th>
-                  <th className="py-2 pr-4 text-right">Qtd. realizada</th>
-                  <th className="py-2 pr-4 text-right">Custo unitário</th>
-                  <th className="py-2 pr-4 text-right">Custo total</th>
-                  <th className="py-2 text-right">% do custo total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {custosPacotes.map((c) => (
-                  <tr key={c.servico} className="border-b border-slate-50">
-                    <td className="py-3 pr-4 font-bold text-slate-700">{c.servico}</td>
-                    <td className="py-3 pr-4 text-right font-bold text-slate-600">{c.qtd}</td>
-                    <td className="py-3 pr-4 text-right font-bold text-slate-600">{formatCurrencyBR(c.custoUnitario)}</td>
-                    <td className="py-3 pr-4 text-right font-black text-slate-800">{formatCurrencyBR(c.custoTotal)}</td>
-                    <td className="py-3 text-right font-bold text-slate-600">{custoTotalGeralPacotes > 0 ? `${((c.custoTotal / custoTotalGeralPacotes) * 100).toFixed(1)}%` : '—'}</td>
-                  </tr>
-                ))}
-                <tr>
-                  <td className="py-3 pr-4 font-black text-slate-900 uppercase text-xs">Total</td>
-                  <td className="py-3 pr-4 text-right font-black text-slate-900">{banhosViaPacote}</td>
-                  <td className="py-3 pr-4"></td>
-                  <td className="py-3 pr-4 text-right font-black text-slate-900">{formatCurrencyBR(custoTotalGeralPacotes)}</td>
-                  <td className="py-3 text-right font-black text-slate-900">100%</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Bloco: Transporte */}
-      <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
-        <SectionTitle
-          icon="fa-taxi"
-          color="bg-sky-50 text-sky-600"
-          title="Transporte"
-          subtitle="Ainda não há cadastro de motorista/custo de viagem — exibindo apenas dados reais disponíveis"
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-slate-50 rounded-2xl p-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pets transportados</p>
-            <p className="text-xl font-black text-slate-800">{transporteLoading ? '—' : transporteResumo?.petsTransportados ?? 0}</p>
-          </div>
-          <div className="bg-slate-50 rounded-2xl p-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Faturamento de transporte</p>
-            <p className="text-xl font-black text-slate-800">{transporteLoading ? '—' : formatCurrencyBR(transporteResumo?.faturamentoTransporte ?? 0)}</p>
-          </div>
-          <div className="bg-slate-50 rounded-2xl p-5 opacity-60">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Custo por motorista</p>
-            <p className="text-sm font-bold text-slate-400">Sem cadastro ainda</p>
-          </div>
-        </div>
-      </div>
-
+      {/* Linha: Top adicionais + Próximos agendamentos */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        {/* Bloco: Top adicionais */}
         <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-          <SectionTitle icon="fa-plus" color="bg-emerald-50 text-emerald-600" title="Top Serviços Adicionais" />
+          <SectionTitle title="Top Serviços Adicionais" subtitle="Extras e adicionais com maior venda" />
           <div className="mt-4">
             {topAdicionaisLoading ? (
               <CardSkeleton height={200} />
@@ -641,10 +494,10 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                    <th className="py-2 pr-4">Serviço</th>
-                    <th className="py-2 pr-4 text-right">Qtd.</th>
-                    <th className="py-2 text-right">Faturamento</th>
+                  <tr className="border-b border-slate-100">
+                    <th className={thClass}>Serviço adicional</th>
+                    <th className={thClassRight}>Qtd. vendida</th>
+                    <th className={thClassRight}>Receita total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -652,7 +505,7 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
                     <tr key={a.servico} className="border-b border-slate-50">
                       <td className="py-3 pr-4 font-bold text-slate-700">{a.servico}</td>
                       <td className="py-3 pr-4 text-right font-bold text-slate-600">{a.qtd}</td>
-                      <td className="py-3 text-right font-black text-slate-800">{formatCurrencyBR(a.faturamento)}</td>
+                      <td className="py-3 text-right font-black text-emerald-600">{formatCurrencyBR(a.faturamento)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -661,9 +514,75 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
           </div>
         </div>
 
-        {/* Bloco: Formas de pagamento */}
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
+          <SectionTitle title="Próximos Agendamentos" subtitle="Próximos pets agendados para banho e tosa" />
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatTile label="Agendados" value={agendamentosCardsLoading ? '—' : agendamentosCards?.agendados ?? 0} />
+            <StatTile label="Concluídos" value={agendamentosCardsLoading ? '—' : agendamentosCards?.concluidos ?? 0} tone="violet" />
+            <StatTile label="Cancelados" value={agendamentosCardsLoading ? '—' : agendamentosCards?.cancelados ?? 0} tone="rose" />
+            <StatTile label="Taxa conclusão" value={agendamentosCardsLoading ? '—' : `${formatDecimalBR(agendamentosCards?.taxaConclusao ?? 0)}%`} />
+          </div>
+
+          {proximosLoading ? (
+            <CardSkeleton height={160} />
+          ) : proximosAgendamentos.length === 0 ? (
+            <p className="text-center text-slate-300 font-bold italic py-8">Nenhum agendamento futuro encontrado.</p>
+          ) : (
+            <div className="overflow-x-auto -mx-2">
+              <table className="w-full text-sm min-w-[480px]">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className={`${thClass} px-2`}>Pet / Cliente</th>
+                    <th className={`${thClass} px-2`}>Unidade</th>
+                    <th className={`${thClassRight} px-2`}>Horário</th>
+                    <th className={`${thClassRight} px-2`}>Valor</th>
+                    <th className={`${thClassRight} px-2`}>Táxi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {proximosAgendamentos.map((a) => (
+                    <tr key={a.id} className="border-b border-slate-50">
+                      <td className="py-3 px-2 min-w-0">
+                        <p className="font-black text-slate-800 text-sm truncate">
+                          {a.petNome}{a.petRaca ? ` (${a.petRaca})` : ''}
+                          {a.numeroSessao ? <span className="ml-2 text-[9px] font-black text-violet-500 uppercase">Sessão {a.numeroSessao}</span> : null}
+                        </p>
+                        {a.clienteNome && <p className="text-[11px] text-slate-400 font-bold truncate">{a.clienteNome}</p>}
+                      </td>
+                      <td className="py-3 px-2 text-slate-500 font-bold text-xs">{a.unidadeNome || '—'}</td>
+                      <td className="py-3 px-2 text-right text-slate-600 font-bold text-xs whitespace-nowrap">{a.horario}</td>
+                      <td className="py-3 px-2 text-right font-black text-slate-800 whitespace-nowrap">{formatCurrencyBR(a.valor)}</td>
+                      <td className="py-3 px-2 text-right">
+                        {a.temTaxi ? (
+                          <span className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase">Sim</span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Linha: Serviços mais vendidos + Formas de pagamento + Insights IA */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-          <SectionTitle icon="fa-credit-card" color="bg-indigo-50 text-indigo-600" title="Formas de Pagamento" subtitle="Pagamentos divididos contam cada parte separadamente" />
+          <SectionTitle title="Serviços Mais Vendidos" subtitle="Faturamento por tipo de serviço" />
+          <div className="mt-4">
+            <SimpleDonut
+              loading={faturamentoCategoriaLoading}
+              data={faturamentoCategoria.map((c) => ({ label: CATEGORIA_LABEL[c.categoria] || c.categoria, valor: c.valor, cor: CATEGORIA_COR[c.categoria] || '#94A3B8' }))}
+            />
+          </div>
+        </div>
+
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+          <SectionTitle title="Formas de Pagamento" subtitle="Métodos mais utilizados na rede" />
           <div className="mt-4">
             <SimpleDonut
               loading={formasPagamentoLoading}
@@ -671,70 +590,23 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
             />
           </div>
         </div>
-      </div>
 
-      {/* Bloco: Agendamentos */}
-      <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
-        <SectionTitle icon="fa-calendar-check" color="bg-amber-50 text-amber-600" title="Agendamentos" />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-slate-50 rounded-2xl p-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Agendados</p>
-            <p className="text-xl font-black text-slate-800">{agendamentosCardsLoading ? '—' : agendamentosCards?.agendados ?? 0}</p>
-          </div>
-          <div className="bg-slate-50 rounded-2xl p-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Concluídos</p>
-            <p className="text-xl font-black text-slate-800">{agendamentosCardsLoading ? '—' : agendamentosCards?.concluidos ?? 0}</p>
-          </div>
-          <div className="bg-slate-50 rounded-2xl p-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cancelados</p>
-            <p className="text-xl font-black text-slate-800">{agendamentosCardsLoading ? '—' : agendamentosCards?.cancelados ?? 0}</p>
-          </div>
-          <div className="bg-slate-50 rounded-2xl p-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Taxa de conclusão</p>
-            <p className="text-xl font-black text-slate-800">{agendamentosCardsLoading ? '—' : `${agendamentosCards?.taxaConclusao ?? 0}%`}</p>
-          </div>
-        </div>
-
-        <div>
-          <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Próximos agendamentos</h4>
-          {proximosLoading ? (
-            <CardSkeleton height={160} />
-          ) : proximosAgendamentos.length === 0 ? (
-            <p className="text-center text-slate-300 font-bold italic py-8">Nenhum agendamento futuro encontrado.</p>
-          ) : (
-            <div className="space-y-2">
-              {proximosAgendamentos.map((a) => (
-                <div key={a.id} className="flex items-center justify-between gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex-wrap">
-                  <div className="flex items-center gap-4 min-w-0">
-                    <span className="text-xs font-black text-slate-700 shrink-0">{a.horario}</span>
-                    <div className="min-w-0">
-                      <p className="font-black text-slate-800 text-sm truncate">
-                        {a.petNome}{a.petRaca ? ` · ${a.petRaca}` : ''}
-                        {a.numeroSessao ? <span className="ml-2 text-[9px] font-black text-violet-500 uppercase">Sessão {a.numeroSessao}</span> : null}
-                      </p>
-                      <p className="text-[11px] text-slate-400 font-bold truncate">{a.servicos}</p>
-                    </div>
-                  </div>
-                  {a.temTaxi && (
-                    <span className="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-600 text-[9px] font-black uppercase shrink-0">
-                      <i className="fa-solid fa-taxi mr-1"></i>Transporte
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <InsightsCard
+          loading={insightsLoading}
+          variacaoFaturamento={variacaoFaturamento}
+          topCategoriaLabel={topCategoriaLabel}
+          topUnidadeNome={topUnidade?.unidadeNome ?? null}
+        />
       </div>
 
       {/* Modal de configuração de custos por serviço */}
       {isCostModalOpen && (
         <div className="app-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
           <div className="app-modal-panel bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <header className="bg-orange-500 p-6 text-white flex justify-between items-center shrink-0">
+            <header className="bg-violet-600 p-6 text-white flex justify-between items-center shrink-0">
               <div>
                 <h3 className="text-lg font-black">Custo padrão por serviço</h3>
-                <p className="text-orange-100 text-xs font-medium">Usado no bloco de Custos com Pacotes</p>
+                <p className="text-violet-100 text-xs font-medium">Usado no bloco de Custos com Pacotes</p>
               </div>
               <button onClick={() => setIsCostModalOpen(false)} className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full text-xl">
                 <i className="fa-solid fa-xmark"></i>
@@ -768,7 +640,7 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
               <button
                 onClick={saveCustos}
                 disabled={savingCustos}
-                className="px-8 py-3 bg-orange-500 text-white rounded-xl font-black text-[11px] uppercase shadow-lg shadow-orange-500/20"
+                className="px-8 py-3 bg-violet-600 text-white rounded-xl font-black text-[11px] uppercase shadow-lg shadow-violet-500/20"
               >
                 {savingCustos ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'Salvar'}
               </button>
