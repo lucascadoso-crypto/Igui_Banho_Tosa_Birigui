@@ -1,297 +1,249 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Unit } from '../types';
+import { formatCurrencyBR, formatDecimalBR } from '../services/appointmentTotals';
+import {
+  FinanceiroFiltros,
+  FinanceiroKpis,
+  FluxoDiarioPonto,
+  LinhaServicoValor,
+  FormaPagamentoValor,
+  Fidelidade,
+  ContaPendente,
+  getFiltrosDefault,
+  calcularVariacao,
+  fetchFinanceiroKpis,
+  fetchFluxoDiario,
+  fetchFaturamentoPorLinha,
+  fetchFormasPagamentoFinanceiro,
+  fetchFidelidade,
+  fetchContasPendentes
+} from '../services/financeiroGeral';
+import FinanceStatusBar from './FinanceiroGeral/FinanceStatusBar';
+import FinanceiroFiltersCard from './FinanceiroGeral/FinanceiroFiltersCard';
+import FinanceKpiCard from './FinanceiroGeral/FinanceKpiCard';
+import CashFlowLineChart from './FinanceiroGeral/CashFlowLineChart';
+import ServiceTypeBarChart from './FinanceiroGeral/ServiceTypeBarChart';
+import FidelidadeCard from './FinanceiroGeral/FidelidadeCard';
+import ContasReceberCard from './FinanceiroGeral/ContasReceberCard';
+import ContasReceberModal from './FinanceiroGeral/ContasReceberModal';
+import CardSkeleton from './Dashboard/CardSkeleton';
+import SectionTitle from './Dashboard/SectionTitle';
+import SimpleDonut from './Dashboard/SimpleDonut';
 
 interface FinanceiroGlobalProps {
   units: Unit[];
   supabaseClient: any;
 }
 
+const FORMA_PAGAMENTO_COR: Record<string, string> = {
+  Pix: '#10B981',
+  Dinheiro: '#0EA5E9',
+  Débito: '#7C3AED',
+  Crédito: '#F59E0B',
+  Transferência: '#EC4899',
+  Outro: '#94A3B8',
+  'Não informado': '#CBD5E1'
+};
+
+const trendFrom = (atual: number, anterior: number) => ({
+  value: Math.abs(calcularVariacao(atual, anterior)),
+  direction: (atual >= anterior ? 'up' : 'down') as 'up' | 'down'
+});
+
 const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClient }) => {
-  const [loading, setLoading] = useState(false);
-  const [hasError, setHasError] = useState(false); 
-  const getTodayBR = () => {
-    const dataLocalBR = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-    const [dia, mes, ano] = dataLocalBR.split('/');
-    return `${ano}-${mes}-${dia}`;
-  };
+  const [filtros, setFiltros] = useState<FinanceiroFiltros>(() => getFiltrosDefault(units.length === 1 ? units[0].id : null));
+  const [syncing, setSyncing] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const [startDate, setStartDate] = useState(() => {
-    const today = getTodayBR();
-    const [y, m] = today.split('-');
-    return `${y}-${m}-01`;
-  }); 
-  const [endDate, setEndDate] = useState(getTodayBR()); 
-  
-  const [globalKPIs, setGlobalKPIs] = useState({
-    receitaBruta: 0,
-    despesasTotais: 0,
-    cartoes: 0,
-    pixDinheiro: 0,
-    lucroLiquido: 0
-  });
+  const [kpis, setKpis] = useState<FinanceiroKpis | null>(null);
+  const [kpisLoading, setKpisLoading] = useState(true);
+  const [kpisError, setKpisError] = useState<string | null>(null);
 
-  const [unitData, setUnitData] = useState<any[]>([]);
+  const [fluxoDiario, setFluxoDiario] = useState<FluxoDiarioPonto[]>([]);
+  const [fluxoDiarioLoading, setFluxoDiarioLoading] = useState(true);
+
+  const [porLinha, setPorLinha] = useState<LinhaServicoValor[]>([]);
+  const [porLinhaLoading, setPorLinhaLoading] = useState(true);
+
+  const [formasPagamento, setFormasPagamento] = useState<FormaPagamentoValor[]>([]);
+  const [formasPagamentoLoading, setFormasPagamentoLoading] = useState(true);
+
+  const [fidelidade, setFidelidade] = useState<Fidelidade | null>(null);
+  const [fidelidadeLoading, setFidelidadeLoading] = useState(true);
+
+  const [contasPendentes, setContasPendentes] = useState<ContaPendente[]>([]);
+  const [contasPendentesLoading, setContasPendentesLoading] = useState(true);
+
+  const carregarTudo = useCallback(() => {
+    setKpisLoading(true);
+    setKpisError(null);
+    fetchFinanceiroKpis(supabaseClient, filtros)
+      .then(setKpis)
+      .catch((err) => { console.error('Erro ao carregar KPIs do Financeiro Geral:', err); setKpisError(err?.message || 'Falha ao carregar KPIs.'); })
+      .finally(() => setKpisLoading(false));
+
+    setFluxoDiarioLoading(true);
+    fetchFluxoDiario(supabaseClient, filtros)
+      .then(setFluxoDiario)
+      .catch((err) => console.error('Erro ao carregar fluxo financeiro diário:', err))
+      .finally(() => setFluxoDiarioLoading(false));
+
+    setPorLinhaLoading(true);
+    fetchFaturamentoPorLinha(supabaseClient, filtros)
+      .then(setPorLinha)
+      .catch((err) => console.error('Erro ao carregar faturamento por linha de serviço:', err))
+      .finally(() => setPorLinhaLoading(false));
+
+    setFormasPagamentoLoading(true);
+    fetchFormasPagamentoFinanceiro(supabaseClient, filtros)
+      .then(setFormasPagamento)
+      .catch((err) => console.error('Erro ao carregar formas de pagamento:', err))
+      .finally(() => setFormasPagamentoLoading(false));
+
+    setFidelidadeLoading(true);
+    fetchFidelidade(supabaseClient, filtros)
+      .then(setFidelidade)
+      .catch((err) => console.error('Erro ao carregar fidelidade pacotes x avulsos:', err))
+      .finally(() => setFidelidadeLoading(false));
+
+    setContasPendentesLoading(true);
+    fetchContasPendentes(supabaseClient, filtros)
+      .then(setContasPendentes)
+      .catch((err) => console.error('Erro ao carregar contas a receber:', err))
+      .finally(() => setContasPendentesLoading(false));
+  }, [supabaseClient, filtros]);
 
   useEffect(() => {
-    if (hasError) return;
-    fetchGlobalFinance();
-  }, [units.length, startDate, endDate]); 
+    carregarTudo();
+  }, [carregarTudo]);
 
-  const fetchGlobalFinance = async () => {
-    if (!units.length || !supabaseClient) return;
-    setLoading(true);
-    
-    try {
-      let appts: any[] = [];
-      let packs: any[] = [];
-      let expenses: any[] = [];
-      const dataInicioFull = `${startDate}T00:00:00Z`;
-      const dataFimFull = `${endDate}T23:59:59Z`;
-
-      // 1. Buscar Agendamentos (Traz tudo e filtra no JS para evitar erro 400 de coluna ausente)
-      const { data: dAppts, error: errAppts } = await supabaseClient
-        .from('agendamentos')
-        .select('*')
-        .gte('data_agendamento', startDate)
-        .lte('data_agendamento', endDate);
-      
-      if (errAppts) {
-        console.warn("Aviso (Agendamentos):", errAppts);
-      } else {
-        // Filtra os pagos e que não fazem parte de um pacote
-        appts = (dAppts || []).filter(a => (a.pago === true || a.pago === 'true') && !a.pacote_id);
-      }
-
-      // 2. Buscar Pacotes
-      // Usando comparação estrita de string YYYY-MM-DD para evitar deslocamento de fuso
-      const { data: dPacks, error: errPacks } = await supabaseClient
-        .from('pacotes')
-        .select('*')
-        .gte('data_pagamento', startDate)
-        .lte('data_pagamento', endDate);
-
-      if (errPacks) {
-        console.warn("Aviso (Pacotes):", errPacks);
-      } else {
-        // Filtra apenas os pacotes pagos
-        packs = (dPacks || []).filter(p => p.pago === true || p.pago === 'true');
-      }
-
-      // 3. Buscar Despesas (A prova de falhas: Tenta por data_despesa, se der erro, tenta por created_at)
-      let { data: dExp, error: errExp } = await supabaseClient
-        .from('despesas')
-        .select('*')
-        .gte('data_despesa', startDate)
-        .lte('data_despesa', endDate);
-
-      if (errExp) {
-        console.warn("Tentando buscar despesas de forma alternativa...", errExp);
-        const { data: dExpAlt } = await supabaseClient
-          .from('despesas')
-          .select('*')
-          .gte('created_at', dataInicioFull)
-          .lte('created_at', dataFimFull);
-        expenses = dExpAlt || [];
-      } else {
-        expenses = dExp || [];
-      }
-
-      // 4. Agregação e Matemática
-      let gReceita = 0;
-      let gDespesa = 0;
-      let gCartoes = 0;
-      let gPixDinheiro = 0;
-
-      const breakdown = units.map(unit => {
-        const uAppts = appts.filter((a: any) => a.unidade_id === unit.id);
-        const uPacks = packs.filter((p: any) => p.unidade_id === unit.id);
-        const uExpenses = expenses.filter((e: any) => e.unidade_id === unit.id);
-
-        const receita = uAppts.reduce((acc, curr) => acc + (parseFloat(curr.valor_total) || 0) + (parseFloat(curr.valor_pagamento_2) || 0), 0) + 
-                        uPacks.reduce((acc, curr) => acc + (parseFloat(curr.valor_total) || 0) + (parseFloat(curr.valor_pagamento_2) || 0), 0);
-        
-        // Cobre tanto o nome 'valor_total' quanto 'valor' caso a tabela despesas seja diferente
-        const despesa = uExpenses.reduce((acc, curr) => acc + (parseFloat(curr.valor_total || curr.valor) || 0), 0);
-
-        gReceita += receita;
-        gDespesa += despesa;
-
-        [...uAppts, ...uPacks].forEach((item: any) => {
-          const method = (item.forma_pagamento || '').toLowerCase();
-          const v1 = (parseFloat(item.valor_total) || 0);
-          
-          if (method.includes('cartão') || method.includes('credito') || method.includes('debito') || method.includes('crédito') || method.includes('débito')) {
-            gCartoes += v1;
-          } else if (method.includes('pix') || method.includes('dinheiro')) {
-            gPixDinheiro += v1;
-          }
-
-          // Adicionar Valor 2 se existir
-          const method2 = (item.forma_pagamento_2 || '').toLowerCase();
-          const v2 = (parseFloat(item.valor_pagamento_2) || 0);
-          if (v2 > 0) {
-            if (method2.includes('cartão') || method2.includes('credito') || method2.includes('debito') || method2.includes('crédito') || method2.includes('débito')) {
-              gCartoes += v2;
-            } else if (method2.includes('pix') || method2.includes('dinheiro')) {
-              gPixDinheiro += v2;
-            }
-          }
-        });
-
-        return {
-          id: unit.id,
-          nome: unit.name.toUpperCase(),
-          receita,
-          despesa,
-          resultado: receita - despesa
-        };
-      });
-
-      setGlobalKPIs({
-        receitaBruta: gReceita,
-        despesasTotais: gDespesa,
-        cartoes: gCartoes,
-        pixDinheiro: gPixDinheiro,
-        lucroLiquido: gReceita - gDespesa
-      });
-
-      setUnitData(breakdown);
-      setHasError(false);
-
-    } catch (err: any) {
-      console.error("Erro Fatal no Javascript (Consolidação Global):", err);
-      setHasError(true); 
-    } finally {
-      setLoading(false); 
-    }
+  const handleSync = () => {
+    setSyncing(true);
+    carregarTudo();
+    setTimeout(() => setSyncing(false), 600);
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
-      
-      {/* Cabeçalho */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-        <div className="flex items-center space-x-5">
-           <div className="w-14 h-14 bg-slate-900 text-amber-500 rounded-2xl flex items-center justify-center text-2xl shadow-lg">
-              <i className="fa-solid fa-wallet"></i>
-           </div>
-           <div>
-              <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Faturamento Global</h2>
-              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Rede de Lojas • Balanço Consolidado</p>
-           </div>
-        </div>
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <FinanceStatusBar syncing={syncing} onSync={handleSync} />
 
-        <div className="flex items-center space-x-4">
-           <div className="flex flex-col">
-              <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1">Início</label>
-              <input 
-                type="date" 
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 text-sm outline-none focus:ring-2 focus:ring-amber-500"
-              />
-           </div>
-           <div className="flex flex-col">
-              <label className="text-[9px] font-black text-slate-400 uppercase ml-2 mb-1">Fim</label>
-              <input 
-                type="date" 
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 text-sm outline-none focus:ring-2 focus:ring-amber-500"
-              />
-           </div>
-        </div>
-      </header>
+      <FinanceiroFiltersCard units={units} filtros={filtros} onChangeFiltros={setFiltros} />
 
-      {hasError && (
-        <div className="bg-rose-50 border border-rose-100 p-8 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-4">
-           <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-rose-500 text-white rounded-2xl flex items-center justify-center shadow-lg"><i className="fa-solid fa-cloud-bolt text-xl"></i></div>
-              <div>
-                 <p className="text-sm font-black text-rose-800 uppercase tracking-tight">Falha Parcial nos Dados</p>
-                 <p className="text-xs font-bold text-rose-500">Algumas tabelas não retornaram dados, mas os cálculos disponíveis foram feitos.</p>
-              </div>
-           </div>
-           <button onClick={() => { setHasError(false); fetchGlobalFinance(); }} className="bg-rose-500 hover:bg-rose-600 text-white px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all">Tentar Novamente</button>
+      {kpisError && (
+        <div className="bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold px-4 py-3 rounded-xl flex items-center gap-2">
+          <i className="fa-solid fa-triangle-exclamation"></i> {kpisError}
         </div>
       )}
 
-      {/* KPIs Globais */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Receita Bruta</p>
-            <p className="text-2xl font-black text-emerald-600">R$ {globalKPIs.receitaBruta.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-            <div className="mt-3 flex items-center text-[9px] font-bold text-emerald-500">
-               <i className="fa-solid fa-arrow-trend-up mr-1"></i> Entradas Totais
-            </div>
-         </div>
-         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Despesas Totais</p>
-            <p className="text-2xl font-black text-rose-500">R$ {globalKPIs.despesasTotais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-            <div className="mt-3 flex items-center text-[9px] font-bold text-rose-400">
-               <i className="fa-solid fa-arrow-trend-down mr-1"></i> Saídas Gastos
-            </div>
-         </div>
-         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Cartões (C+D)</p>
-            <p className="text-2xl font-black text-slate-800">R$ {globalKPIs.cartoes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-            <div className="mt-3 text-[9px] font-bold text-slate-400">Taxas não deduzidas</div>
-         </div>
-         <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Pix / Dinheiro</p>
-            <p className="text-2xl font-black text-slate-800">R$ {globalKPIs.pixDinheiro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-            <div className="mt-3 text-[9px] font-bold text-slate-400">Liquidez imediata</div>
-         </div>
-         <div className="bg-slate-900 p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
-            <div className="relative z-10">
-               <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1">Lucro Líquido Rede</p>
-               <p className="text-2xl font-black text-white">R$ {globalKPIs.lucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-               <div className="mt-3 text-[9px] font-black text-amber-500/50 uppercase">Resultado Final</div>
-            </div>
-            <i className="fa-solid fa-sack-dollar absolute -right-2 -bottom-2 text-5xl opacity-5 text-white group-hover:scale-110 transition-transform"></i>
-         </div>
+      {/* Linha: 6 KPIs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        <FinanceKpiCard
+          label="Faturamento"
+          value={formatCurrencyBR(kpis?.faturamentoAtual ?? 0)}
+          icon="fa-sack-dollar"
+          barColor="purple"
+          loading={kpisLoading}
+          trend={kpis ? trendFrom(kpis.faturamentoAtual, kpis.faturamentoAnterior) : undefined}
+        />
+        <FinanceKpiCard
+          label="Recebido"
+          value={formatCurrencyBR(kpis?.recebidoAtual ?? 0)}
+          icon="fa-hand-holding-dollar"
+          barColor="green"
+          loading={kpisLoading}
+          trend={kpis ? trendFrom(kpis.recebidoAtual, kpis.recebidoAnterior) : undefined}
+        />
+        <FinanceKpiCard
+          label="A Receber"
+          value={formatCurrencyBR(kpis?.aReceberPeriodo ?? 0)}
+          subtext="Previsão de entrada"
+          icon="fa-hourglass-half"
+          barColor="orange"
+          loading={kpisLoading}
+        />
+        <FinanceKpiCard
+          label="Custos"
+          value={formatCurrencyBR(kpis?.custosAtual ?? 0)}
+          subtext="Despesas operacionais"
+          subtextTone="red"
+          icon="fa-file-invoice-dollar"
+          barColor="red"
+          valueTone="red"
+          loading={kpisLoading}
+        />
+        <FinanceKpiCard
+          label="Lucro"
+          value={formatCurrencyBR(kpis?.lucroAtual ?? 0)}
+          icon="fa-chart-line"
+          barColor="green"
+          valueTone="green"
+          loading={kpisLoading}
+          trend={kpis ? trendFrom(kpis.lucroAtual, kpis.lucroAnterior) : undefined}
+        />
+        <FinanceKpiCard
+          label="Inadimplência"
+          value={`${formatDecimalBR(kpis?.inadimplenciaPct ?? 0)}%`}
+          subtext={`${formatCurrencyBR(kpis?.vencidoTotal ?? 0)} em aberto`}
+          subtextTone="red"
+          icon="fa-triangle-exclamation"
+          barColor="red"
+          valueTone="red"
+          loading={kpisLoading}
+        />
       </div>
 
-      {/* Performance por Unidade */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-         {unitData.map(unit => (
-            <div key={unit.id} className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 hover:shadow-lg transition-all group">
-               <div className="flex items-center space-x-3 mb-8">
-                  <div className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center text-lg group-hover:bg-amber-50 group-hover:text-amber-500 transition-colors">
-                     <i className="fa-solid fa-store"></i>
-                  </div>
-                  <h4 className="font-black text-slate-800 text-sm tracking-tight">IGUI {unit.nome}</h4>
-               </div>
-
-               <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Entradas</span>
-                     <span className="font-black text-emerald-500">R$ {unit.receita.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Saídas</span>
-                     <span className="font-black text-rose-500">R$ {unit.despesa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <hr className="border-slate-50" />
-                  <div className="flex justify-between items-end pt-2">
-                     <span className="text-xs font-black text-slate-900 uppercase">Resultado</span>
-                     <div className="text-right">
-                        <p className={`text-2xl font-black ${unit.resultado >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
-                           R$ {unit.resultado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                     </div>
-                  </div>
-               </div>
-            </div>
-         ))}
-      </div>
-
-      {loading && !hasError && (
-        <div className="fixed bottom-10 right-10 bg-white p-5 rounded-2xl shadow-2xl border border-slate-100 flex items-center space-x-3 animate-bounce">
-           <i className="fa-solid fa-circle-notch fa-spin text-amber-500"></i>
-           <span className="text-xs font-black text-slate-500 uppercase">Calculando Rede...</span>
+      {/* Linha: Fluxo financeiro diário + Por tipo de serviço */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+        <div className="xl:col-span-2 bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+          <SectionTitle title="Fluxo Financeiro Diário" subtitle="Balanço temporal de Entradas, Custos e Lucro Líquido" />
+          <div className="mt-4">
+            {fluxoDiarioLoading ? <CardSkeleton height={260} /> : <CashFlowLineChart data={fluxoDiario} />}
+          </div>
         </div>
-      )}
+
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+          <SectionTitle title="Por Tipo de Serviço" subtitle="Faturamento bruto das principais linhas operacionais" />
+          <div className="mt-4">
+            {porLinhaLoading ? <CardSkeleton height={220} /> : <ServiceTypeBarChart data={porLinha} />}
+          </div>
+        </div>
+      </div>
+
+      {/* Linha: Formas de pagamento + Fidelidade */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+          <SectionTitle title="Formas de Pagamento" subtitle="Adesão dos clientes aos métodos de pagamento integrados" />
+          <div className="mt-4">
+            <SimpleDonut
+              loading={formasPagamentoLoading}
+              centerLabel="Total Recebido"
+              emptyLabel="Nenhum recebimento"
+              data={formasPagamento.map((f) => ({ label: f.forma, valor: f.valor, cor: FORMA_PAGAMENTO_COR[f.forma] || '#94A3B8' }))}
+            />
+          </div>
+        </div>
+
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+          <SectionTitle title="Fidelidade: Pacotes x Avulsos" subtitle="Comparação proporcional entre faturamento recorrente e atendimentos individuais" />
+          <div className="mt-4">
+            <FidelidadeCard data={fidelidade} loading={fidelidadeLoading} />
+          </div>
+        </div>
+      </div>
+
+      {/* Linha: Contas a Receber */}
+      <ContasReceberCard
+        items={contasPendentes}
+        loading={contasPendentesLoading}
+        onVerTodas={() => setModalOpen(true)}
+      />
+
+      <ContasReceberModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        items={contasPendentes}
+        loading={contasPendentesLoading}
+      />
     </div>
   );
 };

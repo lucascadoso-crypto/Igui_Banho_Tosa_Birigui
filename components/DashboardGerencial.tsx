@@ -6,6 +6,11 @@ import DashboardHeader from './Dashboard/DashboardHeader';
 import RevenueLineChart from './Dashboard/RevenueLineChart';
 import UnitBarChart from './Dashboard/UnitBarChart';
 import InsightsCard from './Dashboard/InsightsCard';
+import CardSkeleton from './Dashboard/CardSkeleton';
+import SectionTitle from './Dashboard/SectionTitle';
+import SimpleDonut from './Dashboard/SimpleDonut';
+import StatTile from './Dashboard/StatTile';
+import { thClass, thClassRight } from './Dashboard/tableClasses';
 import {
   DashboardFiltros,
   Granularidade,
@@ -63,100 +68,6 @@ const FORMA_PAGAMENTO_COR: Record<string, string> = {
   Outro: '#94A3B8',
   'Não informado': '#CBD5E1'
 };
-
-const CardSkeleton: React.FC<{ height?: number }> = ({ height = 280 }) => (
-  <div className="bg-white rounded-[2rem] p-6 sm:p-8 shadow-sm border border-slate-100 animate-pulse" style={{ minHeight: height }}>
-    <div className="h-4 w-1/3 bg-slate-100 rounded mb-6"></div>
-    <div className="h-full w-full bg-slate-50 rounded-xl"></div>
-  </div>
-);
-
-const SectionTitle: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
-  <div className="mb-2">
-    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide leading-tight">{title}</h3>
-    {subtitle && <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">{subtitle}</p>}
-  </div>
-);
-
-const SimpleDonut: React.FC<{
-  data: { label: string; valor: number; cor: string }[];
-  loading?: boolean;
-  centerLabel?: string;
-}> = ({ data, loading, centerLabel = 'Total' }) => {
-  const total = data.reduce((sum, d) => sum + d.valor, 0);
-
-  if (loading) return <CardSkeleton height={260} />;
-
-  if (total <= 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-10 text-slate-300">
-        <i className="fa-solid fa-chart-pie text-5xl mb-3 opacity-30"></i>
-        <p className="font-bold text-sm">Sem dados no período.</p>
-      </div>
-    );
-  }
-
-  const radius = 68;
-  const stroke = 30;
-  const circumference = 2 * Math.PI * radius;
-  let acc = 0;
-
-  return (
-    <div className="flex flex-col sm:flex-row items-center gap-6 min-w-0 max-w-full">
-      <div className="relative shrink-0 w-32 h-32 sm:w-[140px] sm:h-[140px] mx-auto sm:mx-0">
-        <svg viewBox="0 0 180 180" className="w-full h-full">
-          <g transform="translate(90,90) rotate(-90)">
-            {data.filter(d => d.valor > 0).map((d, idx) => {
-              const frac = d.valor / total;
-              const dash = frac * circumference;
-              const gap = circumference - dash;
-              const offset = -acc * circumference;
-              acc += frac;
-              return (
-                <circle
-                  key={idx}
-                  r={radius}
-                  fill="none"
-                  stroke={d.cor}
-                  strokeWidth={stroke}
-                  strokeDasharray={`${dash} ${gap}`}
-                  strokeDashoffset={offset}
-                />
-              );
-            })}
-          </g>
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center px-2">
-          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{centerLabel}</p>
-          <p className="text-[11px] sm:text-xs font-black text-slate-800 text-center leading-tight break-words">{formatCurrencyBR(total)}</p>
-        </div>
-      </div>
-      <div className="flex-1 w-full min-w-0 space-y-2.5">
-        {data.filter(d => d.valor > 0).map((d, idx) => (
-          <div key={idx} className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-xs min-w-0">
-            <span className="flex items-center gap-2 font-bold text-slate-600 min-w-0 max-w-full">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.cor }}></span>
-              <span className="break-words">{d.label}</span>
-            </span>
-            <span className="font-black text-slate-800 whitespace-nowrap">
-              {formatCurrencyBR(d.valor)} <span className="text-slate-400 font-bold">({Math.round((d.valor / total) * 100)}%)</span>
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const thClass = 'py-2 pr-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left';
-const thClassRight = 'py-2 pr-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right';
-
-const StatTile: React.FC<{ label: string; value: React.ReactNode; tone?: 'neutral' | 'rose' | 'violet' }> = ({ label, value, tone = 'neutral' }) => (
-  <div className="bg-slate-50 rounded-2xl p-5">
-    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-    <p className={`text-xl font-black ${tone === 'rose' ? 'text-rose-600' : tone === 'violet' ? 'text-violet-600' : 'text-slate-800'}`}>{value}</p>
-  </div>
-);
 
 const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabaseClient }) => {
   const defaultPeriodo = getDefaultPeriodo();
