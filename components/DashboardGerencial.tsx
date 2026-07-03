@@ -374,6 +374,36 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
         />
       </div>
 
+      {/* Linha: Serviços mais vendidos + Formas de pagamento + Insights IA */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+          <SectionTitle title="Serviços Mais Vendidos" subtitle="Faturamento por tipo de serviço" />
+          <div className="mt-4">
+            <SimpleDonut
+              loading={faturamentoCategoriaLoading}
+              data={faturamentoCategoria.map((c) => ({ label: CATEGORIA_LABEL[c.categoria] || c.categoria, valor: c.valor, cor: CATEGORIA_COR[c.categoria] || '#94A3B8' }))}
+            />
+          </div>
+        </div>
+
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+          <SectionTitle title="Formas de Pagamento" subtitle="Métodos mais utilizados na rede" />
+          <div className="mt-4">
+            <SimpleDonut
+              loading={formasPagamentoLoading}
+              data={formasPagamento.map((f) => ({ label: f.forma, valor: f.valor, cor: FORMA_PAGAMENTO_COR[f.forma] || '#94A3B8' }))}
+            />
+          </div>
+        </div>
+
+        <InsightsCard
+          loading={insightsLoading}
+          variacaoFaturamento={variacaoFaturamento}
+          topCategoriaLabel={topCategoriaLabel}
+          topUnidadeNome={topUnidade?.unidadeNome ?? null}
+        />
+      </div>
+
       {/* Linha: Faturamento diário + Faturamento da unidade */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div className="xl:col-span-2 bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
@@ -567,36 +597,6 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
             </div>
           )}
         </div>
-      </div>
-
-      {/* Linha: Serviços mais vendidos + Formas de pagamento + Insights IA */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-          <SectionTitle title="Serviços Mais Vendidos" subtitle="Faturamento por tipo de serviço" />
-          <div className="mt-4">
-            <SimpleDonut
-              loading={faturamentoCategoriaLoading}
-              data={faturamentoCategoria.map((c) => ({ label: CATEGORIA_LABEL[c.categoria] || c.categoria, valor: c.valor, cor: CATEGORIA_COR[c.categoria] || '#94A3B8' }))}
-            />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
-          <SectionTitle title="Formas de Pagamento" subtitle="Métodos mais utilizados na rede" />
-          <div className="mt-4">
-            <SimpleDonut
-              loading={formasPagamentoLoading}
-              data={formasPagamento.map((f) => ({ label: f.forma, valor: f.valor, cor: FORMA_PAGAMENTO_COR[f.forma] || '#94A3B8' }))}
-            />
-          </div>
-        </div>
-
-        <InsightsCard
-          loading={insightsLoading}
-          variacaoFaturamento={variacaoFaturamento}
-          topCategoriaLabel={topCategoriaLabel}
-          topUnidadeNome={topUnidade?.unidadeNome ?? null}
-        />
       </div>
 
       {/* Modal de configuração de custos por serviço */}

@@ -42,8 +42,8 @@ const UnitBarChart: React.FC<UnitBarChartProps> = ({ data }) => {
 
   return (
     <div className="w-full">
-      <div className="w-full overflow-x-auto">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ minWidth: Math.max(220, data.length * 70) }}>
+      <div className="w-full">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full">
           {gridLines.map((g) => {
             const y = padTop + chartH - g * chartH;
             return (

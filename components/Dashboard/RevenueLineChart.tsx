@@ -76,8 +76,8 @@ const RevenueLineChart: React.FC<RevenueLineChartProps> = ({ data }) => {
   const hover = hoverIdx !== null ? points[hoverIdx] : null;
 
   return (
-    <div className="w-full overflow-x-auto">
-      <div className="relative" style={{ minWidth: 480 }}>
+    <div className="w-full">
+      <div className="relative w-full">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="w-full"
