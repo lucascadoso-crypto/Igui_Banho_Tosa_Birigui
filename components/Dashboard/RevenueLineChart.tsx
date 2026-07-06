@@ -5,6 +5,10 @@ import { formatCurrencyBR } from '../../services/appointmentTotals';
 
 interface RevenueLineChartProps {
   data: FaturamentoPontoPeriodo[];
+  color?: string;
+  seriesLabel?: string;
+  gradientId?: string;
+  emptyLabel?: string;
 }
 
 /**
@@ -29,14 +33,20 @@ const niceMax = (value: number) => {
   return niceNormalized * magnitude;
 };
 
-const RevenueLineChart: React.FC<RevenueLineChartProps> = ({ data }) => {
+const RevenueLineChart: React.FC<RevenueLineChartProps> = ({
+  data,
+  color = '#7C3AED',
+  seriesLabel = 'Faturamento',
+  gradientId = 'dashRevenueGradient',
+  emptyLabel = 'Sem faturamento no período.'
+}) => {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   if (!data.length || data.every((d) => d.valor === 0)) {
     return (
       <div className="flex flex-col items-center justify-center py-10 text-slate-300">
         <i className="fa-solid fa-chart-area text-5xl mb-3 opacity-30"></i>
-        <p className="font-bold text-sm">Sem faturamento no período.</p>
+        <p className="font-bold text-sm">{emptyLabel}</p>
       </div>
     );
   }
@@ -85,9 +95,9 @@ const RevenueLineChart: React.FC<RevenueLineChartProps> = ({ data }) => {
           onMouseLeave={() => setHoverIdx(null)}
         >
           <defs>
-            <linearGradient id="dashRevenueGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#7C3AED" stopOpacity={0.28} />
-              <stop offset="100%" stopColor="#7C3AED" stopOpacity={0} />
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.28} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
 
@@ -101,8 +111,8 @@ const RevenueLineChart: React.FC<RevenueLineChartProps> = ({ data }) => {
             );
           })}
 
-          <path d={areaPath} fill="url(#dashRevenueGradient)" stroke="none" />
-          <path d={linePath} fill="none" stroke="#7C3AED" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+          <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
+          <path d={linePath} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
           {points.map((p, idx) => (
             <circle
               key={idx}
@@ -110,11 +120,11 @@ const RevenueLineChart: React.FC<RevenueLineChartProps> = ({ data }) => {
               cy={p.y}
               r={hoverIdx === idx ? 5 : 3}
               fill="#fff"
-              stroke="#7C3AED"
+              stroke={color}
               strokeWidth={2.5}
             />
           ))}
-          {hover && <line x1={hover.x} x2={hover.x} y1={padTop} y2={padTop + chartH} stroke="#7C3AED" strokeWidth={1} strokeDasharray="3 3" opacity={0.4} />}
+          {hover && <line x1={hover.x} x2={hover.x} y1={padTop} y2={padTop + chartH} stroke={color} strokeWidth={1} strokeDasharray="3 3" opacity={0.4} />}
 
           {points.map((p, idx) => (
             (idx === 0 || idx === points.length - 1 || idx % Math.ceil(points.length / 8 || 1) === 0) && (
@@ -135,7 +145,7 @@ const RevenueLineChart: React.FC<RevenueLineChartProps> = ({ data }) => {
             }}
           >
             <p className="font-black text-slate-800">{formatBucketLabel(hover.bucket)}</p>
-            <p className="font-bold text-violet-600">Faturamento: {formatCurrencyBR(hover.valor)}</p>
+            <p className="font-bold" style={{ color }}>{seriesLabel}: {formatCurrencyBR(hover.valor)}</p>
           </div>
         )}
       </div>

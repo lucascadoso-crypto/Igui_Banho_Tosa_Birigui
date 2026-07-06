@@ -1,5 +1,5 @@
 import { toCurrencyNumber } from './appointmentTotals';
-import { getDefaultPeriodo } from './dashboardGerencial';
+import { getDefaultPeriodo, getTodayBR } from './dashboardGerencial';
 
 export interface RentabilidadeFiltros {
   unidadeId: number | null; // null = Todas as unidades
@@ -330,4 +330,24 @@ export const salvarCustoTransporte = async (supabaseClient: any, input: NovoCust
     }
   ]);
   if (error) throw error;
+};
+
+// ---------------------------------------------------------------------------
+// Sugestões vindas de Gastos (folha de pagamento / combustível). Nunca
+// sobrescrevem os custos vigentes sozinhas — a tela aplica só se o usuário
+// clicar em "usar sugestão".
+// ---------------------------------------------------------------------------
+
+/** Sugestão de custo de mão de obra por atendimento = folha do mês ÷ qtd de serviços realizados no mês. */
+export const fetchCustoMaoObraSugerido = async (supabaseClient: any, unidadeId: number | null = null, anoMes: string = getTodayBR()): Promise<number> => {
+  const { data, error } = await supabaseClient.rpc('fn_custo_mao_obra_sugerido', { p_unidade_id: unidadeId, p_ano_mes: anoMes });
+  if (error) throw error;
+  return toCurrencyNumber(data);
+};
+
+/** Sugestão de custo de transporte por viagem = combustível pago no mês ÷ qtd de viagens (táxi) no mês. */
+export const fetchCustoTransporteSugerido = async (supabaseClient: any, unidadeId: number | null = null, anoMes: string = getTodayBR()): Promise<number> => {
+  const { data, error } = await supabaseClient.rpc('fn_custo_transporte_sugerido', { p_unidade_id: unidadeId, p_ano_mes: anoMes });
+  if (error) throw error;
+  return toCurrencyNumber(data);
 };

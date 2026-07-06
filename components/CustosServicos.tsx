@@ -13,7 +13,9 @@ import {
   fetchCustoTransporteAtual,
   salvarCustoTransporte,
   fetchRentabilidadeThresholds,
-  saveRentabilidadeThresholds
+  saveRentabilidadeThresholds,
+  fetchCustoMaoObraSugerido,
+  fetchCustoTransporteSugerido
 } from '../services/rentabilidade';
 
 interface CustosServicosProps {
@@ -50,6 +52,9 @@ const CustosServicos: React.FC<CustosServicosProps> = ({ supabaseClient, userPro
 
   const [thresholds, setThresholds] = useState<RentabilidadeThresholds>({ margemVerdeMin: 60, margemAmarelaMin: 30 });
   const [savingThresholds, setSavingThresholds] = useState(false);
+
+  const [sugestaoMaoObra, setSugestaoMaoObra] = useState<number | null>(null);
+  const [sugestaoTransporte, setSugestaoTransporte] = useState<number | null>(null);
 
   const showMsg = (text: string, type: 'success' | 'error' = 'success') => {
     setMessage({ text, type });
@@ -90,6 +95,8 @@ const CustosServicos: React.FC<CustosServicosProps> = ({ supabaseClient, userPro
       custoTotal: String(s.custoAtual || ''),
       usarDecomposicao: false
     });
+    setSugestaoMaoObra(null);
+    fetchCustoMaoObraSugerido(supabaseClient).then(setSugestaoMaoObra).catch((err) => console.error('Erro ao calcular sugestão de mão de obra:', err));
   };
 
   const somaDecomposicao = (edit: EditingCusto) =>
@@ -147,6 +154,8 @@ const CustosServicos: React.FC<CustosServicosProps> = ({ supabaseClient, userPro
       usarDecomposicao: false
     });
     setEditingTransporte(true);
+    setSugestaoTransporte(null);
+    fetchCustoTransporteSugerido(supabaseClient).then(setSugestaoTransporte).catch((err) => console.error('Erro ao calcular sugestão de transporte:', err));
   };
 
   const salvarTransporte = async () => {
@@ -356,6 +365,16 @@ const CustosServicos: React.FC<CustosServicosProps> = ({ supabaseClient, userPro
                     <input type="number" min={0} step="0.01" value={editing.custoMaoObra}
                       onChange={(e) => setEditing({ ...editing, custoMaoObra: e.target.value })}
                       className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none font-bold" />
+                    {sugestaoMaoObra !== null && sugestaoMaoObra > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setEditing({ ...editing, custoMaoObra: String(sugestaoMaoObra) })}
+                        className="mt-1.5 text-[10px] font-bold text-violet-600 hover:text-violet-800"
+                      >
+                        <i className="fa-solid fa-wand-magic-sparkles mr-1"></i>
+                        Sugestão (folha ÷ atendimentos do mês): {formatCurrencyBR(sugestaoMaoObra)} — usar
+                      </button>
+                    )}
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase">Outros custos</label>
@@ -426,6 +445,16 @@ const CustosServicos: React.FC<CustosServicosProps> = ({ supabaseClient, userPro
                   <input type="number" min={0} step="0.01" value={transporteForm.custoTotal}
                     onChange={(e) => setTransporteForm({ ...transporteForm, custoTotal: e.target.value })}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl outline-none font-bold" />
+                  {sugestaoTransporte !== null && sugestaoTransporte > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setTransporteForm({ ...transporteForm, custoTotal: String(sugestaoTransporte) })}
+                      className="mt-1.5 text-[10px] font-bold text-violet-600 hover:text-violet-800"
+                    >
+                      <i className="fa-solid fa-wand-magic-sparkles mr-1"></i>
+                      Sugestão (combustível ÷ viagens do mês): {formatCurrencyBR(sugestaoTransporte)} — usar
+                    </button>
+                  )}
                 </div>
               )}
             </div>

@@ -107,7 +107,7 @@ const AppContent: React.FC = () => {
       case 'Financeiro':
         return activeUnit ? <Financeiro unit={activeUnit} supabaseClient={supabase} userProfile={effectiveUserProfile} /> : <div>Selecione uma unidade</div>;
       case 'Gastos':
-        return activeUnit ? <Gastos unit={activeUnit} supabaseClient={supabase} userProfile={effectiveUserProfile} /> : <div>Selecione uma unidade</div>;
+        return activeUnit ? <Gastos unit={activeUnit} units={units} supabaseClient={supabase} userProfile={effectiveUserProfile} /> : <div>Selecione uma unidade</div>;
       case 'Auditoria':
         return activeUnit ? <Auditoria unit={activeUnit} supabaseClient={supabase} userProfile={effectiveUserProfile} /> : <div>Selecione uma unidade</div>;
       default:
