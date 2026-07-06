@@ -1,16 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Unit } from '../types';
+import { useNavigation } from '../contexts/NavigationContext';
 import { formatCurrencyBR, formatDecimalBR } from '../services/appointmentTotals';
 import {
   RentabilidadeFiltros,
   RentabilidadeResumo,
   RentabilidadeServico,
-  RentabilidadePacote,
   RentabilidadeThresholds,
   getFiltrosDefault,
   fetchRentabilidadeResumo,
   fetchRentabilidadeServicos,
-  fetchRentabilidadePacotes,
   fetchRentabilidadeThresholds,
   classificarMargem
 } from '../services/rentabilidade';
@@ -75,6 +74,7 @@ const SortableTh: React.FC<{ label: string; sortKey: string; activeKey: string; 
 );
 
 const Rentabilidade: React.FC<RentabilidadeProps> = ({ units, supabaseClient }) => {
+  const { setNavState } = useNavigation();
   const [filtros, setFiltros] = useState<RentabilidadeFiltros>(() => getFiltrosDefault(units.length === 1 ? units[0].id : null));
 
   const [resumo, setResumo] = useState<RentabilidadeResumo | null>(null);
@@ -83,9 +83,6 @@ const Rentabilidade: React.FC<RentabilidadeProps> = ({ units, supabaseClient }) 
 
   const [servicos, setServicos] = useState<RentabilidadeServico[]>([]);
   const [servicosLoading, setServicosLoading] = useState(true);
-
-  const [pacotes, setPacotes] = useState<RentabilidadePacote[]>([]);
-  const [pacotesLoading, setPacotesLoading] = useState(true);
 
   const [thresholds, setThresholds] = useState<RentabilidadeThresholds>({ margemVerdeMin: 60, margemAmarelaMin: 30 });
 
@@ -103,12 +100,6 @@ const Rentabilidade: React.FC<RentabilidadeProps> = ({ units, supabaseClient }) 
       .catch((err) => console.error('Erro ao carregar rentabilidade por serviço:', err))
       .finally(() => setServicosLoading(false));
 
-    setPacotesLoading(true);
-    fetchRentabilidadePacotes(supabaseClient, filtros)
-      .then(setPacotes)
-      .catch((err) => console.error('Erro ao carregar rentabilidade por pacote:', err))
-      .finally(() => setPacotesLoading(false));
-
     fetchRentabilidadeThresholds(supabaseClient)
       .then(setThresholds)
       .catch((err) => console.error('Erro ao carregar thresholds de margem:', err));
@@ -118,19 +109,21 @@ const Rentabilidade: React.FC<RentabilidadeProps> = ({ units, supabaseClient }) 
     carregarTudo();
   }, [carregarTudo]);
 
-  const servicosSort = useSort<RentabilidadeServico>(servicos, 'lucroTotal');
-  const pacotesSort = useSort<RentabilidadePacote>(pacotes, 'lucroTotal');
+  const irParaCustos = () => setNavState({ mode: 'global', view: 'Configurações', settingsTab: 'custos' });
 
-  const alertasServicos = servicos
+  const servicosSort = useSort<RentabilidadeServico>(servicos, 'lucroTotal');
+
+  const servicosComCusto = servicos.filter((s) => s.custoCadastrado);
+  const servicosSemCusto = servicos.filter((s) => !s.custoCadastrado);
+
+  const alertas = servicosComCusto
     .filter((s) => s.margemPct < thresholds.margemAmarelaMin)
-    .map((s) => ({ nome: s.servico, margemPct: s.margemPct, lucroTotal: s.lucroTotal, tipo: 'Serviço' as const }));
-  const alertasPacotes = pacotes
-    .filter((p) => p.margemPct < thresholds.margemAmarelaMin)
-    .map((p) => ({ nome: p.pacoteNome, margemPct: p.margemPct, lucroTotal: p.lucroTotal, tipo: 'Pacote' as const }));
-  const alertas = [...alertasServicos, ...alertasPacotes].sort((a, b) => a.margemPct - b.margemPct);
+    .map((s) => ({ nome: s.servico, margemPct: s.margemPct, lucroTotal: s.lucroTotal }))
+    .sort((a, b) => a.margemPct - b.margemPct);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {/* 1. Filtros */}
       <RentabilidadeFiltersCard units={units} filtros={filtros} onChangeFiltros={setFiltros} />
 
       {resumoError && (
@@ -139,39 +132,7 @@ const Rentabilidade: React.FC<RentabilidadeProps> = ({ units, supabaseClient }) 
         </div>
       )}
 
-      {/* Bloco E: Alertas de prejuízo/margem baixa */}
-      <div className={`p-6 sm:p-8 rounded-[2rem] shadow-sm border space-y-4 ${alertas.length > 0 ? 'bg-rose-50/60 border-rose-100' : 'bg-emerald-50/60 border-emerald-100'}`}>
-        <SectionTitle
-          title="Alertas de Rentabilidade"
-          subtitle={alertas.length > 0 ? `${alertas.length} item(ns) com margem abaixo do mínimo (${formatDecimalBR(thresholds.margemAmarelaMin, 0)}%)` : 'Nenhum alerta no período'}
-        />
-        {servicosLoading || pacotesLoading ? (
-          <CardSkeleton height={80} />
-        ) : alertas.length === 0 ? (
-          <p className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
-            <i className="fa-solid fa-circle-check"></i> Todos os serviços e pacotes com margem saudável.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {alertas.map((a, idx) => {
-              const critico = a.lucroTotal < 0;
-              return (
-                <div
-                  key={`${a.tipo}-${a.nome}-${idx}`}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${critico ? 'bg-rose-100 border-rose-200' : 'bg-white border-rose-100'}`}
-                >
-                  <i className={`fa-solid ${critico ? 'fa-circle-exclamation text-rose-600' : 'fa-triangle-exclamation text-amber-500'}`}></i>
-                  <p className={`text-sm font-bold ${critico ? 'text-rose-700' : 'text-slate-700'}`}>
-                    <span className="font-black">{a.tipo} "{a.nome}"</span> está com margem de {formatDecimalBR(a.margemPct)}% — abaixo do mínimo configurado ({formatDecimalBR(thresholds.margemAmarelaMin, 0)}%){critico ? '. PREJUÍZO: custo maior que o preço cobrado.' : '.'}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Bloco A: resumo do período */}
+      {/* 2. Cards de resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
         <KPICard
           label="Receita Total"
@@ -210,13 +171,58 @@ const Rentabilidade: React.FC<RentabilidadeProps> = ({ units, supabaseClient }) 
         />
       </div>
 
-      {/* Bloco B: rentabilidade por serviço */}
+      {/* 3. Alertas de margem baixa/prejuízo */}
+      <div className={`p-6 sm:p-8 rounded-[2rem] shadow-sm border space-y-4 ${alertas.length > 0 ? 'bg-rose-50/60 border-rose-100' : 'bg-emerald-50/60 border-emerald-100'}`}>
+        <SectionTitle
+          title="Alertas de Rentabilidade"
+          subtitle={alertas.length > 0 ? `${alertas.length} serviço(s) com margem abaixo do mínimo (${formatDecimalBR(thresholds.margemAmarelaMin, 0)}%)` : 'Nenhum alerta no período'}
+        />
+        {servicosLoading ? (
+          <CardSkeleton height={80} />
+        ) : alertas.length === 0 ? (
+          <p className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
+            <i className="fa-solid fa-circle-check"></i> Todos os serviços com margem saudável.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {alertas.map((a, idx) => {
+              const critico = a.lucroTotal < 0;
+              return (
+                <div
+                  key={`${a.nome}-${idx}`}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${critico ? 'bg-rose-100 border-rose-200' : 'bg-white border-rose-100'}`}
+                >
+                  <i className={`fa-solid ${critico ? 'fa-circle-exclamation text-rose-600' : 'fa-triangle-exclamation text-amber-500'}`}></i>
+                  <p className={`text-sm font-bold ${critico ? 'text-rose-700' : 'text-slate-700'}`}>
+                    <span className="font-black">Serviço "{a.nome}"</span> está com margem de {formatDecimalBR(a.margemPct)}% — abaixo do mínimo configurado ({formatDecimalBR(thresholds.margemAmarelaMin, 0)}%){critico ? '. PREJUÍZO: custo maior que o preço cobrado.' : '.'}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 4. Rentabilidade por serviço */}
       <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
-        <SectionTitle title="Rentabilidade por Serviço" subtitle="Preço médio real cobrado x custo do serviço no período" />
+        <SectionTitle title="Rentabilidade por Serviço" subtitle="Preço médio real cobrado x custo do serviço no período, incluindo sessões de pacote pelo valor efetivo por sessão" />
+
+        {!servicosLoading && servicosSemCusto.length > 0 && (
+          <div className="flex items-center justify-between gap-3 flex-wrap bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+            <p className="text-xs font-bold text-amber-700">
+              <i className="fa-solid fa-triangle-exclamation mr-1.5"></i>
+              {servicosSemCusto.length} serviço(s) sem custo cadastrado — excluído(s) dos totais e das médias acima.
+            </p>
+            <button onClick={irParaCustos} className="text-[10px] font-black text-amber-700 hover:text-amber-900 uppercase tracking-widest underline shrink-0">
+              Cadastrar custos
+            </button>
+          </div>
+        )}
+
         {servicosLoading ? (
           <CardSkeleton height={220} />
         ) : servicos.length === 0 ? (
-          <p className="text-center text-slate-300 font-bold italic py-8">Nenhum serviço avulso ou adicional pago no período.</p>
+          <p className="text-center text-slate-300 font-bold italic py-8">Nenhum serviço realizado no período.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -228,12 +234,29 @@ const Rentabilidade: React.FC<RentabilidadeProps> = ({ units, supabaseClient }) 
                   <th className={thClassRight}>Lucro/unidade</th>
                   <SortableTh label="Margem" sortKey="margemPct" activeKey={servicosSort.sortKey as string} dir={servicosSort.sortDir} onClick={servicosSort.toggleSort} />
                   <SortableTh label="Markup" sortKey="markup" activeKey={servicosSort.sortKey as string} dir={servicosSort.sortDir} onClick={servicosSort.toggleSort} />
-                  <SortableTh label="Qtd." sortKey="qtd" activeKey={servicosSort.sortKey as string} dir={servicosSort.sortDir} onClick={servicosSort.toggleSort} />
+                  <SortableTh label="Qtd. avulsa" sortKey="qtdAvulsa" activeKey={servicosSort.sortKey as string} dir={servicosSort.sortDir} onClick={servicosSort.toggleSort} />
+                  <SortableTh label="Qtd. pacote" sortKey="qtdPacote" activeKey={servicosSort.sortKey as string} dir={servicosSort.sortDir} onClick={servicosSort.toggleSort} />
                   <SortableTh label="Lucro total" sortKey="lucroTotal" activeKey={servicosSort.sortKey as string} dir={servicosSort.sortDir} onClick={servicosSort.toggleSort} />
                 </tr>
               </thead>
               <tbody>
                 {servicosSort.sorted.map((s) => {
+                  if (!s.custoCadastrado) {
+                    return (
+                      <tr key={s.servicoId} className="border-b border-slate-50 bg-slate-50/60">
+                        <td className="py-3 pr-4 font-bold text-slate-700">{s.servico}</td>
+                        <td className="py-3 pr-4 text-right font-bold text-slate-600">{formatCurrencyBR(s.precoMedio)}</td>
+                        <td className="py-3 text-right" colSpan={4}>
+                          <button onClick={irParaCustos} className="text-xs font-black text-amber-700 hover:text-amber-900 underline">
+                            Custo não cadastrado — cadastrar agora
+                          </button>
+                        </td>
+                        <td className="py-3 pr-4 text-right font-bold text-slate-600">{s.qtdAvulsa}</td>
+                        <td className="py-3 pr-4 text-right font-bold text-slate-600">{s.qtdPacote}</td>
+                        <td className="py-3 text-right font-bold text-slate-300">—</td>
+                      </tr>
+                    );
+                  }
                   const tone = classificarMargem(s.margemPct, thresholds);
                   const lucroUnidade = s.precoMedio - s.custoMedio;
                   return (
@@ -244,15 +267,16 @@ const Rentabilidade: React.FC<RentabilidadeProps> = ({ units, supabaseClient }) 
                       <td className={`py-3 pr-4 text-right font-black ${lucroUnidade >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrencyBR(lucroUnidade)}</td>
                       <td className="py-3 pr-4 text-right"><MargemBadge margemPct={s.margemPct} tone={tone} /></td>
                       <td className="py-3 pr-4 text-right font-bold text-slate-600">{formatDecimalBR(s.markup, 2)}x</td>
-                      <td className="py-3 pr-4 text-right font-bold text-slate-600">{s.qtd}</td>
+                      <td className="py-3 pr-4 text-right font-bold text-slate-600">{s.qtdAvulsa}</td>
+                      <td className="py-3 pr-4 text-right font-bold text-slate-600">{s.qtdPacote}</td>
                       <td className={`py-3 text-right font-black ${s.lucroTotal >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrencyBR(s.lucroTotal)}</td>
                     </tr>
                   );
                 })}
                 <tr>
                   <td className="py-3 pr-4 font-black text-slate-900 uppercase text-xs">Total</td>
-                  <td colSpan={6}></td>
-                  <td className="py-3 text-right font-black text-slate-900">{formatCurrencyBR(servicos.reduce((acc, s) => acc + s.lucroTotal, 0))}</td>
+                  <td colSpan={7}></td>
+                  <td className="py-3 text-right font-black text-slate-900">{formatCurrencyBR(servicosComCusto.reduce((acc, s) => acc + s.lucroTotal, 0))}</td>
                 </tr>
               </tbody>
             </table>
@@ -260,71 +284,8 @@ const Rentabilidade: React.FC<RentabilidadeProps> = ({ units, supabaseClient }) 
         )}
       </div>
 
-      {/* Bloco C: rentabilidade por pacote */}
-      <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
-        <SectionTitle title="Rentabilidade por Pacote" subtitle="Vale sempre o valor do pacote, nunca a soma dos serviços" />
-        {pacotesLoading ? (
-          <CardSkeleton height={220} />
-        ) : pacotes.length === 0 ? (
-          <p className="text-center text-slate-300 font-bold italic py-8">Nenhum pacote pago no período.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className={thClass}>Pacote</th>
-                  <SortableTh label="Preço" sortKey="precoMedio" activeKey={pacotesSort.sortKey as string} dir={pacotesSort.sortDir} onClick={pacotesSort.toggleSort} />
-                  <SortableTh label="Nº sessões" sortKey="qtdSessoesMedia" activeKey={pacotesSort.sortKey as string} dir={pacotesSort.sortDir} onClick={pacotesSort.toggleSort} />
-                  <SortableTh label="Custo total" sortKey="custoMedio" activeKey={pacotesSort.sortKey as string} dir={pacotesSort.sortDir} onClick={pacotesSort.toggleSort} />
-                  <SortableTh label="Lucro" sortKey="lucroTotal" activeKey={pacotesSort.sortKey as string} dir={pacotesSort.sortDir} onClick={pacotesSort.toggleSort} />
-                  <SortableTh label="Margem" sortKey="margemPct" activeKey={pacotesSort.sortKey as string} dir={pacotesSort.sortDir} onClick={pacotesSort.toggleSort} />
-                  <SortableTh label="Markup" sortKey="markup" activeKey={pacotesSort.sortKey as string} dir={pacotesSort.sortDir} onClick={pacotesSort.toggleSort} />
-                  <th className={thClassRight}>R$/sessão x avulso</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pacotesSort.sorted.map((p) => {
-                  const tone = classificarMargem(p.margemPct, thresholds);
-                  const servicoAvulso = servicos.find((s) => s.servicoId === p.servicoId);
-                  const descontoPct = servicoAvulso && servicoAvulso.precoMedio > 0
-                    ? ((servicoAvulso.precoMedio - p.valorEfetivoSessaoMedio) / servicoAvulso.precoMedio) * 100
-                    : null;
-                  return (
-                    <tr key={`${p.catalogoPacoteId ?? p.pacoteNome}`} className={`border-b border-slate-50 ${tone === 'vermelho' ? 'bg-rose-50/60' : ''}`}>
-                      <td className="py-3 pr-4 font-bold text-slate-700">{p.pacoteNome}</td>
-                      <td className="py-3 pr-4 text-right font-bold text-slate-600">{formatCurrencyBR(p.precoMedio)}</td>
-                      <td className="py-3 pr-4 text-right font-bold text-slate-600">{formatDecimalBR(p.qtdSessoesMedia, 1)}</td>
-                      <td className="py-3 pr-4 text-right font-bold text-slate-600">{formatCurrencyBR(p.custoMedio)}</td>
-                      <td className={`py-3 pr-4 text-right font-black ${p.lucroTotal >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatCurrencyBR(p.lucroTotal)}</td>
-                      <td className="py-3 pr-4 text-right"><MargemBadge margemPct={p.margemPct} tone={tone} /></td>
-                      <td className="py-3 pr-4 text-right font-bold text-slate-600">{formatDecimalBR(p.markup, 2)}x</td>
-                      <td className="py-3 text-right">
-                        <p className="font-bold text-slate-700">{formatCurrencyBR(p.valorEfetivoSessaoMedio)}<span className="text-slate-300"> /sessão</span></p>
-                        {servicoAvulso && descontoPct !== null ? (
-                          <p className="text-[10px] font-bold text-slate-400">
-                            vs {formatCurrencyBR(servicoAvulso.precoMedio)} avulso ({descontoPct >= 0 ? '−' : '+'}{formatDecimalBR(Math.abs(descontoPct))}%)
-                          </p>
-                        ) : (
-                          <p className="text-[10px] font-bold text-slate-300">sem equivalente avulso no período</p>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr>
-                  <td className="py-3 pr-4 font-black text-slate-900 uppercase text-xs">Total</td>
-                  <td colSpan={3}></td>
-                  <td className="py-3 pr-4 text-right font-black text-slate-900">{formatCurrencyBR(pacotes.reduce((acc, p) => acc + p.lucroTotal, 0))}</td>
-                  <td colSpan={3}></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Bloco D: simulador de preço */}
-      <SimuladorPreco servicos={servicos} pacotes={pacotes} thresholds={thresholds} />
+      {/* 5. Simulador de preço */}
+      <SimuladorPreco servicos={servicosComCusto} thresholds={thresholds} />
     </div>
   );
 };

@@ -23,7 +23,7 @@ const RentabilidadeFiltersCard: React.FC<RentabilidadeFiltersCardProps> = ({ uni
           </div>
           <div className="min-w-0">
             <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase">Rentabilidade</h2>
-            <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest truncate">Markup e margem de lucro por serviço e por pacote</p>
+            <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest truncate">Markup e margem de lucro por serviço</p>
           </div>
         </div>
         <button

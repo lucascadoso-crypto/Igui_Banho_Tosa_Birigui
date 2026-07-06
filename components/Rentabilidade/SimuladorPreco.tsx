@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { formatCurrencyBR, formatDecimalBR } from '../../services/appointmentTotals';
 import {
   RentabilidadeServico,
-  RentabilidadePacote,
   RentabilidadeThresholds,
   calcularMargemPct,
   calcularMarkup,
@@ -14,23 +13,13 @@ import MargemBadge from './MargemBadge';
 
 interface SimuladorPrecoProps {
   servicos: RentabilidadeServico[];
-  pacotes: RentabilidadePacote[];
   thresholds: RentabilidadeThresholds;
 }
 
-type ItemTipo = 'servico' | 'pacote';
-
-const SimuladorPreco: React.FC<SimuladorPrecoProps> = ({ servicos, pacotes, thresholds }) => {
-  const opcoes = useMemo(() => {
-    const servicoOpts = servicos.map((s) => ({ tipo: 'servico' as ItemTipo, id: `s-${s.servicoId}`, nome: s.servico, custo: s.custoMedio }));
-    const pacoteOpts = pacotes.map((p, idx) => ({
-      tipo: 'pacote' as ItemTipo,
-      id: `p-${p.catalogoPacoteId ?? idx}`,
-      nome: p.pacoteNome,
-      custo: p.custoMedio
-    }));
-    return [...servicoOpts, ...pacoteOpts];
-  }, [servicos, pacotes]);
+const SimuladorPreco: React.FC<SimuladorPrecoProps> = ({ servicos, thresholds }) => {
+  const opcoes = useMemo(() => (
+    servicos.map((s) => ({ id: `s-${s.servicoId}`, nome: s.servico, custo: s.custoMedio }))
+  ), [servicos]);
 
   const [selectedId, setSelectedId] = useState<string>('');
   const [precoTeste, setPrecoTeste] = useState<string>('');
@@ -59,24 +48,17 @@ const SimuladorPreco: React.FC<SimuladorPrecoProps> = ({ servicos, pacotes, thre
       </div>
 
       <label className="space-y-1.5 block">
-        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Serviço ou pacote</span>
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Serviço</span>
         <select
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
           className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-sm outline-none"
         >
           <option value="">Selecione...</option>
-          {opcoes.length === 0 && <option disabled>Nenhum serviço/pacote com dados no período</option>}
-          <optgroup label="Serviços">
-            {opcoes.filter((o) => o.tipo === 'servico').map((o) => (
-              <option key={o.id} value={o.id}>{o.nome}</option>
-            ))}
-          </optgroup>
-          <optgroup label="Pacotes">
-            {opcoes.filter((o) => o.tipo === 'pacote').map((o) => (
-              <option key={o.id} value={o.id}>{o.nome}</option>
-            ))}
-          </optgroup>
+          {opcoes.length === 0 && <option disabled>Nenhum serviço com dados no período</option>}
+          {opcoes.map((o) => (
+            <option key={o.id} value={o.id}>{o.nome}</option>
+          ))}
         </select>
       </label>
 

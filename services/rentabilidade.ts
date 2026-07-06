@@ -118,6 +118,8 @@ export interface RentabilidadeServico {
   servicoId: number;
   servico: string;
   qtd: number;
+  qtdAvulsa: number;
+  qtdPacote: number;
   precoMedio: number;
   custoMedio: number;
   receitaTotal: number;
@@ -125,6 +127,7 @@ export interface RentabilidadeServico {
   lucroTotal: number;
   margemPct: number;
   markup: number;
+  custoCadastrado: boolean;
 }
 
 export const fetchRentabilidadeServicos = async (supabaseClient: any, filtros: RentabilidadeFiltros): Promise<RentabilidadeServico[]> => {
@@ -137,67 +140,21 @@ export const fetchRentabilidadeServicos = async (supabaseClient: any, filtros: R
   return (data || []).map((row: any) => {
     const precoMedio = toCurrencyNumber(row.preco_medio);
     const custoMedio = toCurrencyNumber(row.custo_medio);
+    const custoCadastrado = Boolean(row.custo_cadastrado);
     return {
       servicoId: row.servico_id,
       servico: row.servico,
       qtd: toCurrencyNumber(row.qtd),
+      qtdAvulsa: toCurrencyNumber(row.qtd_avulsa),
+      qtdPacote: toCurrencyNumber(row.qtd_pacote),
       precoMedio,
       custoMedio,
       receitaTotal: toCurrencyNumber(row.receita_total),
       custoTotal: toCurrencyNumber(row.custo_total),
       lucroTotal: toCurrencyNumber(row.lucro_total),
-      margemPct: calcularMargemPct(precoMedio, custoMedio),
-      markup: calcularMarkup(precoMedio, custoMedio)
-    };
-  });
-};
-
-// ---------------------------------------------------------------------------
-// Bloco C: rentabilidade por pacote
-// ---------------------------------------------------------------------------
-
-export interface RentabilidadePacote {
-  catalogoPacoteId: number | null;
-  pacoteNome: string;
-  qtdPacotes: number;
-  qtdSessoesMedia: number;
-  precoMedio: number;
-  custoMedio: number;
-  receitaTotal: number;
-  custoTotal: number;
-  lucroTotal: number;
-  margemPct: number;
-  markup: number;
-  valorEfetivoSessaoMedio: number;
-  servicoId: number | null;
-  servicoNome: string | null;
-}
-
-export const fetchRentabilidadePacotes = async (supabaseClient: any, filtros: RentabilidadeFiltros): Promise<RentabilidadePacote[]> => {
-  const { data, error } = await supabaseClient.rpc('fn_rentabilidade_pacotes', {
-    p_unidade_id: filtros.unidadeId,
-    p_data_inicio: filtros.dataInicio,
-    p_data_fim: filtros.dataFim
-  });
-  if (error) throw error;
-  return (data || []).map((row: any) => {
-    const precoMedio = toCurrencyNumber(row.preco_medio);
-    const custoMedio = toCurrencyNumber(row.custo_medio);
-    return {
-      catalogoPacoteId: row.catalogo_pacote_id ?? null,
-      pacoteNome: row.pacote_nome,
-      qtdPacotes: toCurrencyNumber(row.qtd_pacotes),
-      qtdSessoesMedia: toCurrencyNumber(row.qtd_sessoes_media),
-      precoMedio,
-      custoMedio,
-      receitaTotal: toCurrencyNumber(row.receita_total),
-      custoTotal: toCurrencyNumber(row.custo_total),
-      lucroTotal: toCurrencyNumber(row.lucro_total),
-      margemPct: calcularMargemPct(precoMedio, custoMedio),
-      markup: calcularMarkup(precoMedio, custoMedio),
-      valorEfetivoSessaoMedio: toCurrencyNumber(row.valor_efetivo_sessao_medio),
-      servicoId: row.servico_id ?? null,
-      servicoNome: row.servico_nome ?? null
+      margemPct: custoCadastrado ? calcularMargemPct(precoMedio, custoMedio) : 0,
+      markup: custoCadastrado ? calcularMarkup(precoMedio, custoMedio) : 0,
+      custoCadastrado
     };
   });
 };
