@@ -99,7 +99,38 @@ export interface Client {
   unidade_preferencial_id: BusinessId;
   unidade_id?: BusinessId;
   origem_id?: string;
+  ativo?: boolean;
+  mesclado_no_cliente_id?: BusinessId | null;
   created_at?: string;
+}
+
+// Fila de revisão manual de possíveis duplicados vindos do link público
+// (espelha public.clientes_duplicados_pendentes).
+export interface ClienteDuplicadoPendente {
+  id: BusinessId;
+  cliente_id_existente: BusinessId;
+  cliente_id_novo: BusinessId;
+  unidade_id: BusinessId;
+  motivo: 'nome_similar' | 'retroativo_telefone' | string;
+  similaridade?: number | null;
+  status: 'pendente' | 'mesclado' | 'rejeitado';
+  resolvido_em?: string | null;
+  created_at?: string;
+  cliente_existente?: Client;
+  cliente_novo?: Client;
+}
+
+// Log de merges automáticos/manuais de clientes, para auditoria e reversão
+// (espelha public.clientes_merge_log).
+export interface ClienteMergeLog {
+  id: BusinessId;
+  cliente_id: BusinessId;
+  unidade_id: BusinessId;
+  origem: 'cadastro_publico' | 'mesclagem_manual' | string;
+  cliente_removido_id?: BusinessId | null;
+  campos_alterados: Record<string, { antes: any; depois: any }>;
+  created_at?: string;
+  cliente?: Client;
 }
 
 export interface Pet { 

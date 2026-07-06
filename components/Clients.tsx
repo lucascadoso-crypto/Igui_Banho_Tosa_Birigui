@@ -4,6 +4,7 @@ import { Unit, Client, UserProfile } from '../types';
 import CadastroPet from './CadastroPet';
 import ClientDetailsModal from './ClientDetailsModal';
 import ClienteModal from './ClienteModal';
+import ClientesViaLink from './ClientesViaLink';
 import { registrarAtividade } from '../services/logger';
 
 interface ClientsProps {
@@ -26,6 +27,7 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
   const [selectedClientDetails, setSelectedClientDetails] = useState<Client | null>(null);
   const [isPetModalOpen, setIsPetModalOpen] = useState(false);
   const [newPetClientData, setNewPetClientData] = useState<{id: number | string, nome: string} | null>(null);
+  const [isViaLinkOpen, setIsViaLinkOpen] = useState(false);
 
   useEffect(() => {
     fetchClients();
@@ -264,6 +266,13 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
               </>
             )}
           </button>
+
+          <button
+            onClick={() => setIsViaLinkOpen(true)}
+            className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-600 px-6 py-3 rounded-2xl font-bold flex items-center shadow-sm transition-all active:scale-95"
+          >
+            <i className="fa-solid fa-link mr-2"></i> Cadastros via link
+          </button>
         </div>
 
         <div className="flex items-center gap-3 flex-1 md:max-w-xl">
@@ -392,6 +401,15 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
             setIsPetModalOpen(true);
           }}
           userProfile={userProfile}
+        />
+      )}
+
+      {isViaLinkOpen && (
+        <ClientesViaLink
+          unit={unit}
+          supabaseClient={supabaseClient}
+          userProfile={userProfile}
+          onClose={() => setIsViaLinkOpen(false)}
         />
       )}
 

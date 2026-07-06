@@ -12,6 +12,10 @@ const emptyConfig = {
   ativo: false,
   ambiente_fiscal: 'NAO_CONFIGURADO',
   regime_tributario: '',
+  cnae_principal: '',
+  incentivo_fiscal: false,
+  provedor_nfse: 'PORTAL_NACIONAL',
+  serie_rps: '',
   razao_social: '',
   nome_fantasia: '',
   cnpj: '',
@@ -33,6 +37,36 @@ const DEFAULT_FISCAL_DESCRIPTION = 'Prestação de serviços de higiene, embelez
 const DEFAULT_MUNICIPAL_SERVICE_CODE = '050801';
 const DEFAULT_NBS_CODE = '11405600';
 
+const REGIME_TRIBUTARIO_OPTIONS = [
+  { value: '', label: 'Selecione...' },
+  { value: 'simples_nacional', label: 'Simples Nacional' },
+  { value: 'lucro_presumido', label: 'Lucro Presumido' },
+  { value: 'lucro_real', label: 'Lucro Real' },
+  { value: 'mei', label: 'MEI' }
+];
+
+const AMBIENTE_FISCAL_OPTIONS = [
+  { value: 'NAO_CONFIGURADO', label: 'Não configurado' },
+  { value: 'HOMOLOGACAO', label: 'Homologação (testes)' },
+  { value: 'PRODUCAO', label: 'Produção (notas reais)' }
+];
+
+const isValidCnpj = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(digits)) return false;
+
+  const calcDigit = (weights: number[]) => {
+    const sum = weights.reduce((acc, weight, i) => acc + weight * parseInt(digits[i], 10), 0);
+    const rest = sum % 11;
+    return rest < 2 ? 0 : 11 - rest;
+  };
+
+  const d1 = calcDigit([5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const d2 = calcDigit([6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  return d1 === parseInt(digits[12], 10) && d2 === parseInt(digits[13], 10);
+};
+
 const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, userProfile }) => {
   const canEdit = userProfile?.cargo === 'master';
   const canEditFiscalServices = userProfile?.cargo === 'master';
@@ -43,6 +77,16 @@ const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [applyingDefaults, setApplyingDefaults] = useState(false);
+  const [defaultPattern, setDefaultPattern] = useState({
+    descricao_fiscal: DEFAULT_FISCAL_DESCRIPTION,
+    codigo_servico_municipal: DEFAULT_MUNICIPAL_SERVICE_CODE,
+    codigo_tributacao_nacional: '',
+    codigo_nbs: DEFAULT_NBS_CODE,
+    aliquota_iss: '',
+    incidencia_iss: ''
+  });
 
   const selectedUnit = useMemo(
     () => units.find(unit => Number(unit.id) === Number(selectedUnitId)),
@@ -62,6 +106,33 @@ const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, 
     setTimeout(() => setMessage(null), 4000);
   };
 
+  const cnpjPreenchidoEInvalido = (config.cnpj || '').replace(/\D/g, '').length > 0 && !isValidCnpj(config.cnpj || '');
+
+  const handleCepBlur = async () => {
+    const digits = (config.cep || '').replace(/\D/g, '');
+    if (digits.length !== 8) return;
+
+    setBuscandoCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      const data = await response.json();
+      if (!data.erro) {
+        setConfig((prev: any) => ({
+          ...prev,
+          logradouro: data.logradouro || prev.logradouro,
+          bairro: data.bairro || prev.bairro,
+          municipio: data.localidade || prev.municipio,
+          uf: data.uf || prev.uf,
+          codigo_municipio_ibge: data.ibge || prev.codigo_municipio_ibge
+        }));
+      }
+    } catch (err) {
+      console.error('Erro ao buscar CEP:', err);
+    } finally {
+      setBuscandoCep(false);
+    }
+  };
+
   const fetchFiscalData = async () => {
     if (!supabaseClient || !selectedUnitId) return;
     setLoading(true);
@@ -73,10 +144,10 @@ const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, 
           .eq('unidade_id', selectedUnitId)
           .maybeSingle(),
         supabaseClient
-          .from('servicos')
-          .select('id, nome, preco_base, ativo')
-          .eq('ativo', true)
-          .order('nome'),
+          .from('servicos_unidade')
+          .select('preco, servico:servicos!servico_id(id, nome, preco_base, ativo)')
+          .eq('unidade_id', selectedUnitId)
+          .eq('ativo', true),
         supabaseClient
           .from('servicos_fiscais')
           .select('*')
@@ -90,10 +161,17 @@ const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, 
       setConfig(configResult.data || {
         ...emptyConfig,
         unidade_id: selectedUnitId,
+        ambiente_fiscal: 'HOMOLOGACAO',
         nome_fantasia: selectedUnit?.name || '',
         telefone_fiscal: selectedUnit?.phone || ''
       });
-      setServices(servicesResult.data || []);
+
+      const servicosDaUnidade = (servicesResult.data || [])
+        .map((row: any) => row.servico ? { ...row.servico, preco_unidade: row.preco } : null)
+        .filter((servico: any) => servico && servico.ativo)
+        .sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+
+      setServices(servicosDaUnidade);
       setFiscalServices(fiscalServicesResult.data || []);
     } catch (err: any) {
       console.error('Erro ao carregar dados fiscais:', err);
@@ -105,6 +183,13 @@ const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, 
 
   const saveConfig = async () => {
     if (!selectedUnitId || !canEdit) return;
+
+    if (config.ambiente_fiscal === 'PRODUCAO' && !window.confirm(
+      'A emissão real de NFS-e ainda não está implementada neste sistema. Confirma marcar o ambiente como PRODUÇÃO mesmo assim?'
+    )) {
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -205,6 +290,56 @@ const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, 
     }
   };
 
+  const isServicoFiscalConfigurado = (serviceId: number) => {
+    const fiscal = fiscalForService(serviceId);
+    return !!(fiscal?.codigo_servico_municipal && fiscal?.codigo_nbs);
+  };
+
+  const applyDefaultToAll = async () => {
+    if (!selectedUnitId || !canEditFiscalServices || services.length === 0) return;
+    if (!window.confirm(`Aplicar o padrão fiscal a todos os ${services.length} serviços desta unidade? Serviços já configurados individualmente serão sobrescritos.`)) {
+      return;
+    }
+
+    setApplyingDefaults(true);
+    try {
+      const payload = services.map((service: any) => ({
+        unidade_id: Number(selectedUnitId),
+        servico_id: Number(service.id),
+        ativo: true,
+        descricao_fiscal: defaultPattern.descricao_fiscal || DEFAULT_FISCAL_DESCRIPTION,
+        codigo_servico_municipal: defaultPattern.codigo_servico_municipal || DEFAULT_MUNICIPAL_SERVICE_CODE,
+        codigo_tributacao_nacional: defaultPattern.codigo_tributacao_nacional || null,
+        codigo_nbs: defaultPattern.codigo_nbs || DEFAULT_NBS_CODE,
+        aliquota_iss: defaultPattern.aliquota_iss === '' ? null : Number(defaultPattern.aliquota_iss),
+        incidencia_iss: defaultPattern.incidencia_iss || null
+      }));
+
+      const { error } = await supabaseClient
+        .from('servicos_fiscais')
+        .upsert(payload, { onConflict: 'unidade_id,servico_id' });
+
+      if (error) throw error;
+
+      await registrarAtividade(
+        selectedUnitId,
+        userProfile?.email || 'sistema',
+        'APLICAR_PADRAO_FISCAL_TODOS',
+        `Aplicou o padrão fiscal a ${payload.length} serviço(s) da unidade ${selectedUnit?.name || selectedUnitId}.`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+
+      showMsg(`Padrão fiscal aplicado a ${payload.length} serviço(s).`);
+      fetchFiscalData();
+    } catch (err: any) {
+      console.error('Erro ao aplicar padrão fiscal em massa:', err);
+      showMsg(`Falha ao aplicar padrão a todos: ${err.message || err}`, 'error');
+    } finally {
+      setApplyingDefaults(false);
+    }
+  };
+
   const renderField = (label: string, keyName: string, placeholder = '') => (
     <div className="space-y-2">
       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
@@ -257,8 +392,35 @@ const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {renderField('Razao social', 'razao_social')}
                 {renderField('Nome fantasia', 'nome_fantasia')}
-                {renderField('CNPJ', 'cnpj')}
+                <div>
+                  {renderField('CNPJ', 'cnpj', '00.000.000/0000-00')}
+                  {cnpjPreenchidoEInvalido && (
+                    <p className="text-xs font-bold text-rose-500 mt-1.5">CNPJ inválido. Confira os números digitados.</p>
+                  )}
+                </div>
                 {renderField('Inscricao municipal', 'inscricao_municipal')}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Regime tributário</label>
+                  <select
+                    value={config.regime_tributario || ''}
+                    onChange={(e) => setConfig({ ...config, regime_tributario: e.target.value })}
+                    disabled={!canEdit}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500 font-bold text-slate-700 disabled:opacity-60"
+                  >
+                    {REGIME_TRIBUTARIO_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </div>
+                {renderField('CNAE principal', 'cnae_principal', '96.09-2-99')}
+                <label className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!config.incentivo_fiscal}
+                    onChange={(e) => setConfig({ ...config, incentivo_fiscal: e.target.checked })}
+                    disabled={!canEdit}
+                    className="w-5 h-5 accent-teal-600"
+                  />
+                  <span className="text-xs font-black text-slate-600 uppercase tracking-widest">Possui incentivo fiscal</span>
+                </label>
                 {renderField('E-mail fiscal', 'email_fiscal')}
                 {renderField('Telefone fiscal', 'telefone_fiscal')}
               </div>
@@ -269,7 +431,20 @@ const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, 
                 <i className="fa-solid fa-map-location-dot mr-3 text-teal-600"></i> Endereco fiscal
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderField('CEP', 'cep')}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CEP</label>
+                  <div className="relative">
+                    <input
+                      value={config.cep || ''}
+                      onChange={(e) => setConfig({ ...config, cep: e.target.value })}
+                      onBlur={handleCepBlur}
+                      disabled={!canEdit}
+                      placeholder="00000-000"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500 font-bold text-slate-700 disabled:opacity-60"
+                    />
+                    {buscandoCep && <i className="fa-solid fa-circle-notch fa-spin absolute right-4 top-1/2 -translate-y-1/2 text-teal-600"></i>}
+                  </div>
+                </div>
                 {renderField('Logradouro', 'logradouro')}
                 {renderField('Numero', 'numero')}
                 {renderField('Complemento', 'complemento')}
@@ -282,27 +457,35 @@ const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, 
           </section>
 
           <section className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 md:p-8">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-              <div>
+            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+              <div className="flex-1">
                 <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Integracao NFS-e</h4>
+                <p className="text-xs font-bold text-slate-400 mt-1">
+                  Birigui/SP emite pelo Portal Nacional de NFS-e (padrão nacional). A emissão real ainda não está
+                  implementada neste sistema — esta seção só estrutura o ambiente e a numeração para quando a
+                  integração for construída.
+                </p>
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</p>
-                    <p className="text-sm font-black text-slate-800">Nao configurada</p>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ambiente</label>
+                    <select
+                      value={config.ambiente_fiscal || 'NAO_CONFIGURADO'}
+                      onChange={(e) => setConfig({ ...config, ambiente_fiscal: e.target.value })}
+                      disabled={!canEdit}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500 font-black text-slate-700 disabled:opacity-60"
+                    >
+                      {AMBIENTE_FISCAL_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    </select>
                   </div>
-                  <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ambiente</p>
-                    <p className="text-sm font-black text-slate-800">{config.ambiente_fiscal || 'NAO_CONFIGURADO'}</p>
-                  </div>
+                  {renderField('Série RPS', 'serie_rps')}
                 </div>
+                <p className="mt-3 rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 text-xs font-bold text-amber-700">
+                  <i className="fa-solid fa-shield-halved mr-2"></i>
+                  Nenhuma credencial (certificado digital, usuário/senha ou token) é capturada aqui. Quando a
+                  integração real for implementada, essas informações ficarão em Supabase Vault — nunca em texto
+                  simples numa tabela.
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => showMsg('A integracao com a NFS-e sera configurada apos validacao fiscal e credenciamento oficial.', 'success')}
-                className="px-6 py-4 rounded-2xl bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest shadow-lg"
-              >
-                Configurar integracao
-              </button>
             </div>
             {canEdit && (
               <button
@@ -320,7 +503,8 @@ const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, 
             <header className="mb-6">
               <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Servicos fiscais</h4>
               <p className="text-sm font-bold text-slate-400 mt-1">
-                Mapeamento interno para futura NFS-e. Código municipal: 050801 • NBS: 11405600.
+                Lista puxada direto do catálogo de serviços desta unidade (mesmos nomes/preços usados nos
+                agendamentos). Só muda nome e valor entre serviços — defina o padrão fiscal uma vez e aplique a todos.
               </p>
               {!canEditFiscalServices && (
                 <p className="mt-3 rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-xs font-bold text-slate-500">
@@ -329,18 +513,40 @@ const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, 
               )}
             </header>
 
+            {canEditFiscalServices && (
+              <div className="rounded-3xl border border-teal-100 bg-teal-50/40 p-4 md:p-5 mb-6">
+                <p className="text-xs font-black text-teal-700 uppercase tracking-widest mb-3">Padrão fiscal (aplicado a todos os serviços)</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  <input value={defaultPattern.descricao_fiscal} onChange={(e) => setDefaultPattern({ ...defaultPattern, descricao_fiscal: e.target.value })} placeholder="Descrição fiscal" className="xl:col-span-3 px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm font-bold outline-none" />
+                  <input value={defaultPattern.codigo_servico_municipal} onChange={(e) => setDefaultPattern({ ...defaultPattern, codigo_servico_municipal: e.target.value })} placeholder="Código municipal" className="px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm font-bold outline-none" />
+                  <input value={defaultPattern.codigo_nbs} onChange={(e) => setDefaultPattern({ ...defaultPattern, codigo_nbs: e.target.value })} placeholder="NBS" className="px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm font-bold outline-none" />
+                  <input value={defaultPattern.codigo_tributacao_nacional} onChange={(e) => setDefaultPattern({ ...defaultPattern, codigo_tributacao_nacional: e.target.value })} placeholder="Código tributação nacional" className="px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm font-bold outline-none" />
+                  <input value={defaultPattern.aliquota_iss} onChange={(e) => setDefaultPattern({ ...defaultPattern, aliquota_iss: e.target.value })} placeholder="Alíquota ISS (%)" type="number" step="0.01" className="px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm font-bold outline-none" />
+                  <input value={defaultPattern.incidencia_iss} onChange={(e) => setDefaultPattern({ ...defaultPattern, incidencia_iss: e.target.value })} placeholder="Incidência ISS" className="px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm font-bold outline-none" />
+                </div>
+                <button
+                  type="button"
+                  onClick={applyDefaultToAll}
+                  disabled={applyingDefaults || services.length === 0}
+                  className="mt-4 px-6 py-3 rounded-2xl bg-teal-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg disabled:opacity-50"
+                >
+                  {applyingDefaults ? <><i className="fa-solid fa-circle-notch fa-spin mr-2"></i>Aplicando...</> : 'Aplicar padrão a todos'}
+                </button>
+              </div>
+            )}
+
             <div className="space-y-4">
               {services.map(service => {
                 const fiscal = fiscalForService(service.id) || {};
-                const isPending = !fiscal.descricao_fiscal && !fiscal.codigo_servico_municipal && !fiscal.codigo_tributacao_nacional;
+                const isPending = !isServicoFiscalConfigurado(service.id);
                 return (
                   <article key={service.id} className="rounded-3xl border border-slate-100 bg-slate-50/50 p-4 md:p-5">
                     <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                       <div className="min-w-0">
                         <h5 className="font-black text-slate-900">{service.nome}</h5>
-                        <p className="text-xs font-bold text-teal-600 mt-1">R$ {Number(service.preco_base || 0).toFixed(2)}</p>
+                        <p className="text-xs font-bold text-teal-600 mt-1">R$ {Number(service.preco_unidade ?? service.preco_base ?? 0).toFixed(2)}</p>
                         <span className={`inline-flex mt-3 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${isPending ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                          {isPending ? 'Pendente de configuracao fiscal' : 'Configurado parcialmente'}
+                          {isPending ? 'Pendente' : 'Configurado'}
                         </span>
                       </div>
                       {canEditFiscalServices && (

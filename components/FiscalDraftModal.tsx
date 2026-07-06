@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Unit, UserProfile } from '../types';
+import { avaliarChecklistFiscal, montarLinkCadastroWhatsapp } from '../services/fiscalValidation';
 
 interface FiscalDraftModalProps {
   supabaseClient: any;
@@ -21,6 +22,7 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
   const [description, setDescription] = useState('');
   const [competenceDate, setCompetenceDate] = useState('');
   const [fiscalServices, setFiscalServices] = useState<any[]>([]);
+  const [configFiscal, setConfigFiscal] = useState<any>(null);
   const [error, setError] = useState('');
 
   const formatCurrency = (value: any) => `R$ ${Number(value || 0).toFixed(2)}`;
@@ -33,6 +35,13 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
     setLoading(true);
     setError('');
     try {
+      const { data: configData } = await supabaseClient
+        .from('config_fiscal_unidade')
+        .select('*')
+        .eq('unidade_id', unit.id)
+        .maybeSingle();
+      setConfigFiscal(configData || null);
+
       if (transaction.sourceTable === 'agendamentos') {
         const { data, error: fetchError } = await supabaseClient
           .from('agendamentos')
@@ -163,8 +172,19 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
     return Number(sum || totalValue || 0);
   }, [taxItems, totalValue]);
 
+  const checklist = useMemo(() => avaliarChecklistFiscal({
+    configFiscal,
+    servicosFiscais: taxItems.map((item: any) => item.fiscal).filter(Boolean),
+    cliente: client
+  }), [configFiscal, taxItems, client]);
+
+  const handleEnviarLinkCadastro = () => {
+    const { whatsappUrl } = montarLinkCadastroWhatsapp(unit.id, client?.telefone, client?.nome);
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const createDraft = async () => {
-    if (!sourceData) return;
+    if (!sourceData || !checklist.podeEmitir) return;
     setSaving(true);
     setError('');
     try {
@@ -263,15 +283,35 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
               ))}
             </div>
 
-            <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4 text-sm font-bold text-amber-800">
-              Rascunho fiscal criado. A emissao oficial ainda nao esta configurada.
-            </div>
+            {!checklist.podeEmitir ? (
+              <div className="rounded-2xl bg-rose-50 border border-rose-100 p-5 space-y-3">
+                <p className="text-sm font-black text-rose-700">
+                  <i className="fa-solid fa-triangle-exclamation mr-2"></i>
+                  Não é possível criar o rascunho fiscal ainda:
+                </p>
+                <ul className="text-xs font-bold text-rose-600 list-disc list-inside space-y-1">
+                  {checklist.pendencias.map(pendencia => <li key={pendencia}>{pendencia}</li>)}
+                </ul>
+                {(!checklist.clienteCpfOk || !checklist.clienteEnderecoOk) && (
+                  <button
+                    onClick={handleEnviarLinkCadastro}
+                    className="px-5 py-3 rounded-2xl bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center gap-2"
+                  >
+                    <i className="fa-brands fa-whatsapp"></i> Enviar link de cadastro para o cliente
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4 text-sm font-bold text-amber-800">
+                Rascunho fiscal criado. A emissao oficial ainda nao esta configurada.
+              </div>
+            )}
 
             <div className="flex flex-col-reverse md:flex-row gap-3 pt-2">
               <button onClick={onClose} className="w-full md:flex-1 py-4 rounded-2xl bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest">
                 Cancelar
               </button>
-              <button onClick={createDraft} disabled={saving} className="w-full md:flex-[2] py-4 rounded-2xl bg-teal-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/20 disabled:opacity-50">
+              <button onClick={createDraft} disabled={saving || !checklist.podeEmitir} className="w-full md:flex-[2] py-4 rounded-2xl bg-teal-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/20 disabled:opacity-50">
                 {saving ? 'Criando...' : 'Criar rascunho fiscal'}
               </button>
             </div>
