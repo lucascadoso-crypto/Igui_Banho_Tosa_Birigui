@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Unit } from '../types';
+import { useNavigation } from '../contexts/NavigationContext';
 import { formatCurrencyBR, formatDecimalBR } from '../services/appointmentTotals';
 import KPICard from './Dashboard/KPICard';
 import DashboardHeader from './Dashboard/DashboardHeader';
@@ -70,6 +71,7 @@ const FORMA_PAGAMENTO_COR: Record<string, string> = {
 };
 
 const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabaseClient }) => {
+  const { setNavState } = useNavigation();
   const defaultPeriodo = getDefaultPeriodo();
   const [filtros, setFiltros] = useState<DashboardFiltros>({
     unidadeId: units.length === 1 ? units[0].id : null,
@@ -109,10 +111,6 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
 
   const [proximosAgendamentos, setProximosAgendamentos] = useState<ProximoAgendamento[]>([]);
   const [proximosLoading, setProximosLoading] = useState(true);
-
-  const [isCostModalOpen, setIsCostModalOpen] = useState(false);
-  const [servicosCusto, setServicosCusto] = useState<any[]>([]);
-  const [savingCustos, setSavingCustos] = useState(false);
 
   const carregarTudo = useCallback(() => {
     setKpisLoading(true);
@@ -183,32 +181,8 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
       .finally(() => setFaturamentoPeriodoLoading(false));
   }, [supabaseClient, filtros, granularidade]);
 
-  const openCostModal = async () => {
-    try {
-      const { data, error } = await supabaseClient.from('servicos').select('id, nome, custo_padrao').order('nome');
-      if (error) throw error;
-      setServicosCusto((data || []).map((s: any) => ({ ...s, custo_padrao: s.custo_padrao ?? 0 })));
-      setIsCostModalOpen(true);
-    } catch (err) {
-      console.error('Erro ao carregar serviços para configuração de custo:', err);
-    }
-  };
-
-  const saveCustos = async () => {
-    setSavingCustos(true);
-    try {
-      await Promise.all(
-        servicosCusto.map((s) =>
-          supabaseClient.from('servicos').update({ custo_padrao: Number(s.custo_padrao) || 0 }).eq('id', s.id)
-        )
-      );
-      setIsCostModalOpen(false);
-      fetchCustosPacotes(supabaseClient, filtros).then(setCustosPacotes).catch(() => {});
-    } catch (err) {
-      console.error('Erro ao salvar custos de serviços:', err);
-    } finally {
-      setSavingCustos(false);
-    }
+  const abrirConfigCustos = () => {
+    setNavState({ mode: 'global', view: 'Configurações', settingsTab: 'custos' });
   };
 
   const trendFrom = (atual: number, anterior: number) => ({
@@ -233,7 +207,7 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <DashboardHeader units={units} filtros={filtros} onChangeFiltros={setFiltros} onOpenCostModal={openCostModal} />
+      <DashboardHeader units={units} filtros={filtros} onChangeFiltros={setFiltros} onOpenCostModal={abrirConfigCustos} />
 
       {kpisError && (
         <div className="bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold px-4 py-3 rounded-xl flex items-center gap-2">
@@ -416,7 +390,7 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
                 </tbody>
               </table>
               <p className="text-[10px] text-slate-300 font-bold mt-4 italic">
-                Custo de combustível por viagem ainda não é cadastrado no sistema.
+                Custo por viagem (combustível + tempo) é cadastrado em Configurações → Custos dos Serviços e entra no cálculo de lucro em Rentabilidade.
               </p>
             </div>
           )}
@@ -510,55 +484,6 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
         </div>
       </div>
 
-      {/* Modal de configuração de custos por serviço */}
-      {isCostModalOpen && (
-        <div className="app-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="app-modal-panel bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <header className="bg-violet-600 p-6 text-white flex justify-between items-center shrink-0">
-              <div>
-                <h3 className="text-lg font-black">Custo padrão por serviço</h3>
-                <p className="text-violet-100 text-xs font-medium">Usado no bloco de Custos com Pacotes</p>
-              </div>
-              <button onClick={() => setIsCostModalOpen(false)} className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full text-xl">
-                <i className="fa-solid fa-xmark"></i>
-              </button>
-            </header>
-            <div className="flex-1 overflow-y-auto p-6 space-y-3">
-              {servicosCusto.map((s, idx) => (
-                <div key={s.id} className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-bold text-slate-700 truncate">{s.nome}</span>
-                  <div className="relative w-32 shrink-0">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={s.custo_padrao}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setServicosCusto((prev) => prev.map((item, i) => (i === idx ? { ...item, custo_padrao: value } : item)));
-                      }}
-                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <footer className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0">
-              <button onClick={() => setIsCostModalOpen(false)} className="px-6 py-3 bg-white border border-slate-200 rounded-xl font-black text-[11px] uppercase text-slate-500">
-                Cancelar
-              </button>
-              <button
-                onClick={saveCustos}
-                disabled={savingCustos}
-                className="px-8 py-3 bg-violet-600 text-white rounded-xl font-black text-[11px] uppercase shadow-lg shadow-violet-500/20"
-              >
-                {savingCustos ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'Salvar'}
-              </button>
-            </footer>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

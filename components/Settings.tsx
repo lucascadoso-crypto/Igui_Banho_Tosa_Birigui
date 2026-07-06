@@ -6,17 +6,25 @@ import { registrarAtividade } from '../services/logger';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatarErroWhatsApp } from '../lib/errorParser';
 import FiscalSettings from './FiscalSettings';
+import CustosServicos from './CustosServicos';
+
+type SettingsTab = 'identity' | 'units' | 'services' | 'packages' | 'custos' | 'fiscal' | 'whatsapp_logs';
 
 interface SettingsProps {
   supabaseClient: any;
   units: Unit[];
   refreshUnits: () => void;
   userProfile?: UserProfile;
+  initialTab?: string;
 }
 
-const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits, userProfile }) => {
+const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits, userProfile, initialTab }) => {
   const isReadOnly = userProfile?.cargo === 'financeiro';
-  const [activeTab, setActiveTab] = useState<'identity' | 'units' | 'services' | 'packages' | 'fiscal' | 'whatsapp_logs'>('identity');
+  const [activeTab, setActiveTab] = useState<SettingsTab>((initialTab as SettingsTab) || 'identity');
+
+  useEffect(() => {
+    if (initialTab) setActiveTab(initialTab as SettingsTab);
+  }, [initialTab]);
   const [loading, setLoading] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
@@ -570,6 +578,13 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
           <span>Pacotes</span>
         </button>
         <button
+          onClick={() => setActiveTab('custos')}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 ${activeTab === 'custos' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
+        >
+          <i className="fa-solid fa-coins"></i>
+          <span>Custos dos Serviços</span>
+        </button>
+        <button
           onClick={() => setActiveTab('fiscal')}
           className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 ${activeTab === 'fiscal' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
         >
@@ -1084,6 +1099,10 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
             )}
           </div>
         </div>
+      )}
+
+      {activeTab === 'custos' && (
+        <CustosServicos supabaseClient={supabaseClient} userProfile={userProfile} />
       )}
 
       {activeTab === 'fiscal' && (

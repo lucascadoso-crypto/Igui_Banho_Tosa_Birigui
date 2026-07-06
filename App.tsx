@@ -15,6 +15,7 @@ import Financeiro from './components/Financeiro';
 import Gastos from './components/Gastos';
 import DashboardGerencial from './components/DashboardGerencial';
 import FinanceiroGlobal from './components/FinanceiroGlobal';
+import Rentabilidade from './components/Rentabilidade';
 import Equipe from './components/Equipe';
 import ReciboView from './components/ReciboView';
 import Login from './components/Login';
@@ -88,13 +89,15 @@ const AppContent: React.FC = () => {
         return <DashboardGerencial units={units} supabaseClient={supabase} />;
       case 'Financeiro Geral':
         return <FinanceiroGlobal units={units} supabaseClient={supabase} />;
+      case 'Rentabilidade':
+        return <Rentabilidade units={units} supabaseClient={supabase} />;
       case 'Equipe':
         return <Equipe units={units} supabaseClient={supabase} currentUserRole={effectiveUserRole} userProfile={effectiveUserProfile} />;
       case 'Meu Perfil':
         return <Perfil supabaseClient={supabase} />;
       case 'Configuracoes':
       case 'Configurações':
-        return <Settings supabaseClient={supabase} units={units} refreshUnits={fetchUnits} userProfile={effectiveUserProfile} />;
+        return <Settings supabaseClient={supabase} units={units} refreshUnits={fetchUnits} userProfile={effectiveUserProfile} initialTab={navState.settingsTab} />;
       case 'Clientes':
         return activeUnit ? <Clients unit={activeUnit} supabaseClient={supabase} userProfile={effectiveUserProfile} /> : <div>Selecione uma unidade</div>;
       case 'Pacotes':

@@ -65,13 +65,15 @@ export interface Package {
 }
 
 export type SubView = 'Agendamento' | 'Clientes' | 'Pacotes' | 'Financeiro' | 'Gastos' | 'Auditoria';
-export type GlobalView = 'Dashboard' | 'Financeiro Geral' | 'Configurações' | 'Equipe' | 'Meu Perfil';
+export type GlobalView = 'Dashboard' | 'Financeiro Geral' | 'Rentabilidade' | 'Configurações' | 'Equipe' | 'Meu Perfil';
 
 export interface NavigationState {
   mode: 'global' | 'unit';
   view: GlobalView | SubView;
   unitId?: UiId;
   unitName?: string;
+  /** Aba inicial ao navegar para 'Configurações' (ex: 'custos' vindo do botão de custos do Dashboard). */
+  settingsTab?: string;
 }
 
 export interface Client { 
