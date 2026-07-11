@@ -8,7 +8,7 @@ import PacoteFormModal from './PacoteFormModal';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import { calculateAppointmentTotals } from '../services/pricing';
-import { registrarPagamentoPacote } from '../services/pacotePayments';
+import { registrarPagamentoPacote, garantirFinanceiroMovimento } from '../services/pacotePayments';
 
 interface AppointmentsProps {
   unit: Unit;
@@ -606,7 +606,28 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
       if (error) throw error;
       setShowPaymentSelector(false);
-      
+
+      // Nota fiscal manual (Fase 2) so vale para agendamento avulso
+      // (pacote_id nulo) - banho dentro de pacote nunca gera nota propria.
+      if (!viewingAppt.pacote_id) {
+        await garantirFinanceiroMovimento({
+          supabaseClient,
+          unitId: unit.id,
+          agendamentoId: viewingAppt.id,
+          clienteId: viewingAppt.cliente_id,
+          petId: viewingAppt.pet_id,
+          categoria: 'banho_avulso',
+          origem: 'pagamento_agendamento',
+          descricao: `Banho: ${viewingAppt.pets?.nome || 'Pet'}`,
+          dataCompetencia: viewingAppt.data_agendamento,
+          metodo1: data.method1,
+          valor1: data.val1,
+          metodo2: data.method2,
+          valor2: data.val2,
+          observacaoBase: `Pagamento do agendamento ${viewingAppt.id}`
+        });
+      }
+
       // Log de Auditoria
       const petName = viewingAppt.pets?.nome || 'Pet';
       const logMsg = data.method2 

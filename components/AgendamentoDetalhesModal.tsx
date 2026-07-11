@@ -5,6 +5,7 @@ import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import AgendamentoTutorPetPanel from './AgendamentoTutorPetPanel';
 import { calculateAppointmentTotals } from '../services/pricing';
+import NotaFiscalBadge from './NotaFiscalBadge';
 
 interface AgendamentoDetalhesModalProps {
   appt: any;
@@ -783,7 +784,12 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
 
             {/* Seção Recibo */}
             <div className="space-y-4">
-               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Recibo</h3>
+               <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Recibo</h3>
+                  {!appt.pacote_id && appt.status === 'Finalizado' && (
+                     <NotaFiscalBadge supabaseClient={supabaseClient} userProfile={userProfile} agendamentoId={appt.id} />
+                  )}
+               </div>
 
                {appt.pacote_id && (
                   <div className="grid grid-cols-2 gap-3">

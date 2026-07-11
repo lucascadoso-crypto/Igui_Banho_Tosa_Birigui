@@ -146,8 +146,43 @@ function getAgendamentoParts(agendamento: any) {
   return { pet, cliente, pacote };
 }
 
-function buildManualMessage(agendamento: any, tipo: MessageTipo) {
-  const { pet, cliente, pacote } = getAgendamentoParts(agendamento);
+// R2: saldo de pacote e sempre calculado a partir de agendamentos.status =
+// 'Finalizado', nunca lido de uma coluna gravada. Consulta a view
+// pacotes_com_saldo (supabase/migrations/0041_pacotes_saldo_view.sql) no
+// momento do envio para refletir o estado real do banco.
+async function getPacoteSaldo(supabase: any, pacoteId: number | string) {
+  const { data, error } = await supabase
+    .from("pacotes_com_saldo")
+    .select("qtd_sessoes, usados, saldo_calculado")
+    .eq("id", pacoteId)
+    .single();
+
+  if (error || !data) return null;
+
+  return {
+    total: Number(data.qtd_sessoes) || 0,
+    usados: Number(data.usados) || 0,
+    restantes: Number(data.saldo_calculado) || 0,
+  };
+}
+
+// R3: nunca usar fracao tipo "1/2". Banho ainda nao consumido -> numero do
+// proximo banho = usados + 1.
+function buildProximoBanhoLine(saldo: { total: number; usados: number }) {
+  const numeroDoBanho = saldo.usados + 1;
+  return `✨ Este será o banho *${numeroDoBanho}* de *${saldo.total}* do pacote.`;
+}
+
+// R3: mensagem de "pronto" informa quantos banhos restam apos o consumo
+// deste atendimento (que ja conta em saldo.usados, pois o status ja foi
+// gravado como Finalizado antes do disparo desta mensagem).
+function buildRestamBanhosLine(saldo: { restantes: number }) {
+  if (saldo.restantes <= 0) return "Este foi o último banho do pacote! 🎉";
+  return `Restam *${saldo.restantes}* banho(s) no pacote.`;
+}
+
+async function buildManualMessage(supabase: any, agendamento: any, tipo: MessageTipo) {
+  const { pet, cliente } = getAgendamentoParts(agendamento);
   const nomeCliente = String(cliente.nome || "Cliente").trim();
   const nomePet = String(pet?.nome || "seu pet").trim();
   const dataFormatada = formatDateBR(agendamento.data_agendamento);
@@ -165,14 +200,15 @@ function buildManualMessage(agendamento: any, tipo: MessageTipo) {
     ];
 
     if (agendamento.pacote_id) {
-      lines.push(`✨ Sessão *${agendamento.numero_sessao || "?"}/${pacote?.qtd_sessoes || "?"}* do seu pacote.`);
+      const saldo = await getPacoteSaldo(supabase, agendamento.pacote_id);
+      if (saldo) lines.push(buildProximoBanhoLine(saldo));
     }
 
     return lines.join("\n");
   }
 
   if (tipo === "pronto") {
-    return [
+    const lines = [
       `Olá *${nomeCliente}*! 🐾`,
       "",
       `O(A) *${nomePet}* já terminou o banho e está cheirosinho(a)!`,
@@ -180,14 +216,24 @@ function buildManualMessage(agendamento: any, tipo: MessageTipo) {
       hasTaxi
         ? `🚕 Nosso motorista entregará o(a) *${nomePet}* pertinho de você com muito carinho e segurança! 💙`
         : "🛁 Já pode vir buscá-lo(a)!",
-    ].join("\n");
+    ];
+
+    if (agendamento.pacote_id) {
+      const saldo = await getPacoteSaldo(supabase, agendamento.pacote_id);
+      if (saldo) {
+        lines.push("");
+        lines.push(buildRestamBanhosLine(saldo));
+      }
+    }
+
+    return lines.join("\n");
   }
 
-  return buildAutomaticReminderMessage(agendamento, "hoje");
+  return buildAutomaticReminderMessage(supabase, agendamento, "hoje");
 }
 
-function buildAutomaticReminderMessage(agendamento: any, janela: AutomaticJanela) {
-  const { pet, cliente, pacote } = getAgendamentoParts(agendamento);
+async function buildAutomaticReminderMessage(supabase: any, agendamento: any, janela: AutomaticJanela) {
+  const { pet, cliente } = getAgendamentoParts(agendamento);
   const nomeCliente = String(cliente.nome || "Cliente").trim();
   const nomePet = String(pet?.nome || "seu pet").trim();
   const horario = String(agendamento.horario_inicio || "").substring(0, 5);
@@ -203,8 +249,11 @@ function buildAutomaticReminderMessage(agendamento: any, janela: AutomaticJanela
   ];
 
   if (agendamento.pacote_id) {
-    lines.push("");
-    lines.push(`✨ Sessão *${agendamento.numero_sessao || "?"}/${pacote?.qtd_sessoes || "?"}* do seu pacote.`);
+    const saldo = await getPacoteSaldo(supabase, agendamento.pacote_id);
+    if (saldo) {
+      lines.push("");
+      lines.push(buildProximoBanhoLine(saldo));
+    }
   }
 
   return lines.join("\n");
@@ -417,7 +466,7 @@ async function processAutomatic(supabase: any, janelaInput: unknown, origem: unk
         continue;
       }
 
-      const mensagem = buildAutomaticReminderMessage(agendamento, janela);
+      const mensagem = await buildAutomaticReminderMessage(supabase, agendamento, janela);
       const result = await sendAndLogMessage(supabase, agendamento, mensagem, "lembrete", logTipo);
 
       if (result.ok) enviados += 1;
@@ -482,7 +531,7 @@ async function processManual(supabase: any, req: Request, body: any, agendamento
     }, 409);
   }
 
-  const mensagem = String(body?.mensagem || "").trim() || buildManualMessage(agendamento, tipo);
+  const mensagem = String(body?.mensagem || "").trim() || await buildManualMessage(supabase, agendamento, tipo);
 
   if (shouldPreventDuplicate(logTipo) && await alreadySent(supabase, Number(agendamento.id), logTipo)) {
     return jsonResponse({

@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Unit } from '../types';
+import { Unit, UserProfile } from '../types';
 
 interface FiscalHistoryProps {
   supabaseClient: any;
   unit?: Unit;
   clientId?: number;
   compact?: boolean;
+  userProfile?: UserProfile;
 }
 
 const statusClasses: Record<string, string> = {
@@ -18,7 +19,7 @@ const statusClasses: Record<string, string> = {
   CANCELADA: 'bg-zinc-200 text-zinc-600'
 };
 
-const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, clientId, compact = false }) => {
+const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, clientId, compact = false, userProfile }) => {
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
@@ -26,6 +27,25 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
   const [selectedNote, setSelectedNote] = useState<any | null>(null);
+
+  const canManageNotes = ['master', 'financeiro'].includes(userProfile?.cargo || '');
+
+  const [issuingNote, setIssuingNote] = useState<any | null>(null);
+  const [numeroNota, setNumeroNota] = useState('');
+  const [dataEmissao, setDataEmissao] = useState('');
+  const [codigoVerificacao, setCodigoVerificacao] = useState('');
+  const [urlDocumento, setUrlDocumento] = useState('');
+  const [issuingSaving, setIssuingSaving] = useState(false);
+  const [issuingError, setIssuingError] = useState('');
+
+  const [cancelingNote, setCancelingNote] = useState<any | null>(null);
+  const [motivoCancelamento, setMotivoCancelamento] = useState('');
+  const [cancelingSaving, setCancelingSaving] = useState(false);
+  const [cancelingError, setCancelingError] = useState('');
+
+  const [deletingNote, setDeletingNote] = useState<any | null>(null);
+  const [deletingSaving, setDeletingSaving] = useState(false);
+  const [deletingError, setDeletingError] = useState('');
 
   useEffect(() => {
     fetchNotes();
@@ -81,6 +101,92 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
     });
   }, [notes, search]);
 
+  const resumo = useMemo(() => {
+    return filteredNotes.reduce(
+      (acc, note) => {
+        if (note.status === 'RASCUNHO') acc.totalRascunho += Number(note.valor_total || 0);
+        if (note.status === 'EMITIDA') acc.totalEmitido += Number(note.valor_total || 0);
+        return acc;
+      },
+      { totalRascunho: 0, totalEmitido: 0 }
+    );
+  }, [filteredNotes]);
+
+  const openIssueModal = (note: any) => {
+    setIssuingError('');
+    setNumeroNota('');
+    setDataEmissao(new Date().toISOString().slice(0, 10));
+    setCodigoVerificacao('');
+    setUrlDocumento('');
+    setIssuingNote(note);
+  };
+
+  const handleMarkIssued = async () => {
+    if (!issuingNote) return;
+    setIssuingSaving(true);
+    setIssuingError('');
+    try {
+      const { error } = await supabaseClient.rpc('marcar_nota_fiscal_emitida', {
+        p_nota_fiscal_id: issuingNote.id,
+        p_numero_nota: numeroNota,
+        p_data_emissao: dataEmissao ? new Date(`${dataEmissao}T12:00:00`).toISOString() : null,
+        p_codigo_verificacao: codigoVerificacao || null,
+        p_url_documento: urlDocumento || null
+      });
+      if (error) throw error;
+      setIssuingNote(null);
+      await fetchNotes();
+    } catch (err: any) {
+      console.error('Erro ao marcar nota como emitida:', err);
+      setIssuingError(err.message || 'Falha ao marcar nota como emitida.');
+    } finally {
+      setIssuingSaving(false);
+    }
+  };
+
+  const openCancelModal = (note: any) => {
+    setCancelingError('');
+    setMotivoCancelamento('');
+    setCancelingNote(note);
+  };
+
+  const handleCancelNote = async () => {
+    if (!cancelingNote) return;
+    setCancelingSaving(true);
+    setCancelingError('');
+    try {
+      const { error } = await supabaseClient.rpc('cancelar_nota_fiscal', {
+        p_nota_fiscal_id: cancelingNote.id,
+        p_motivo: motivoCancelamento
+      });
+      if (error) throw error;
+      setCancelingNote(null);
+      await fetchNotes();
+    } catch (err: any) {
+      console.error('Erro ao cancelar nota fiscal:', err);
+      setCancelingError(err.message || 'Falha ao cancelar nota fiscal.');
+    } finally {
+      setCancelingSaving(false);
+    }
+  };
+
+  const handleDeleteDraft = async () => {
+    if (!deletingNote) return;
+    setDeletingSaving(true);
+    setDeletingError('');
+    try {
+      const { error } = await supabaseClient.from('notas_fiscais').delete().eq('id', deletingNote.id);
+      if (error) throw error;
+      setDeletingNote(null);
+      await fetchNotes();
+    } catch (err: any) {
+      console.error('Erro ao excluir rascunho fiscal:', err);
+      setDeletingError(err.message || 'Falha ao excluir rascunho fiscal.');
+    } finally {
+      setDeletingSaving(false);
+    }
+  };
+
   const formatDate = (date?: string) => date ? new Date(`${date}T12:00:00`).toLocaleDateString('pt-BR') : '-';
   const formatDateTime = (date?: string) => date ? new Date(date).toLocaleString('pt-BR') : '-';
   const formatCurrency = (value: any) => `R$ ${Number(value || 0).toFixed(2)}`;
@@ -119,6 +225,19 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
             </select>
           </div>
         </section>
+      )}
+
+      {!compact && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-2xl bg-amber-50 border border-amber-100 p-5">
+            <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Pendente de emissao (rascunho)</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">{formatCurrency(resumo.totalRascunho)}</p>
+          </div>
+          <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-5">
+            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Emitido no periodo filtrado</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">{formatCurrency(resumo.totalEmitido)}</p>
+          </div>
+        </div>
       )}
 
       <section className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
@@ -163,10 +282,27 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
                       <td className="px-6 py-4 text-xs font-bold text-slate-500">{formatDate(note.data_competencia)}</td>
                       <td className="px-6 py-4 text-right font-black text-slate-900">{formatCurrency(note.valor_total)}</td>
                       <td className="px-6 py-4 text-xs font-bold text-slate-400">{note.numero_nota || 'Futuro'}</td>
-                      <td className="px-6 py-4 text-right">
-                        <button onClick={() => setSelectedNote(note)} className="px-4 py-2 rounded-xl bg-teal-50 text-teal-700 font-black text-[10px] uppercase tracking-widest">
-                          Ver rascunho
-                        </button>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button onClick={() => setSelectedNote(note)} className="px-4 py-2 rounded-xl bg-teal-50 text-teal-700 font-black text-[10px] uppercase tracking-widest">
+                            Ver rascunho
+                          </button>
+                          {canManageNotes && note.status === 'RASCUNHO' && (
+                            <>
+                              <button onClick={() => openIssueModal(note)} className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 font-black text-[10px] uppercase tracking-widest">
+                                Marcar como emitida
+                              </button>
+                              <button onClick={() => setDeletingNote(note)} className="px-4 py-2 rounded-xl bg-rose-50 text-rose-700 font-black text-[10px] uppercase tracking-widest">
+                                Excluir
+                              </button>
+                            </>
+                          )}
+                          {canManageNotes && note.status === 'EMITIDA' && (
+                            <button onClick={() => openCancelModal(note)} className="px-4 py-2 rounded-xl bg-rose-50 text-rose-700 font-black text-[10px] uppercase tracking-widest">
+                              Cancelar
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -194,6 +330,25 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
                       Ver rascunho
                     </button>
                   </div>
+                  {canManageNotes && (note.status === 'RASCUNHO' || note.status === 'EMITIDA') && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {note.status === 'RASCUNHO' && (
+                        <>
+                          <button onClick={() => openIssueModal(note)} className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 font-black text-[10px] uppercase tracking-widest">
+                            Marcar como emitida
+                          </button>
+                          <button onClick={() => setDeletingNote(note)} className="px-3 py-2 rounded-xl bg-rose-50 text-rose-700 font-black text-[10px] uppercase tracking-widest">
+                            Excluir
+                          </button>
+                        </>
+                      )}
+                      {note.status === 'EMITIDA' && (
+                        <button onClick={() => openCancelModal(note)} className="px-3 py-2 rounded-xl bg-rose-50 text-rose-700 font-black text-[10px] uppercase tracking-widest">
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
@@ -250,6 +405,118 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
                     <span className="font-black text-slate-900">{formatCurrency(item.valor_total)}</span>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {issuingNote && (
+        <div className="app-modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="app-modal-panel w-full max-w-lg bg-white rounded-[2rem] shadow-2xl max-h-[calc(100dvh-24px)] overflow-y-auto">
+            <header className="sticky top-0 bg-white p-6 border-b border-slate-100 flex items-start justify-between gap-4 rounded-t-[2rem]">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Marcar nota #{issuingNote.id} como emitida</h3>
+                <p className="text-xs font-bold text-slate-400 mt-1">Emitida manualmente no Portal Nacional de NFS-e. Registre os dados aqui.</p>
+              </div>
+              <button onClick={() => setIssuingNote(null)} className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-500 shrink-0">
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </header>
+            <div className="p-6 space-y-4">
+              {issuingError && (
+                <div className="rounded-2xl bg-rose-50 border border-rose-100 p-4 text-rose-700 font-bold text-sm">{issuingError}</div>
+              )}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Numero da NFS-e *</label>
+                <input value={numeroNota} onChange={(e) => setNumeroNota(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data de emissao *</label>
+                <input type="date" value={dataEmissao} onChange={(e) => setDataEmissao(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chave/codigo de verificacao (opcional)</label>
+                <input value={codigoVerificacao} onChange={(e) => setCodigoVerificacao(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Link do documento (opcional)</label>
+                <input value={urlDocumento} onChange={(e) => setUrlDocumento(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" />
+              </div>
+              <div className="flex flex-col-reverse md:flex-row gap-3 pt-2">
+                <button onClick={() => setIssuingNote(null)} className="w-full md:flex-1 py-4 rounded-2xl bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest">
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleMarkIssued}
+                  disabled={issuingSaving || !numeroNota.trim() || !dataEmissao}
+                  className="w-full md:flex-[2] py-4 rounded-2xl bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-500/20 disabled:opacity-50"
+                >
+                  {issuingSaving ? 'Salvando...' : 'Marcar como emitida'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelingNote && (
+        <div className="app-modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="app-modal-panel w-full max-w-lg bg-white rounded-[2rem] shadow-2xl max-h-[calc(100dvh-24px)] overflow-y-auto">
+            <header className="sticky top-0 bg-white p-6 border-b border-slate-100 flex items-start justify-between gap-4 rounded-t-[2rem]">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Cancelar nota #{cancelingNote.id}</h3>
+                <p className="text-xs font-bold text-slate-400 mt-1">Numero {cancelingNote.numero_nota || '-'}. Informe o motivo do cancelamento.</p>
+              </div>
+              <button onClick={() => setCancelingNote(null)} className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-500 shrink-0">
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </header>
+            <div className="p-6 space-y-4">
+              {cancelingError && (
+                <div className="rounded-2xl bg-rose-50 border border-rose-100 p-4 text-rose-700 font-bold text-sm">{cancelingError}</div>
+              )}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Motivo do cancelamento *</label>
+                <textarea value={motivoCancelamento} onChange={(e) => setMotivoCancelamento(e.target.value)} rows={3} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none resize-none" />
+              </div>
+              <div className="flex flex-col-reverse md:flex-row gap-3 pt-2">
+                <button onClick={() => setCancelingNote(null)} className="w-full md:flex-1 py-4 rounded-2xl bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest">
+                  Voltar
+                </button>
+                <button
+                  onClick={handleCancelNote}
+                  disabled={cancelingSaving || !motivoCancelamento.trim()}
+                  className="w-full md:flex-[2] py-4 rounded-2xl bg-rose-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl shadow-rose-500/20 disabled:opacity-50"
+                >
+                  {cancelingSaving ? 'Cancelando...' : 'Confirmar cancelamento'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deletingNote && (
+        <div className="app-modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="app-modal-panel w-full max-w-md bg-white rounded-[2rem] shadow-2xl">
+            <div className="p-6 space-y-4">
+              <h3 className="text-lg font-black text-slate-900">Excluir rascunho #{deletingNote.id}?</h3>
+              <p className="text-sm font-bold text-slate-500">Essa acao nao pode ser desfeita. O rascunho fiscal sera removido permanentemente.</p>
+              {deletingError && (
+                <div className="rounded-2xl bg-rose-50 border border-rose-100 p-4 text-rose-700 font-bold text-sm">{deletingError}</div>
+              )}
+              <div className="flex flex-col-reverse md:flex-row gap-3 pt-2">
+                <button onClick={() => setDeletingNote(null)} className="w-full md:flex-1 py-4 rounded-2xl bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest">
+                  Voltar
+                </button>
+                <button
+                  onClick={handleDeleteDraft}
+                  disabled={deletingSaving}
+                  className="w-full md:flex-[2] py-4 rounded-2xl bg-rose-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl shadow-rose-500/20 disabled:opacity-50"
+                >
+                  {deletingSaving ? 'Excluindo...' : 'Excluir rascunho'}
+                </button>
               </div>
             </div>
           </div>

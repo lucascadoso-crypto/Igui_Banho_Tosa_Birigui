@@ -100,7 +100,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
       // 1. Buscar Agendamentos Avulsos Pagos (Onde pacote_id é NULO)
       const apptsPromise = supabaseClient
         .from('agendamentos')
-        .select('id, unidade_id, cliente_id, pet_id, pacote_id, status, valor_total, valor_transporte, forma_pagamento, valor_pagamento_2, forma_pagamento_2, data_agendamento, pets(nome), agendamento_itens(servicos(nome))')
+        .select('id, unidade_id, cliente_id, pet_id, pacote_id, status, pago, valor_total, valor_transporte, forma_pagamento, valor_pagamento_2, forma_pagamento_2, data_agendamento, pets(nome), agendamento_itens(servicos(nome))')
         .eq('unidade_id', unit.id)
         .eq('data_agendamento', selectedDate)
         .eq('pago', true)
@@ -110,7 +110,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
       // Usando comparação estrita de string YYYY-MM-DD para evitar deslocamento de fuso
       const packsPromise = supabaseClient
         .from('pacotes')
-        .select('id, valor_total, valor_transporte, forma_pagamento, valor_pagamento_2, forma_pagamento_2, data_pagamento, created_at, pets(nome)')
+        .select('id, valor_total, valor_transporte, forma_pagamento, valor_pagamento_2, forma_pagamento_2, data_pagamento, created_at, pago, pets(nome)')
         .eq('unidade_id', unit.id)
         .eq('data_pagamento', selectedDate)
         .eq('pago', true);
@@ -917,7 +917,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
                  )}
               </div>
             ) : viewMode === 'fiscal' && canViewFiscal ? (
-              <FiscalHistory supabaseClient={supabaseClient} unit={unit} />
+              <FiscalHistory supabaseClient={supabaseClient} unit={unit} userProfile={userProfile} />
             ) : (
               <div className="space-y-6 animate-in slide-in-from-right duration-500">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

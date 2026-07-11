@@ -4,6 +4,7 @@ import { Pet, Client, Service, Unit, UserProfile } from '../types';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import { registrarAtividade } from '../services/logger';
 import { registrarPagamentoPacote } from '../services/pacotePayments';
+import NotaFiscalBadge from './NotaFiscalBadge';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -552,14 +553,17 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
               
               <div className="border-t border-slate-50 pt-6 md:pt-8">
                 {pack.pago ? (
-                  <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl flex items-center space-x-4 text-emerald-800 animate-in fade-in duration-300">
-                     <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                        <i className="fa-solid fa-check"></i>
+                  <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl flex items-center justify-between flex-wrap gap-4 text-emerald-800 animate-in fade-in duration-300">
+                     <div className="flex items-center space-x-4">
+                        <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                           <i className="fa-solid fa-check"></i>
+                        </div>
+                        <div>
+                           <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Pagamento Confirmado</p>
+                           <p className="text-sm font-bold">PAGO via {pack.forma_pagamento} em {formatDateBR(pack.data_pagamento)}</p>
+                        </div>
                      </div>
-                     <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Pagamento Confirmado</p>
-                        <p className="text-sm font-bold">PAGO via {pack.forma_pagamento} em {formatDateBR(pack.data_pagamento)}</p>
-                     </div>
+                     <NotaFiscalBadge supabaseClient={supabaseClient} userProfile={userProfile} pacoteId={pack.id} />
                   </div>
                 ) : isPaying ? (
                    <div className="bg-slate-50 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border border-slate-200 space-y-5 animate-in slide-in-from-top-4 duration-300 overflow-hidden">
