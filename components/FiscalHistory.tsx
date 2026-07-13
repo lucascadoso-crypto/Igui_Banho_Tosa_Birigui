@@ -387,15 +387,53 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
                   <p className="text-sm font-black text-slate-800">{formatDateTime(selectedNote.data_emissao)}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tomador</p>
-                  <p className="text-sm font-black text-slate-800">{selectedNote.tomador_nome || '-'}</p>
+              <div className="rounded-2xl bg-teal-50 border border-teal-100 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-black text-teal-700 uppercase tracking-widest">Dados do tomador (para emitir no Portal Nacional)</p>
+                  <button
+                    onClick={() => {
+                      const texto = [
+                        `Nome: ${selectedNote.tomador_nome || '-'}`,
+                        `CPF/CNPJ: ${selectedNote.tomador_cpf_cnpj || '-'}`,
+                        `E-mail: ${selectedNote.tomador_email || '-'}`,
+                        `Telefone: ${selectedNote.tomador_telefone || '-'}`,
+                        `Endereco: ${selectedNote.tomador_endereco || '-'}`,
+                        `Valor: ${formatCurrency(selectedNote.valor_total)}`,
+                        `Descricao: ${selectedNote.descricao_servico || '-'}`
+                      ].join('\n');
+                      navigator.clipboard?.writeText(texto);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-teal-600 text-white font-black text-[9px] uppercase tracking-widest shrink-0"
+                  >
+                    Copiar dados
+                  </button>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total</p>
-                  <p className="text-sm font-black text-slate-800">{formatCurrency(selectedNote.valor_total)}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Nome</p>
+                    <p className="text-sm font-black text-slate-800">{selectedNote.tomador_nome || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">CPF/CNPJ</p>
+                    <p className="text-sm font-black text-slate-800">{selectedNote.tomador_cpf_cnpj || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">E-mail</p>
+                    <p className="text-sm font-black text-slate-800">{selectedNote.tomador_email || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Telefone</p>
+                    <p className="text-sm font-black text-slate-800">{selectedNote.tomador_telefone || '-'}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Endereco</p>
+                    <p className="text-sm font-black text-slate-800">{selectedNote.tomador_endereco || '-'}</p>
+                  </div>
                 </div>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total</p>
+                <p className="text-sm font-black text-slate-800">{formatCurrency(selectedNote.valor_total)}</p>
               </div>
               <div className="space-y-2">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Itens</p>
