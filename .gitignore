@@ -27,3 +27,10 @@ dist-ssr
 # Claude Code local config / Supabase CLI local cache
 .claude/
 supabase/.temp/
+
+# Certificados digitais e chaves - nunca devem ser commitados
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
