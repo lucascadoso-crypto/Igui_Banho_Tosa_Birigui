@@ -5,6 +5,7 @@ import ClienteModal from './ClienteModal';
 import AgendamentoDetalhesModal from './AgendamentoDetalhesModal'; // TEST
 import CadastroPet from './CadastroPet';
 import PacoteFormModal from './PacoteFormModal';
+import PetSpeciesTag from './PetSpeciesTag';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import { calculateAppointmentTotals } from '../services/pricing';
@@ -1892,6 +1893,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                              <h4 className="font-black text-xl text-slate-800 truncate group-hover:text-amber-600 transition-colors">
                                 {appt.pets?.nome}
                              </h4>
+                             <PetSpeciesTag especie={appt.pets?.especie} raca={appt.pets?.raca} />
                              {appt.pacote_id && (
                                 <span className="shrink-0 bg-indigo-50 text-indigo-500 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter border border-indigo-100">
                                    Sessão {appt.numero_sessao || '?'}/{appt.pacotes?.qtd_sessoes || '?'}

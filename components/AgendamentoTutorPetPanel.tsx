@@ -4,6 +4,7 @@ import { Client, Pet, UserProfile } from '../types';
 import ClienteModal from './ClienteModal';
 import ClientDetailsModal from './ClientDetailsModal';
 import PetFormModal from './PetFormModal';
+import PetSpeciesTag from './PetSpeciesTag';
 
 interface AgendamentoTutorPetPanelProps {
   appt: any;
@@ -149,7 +150,10 @@ const AgendamentoTutorPetPanel: React.FC<AgendamentoTutorPetPanelProps> = ({
                   <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-300 overflow-hidden shrink-0 border border-slate-100">
                     {pet?.foto_url ? <img src={pet.foto_url} className="w-full h-full object-cover" /> : <i className="fa-solid fa-paw text-xs"></i>}
                   </div>
-                  <p className="font-black text-slate-800 text-sm truncate">{pet?.nome || 'Não identificado'}</p>
+                  <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                    <p className="font-black text-slate-800 text-sm truncate">{pet?.nome || 'Não identificado'}</p>
+                    <PetSpeciesTag especie={pet?.especie} raca={pet?.raca} />
+                  </div>
                 </div>
                 <i className="fa-solid fa-chevron-right text-slate-300 shrink-0"></i>
               </button>
@@ -230,7 +234,10 @@ const AgendamentoTutorPetPanel: React.FC<AgendamentoTutorPetPanelProps> = ({
               </div>
               <div className="min-w-0">
                 <p className="font-black text-slate-800 text-sm truncate">{pet?.nome || 'Não identificado'}</p>
-                <span className="bg-emerald-50 text-emerald-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-emerald-100">Ativo</span>
+                <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                  <PetSpeciesTag especie={pet?.especie} raca={pet?.raca} />
+                  <span className="bg-emerald-50 text-emerald-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-emerald-100">Ativo</span>
+                </div>
               </div>
             </div>
 
