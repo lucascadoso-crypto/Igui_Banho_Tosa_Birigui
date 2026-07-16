@@ -39,7 +39,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
   const [proximaSessaoFiltro, setProximaSessaoFiltro] = useState<'Todos' | 'Hoje' | 'Próximos 7 dias' | 'Sem agendamento' | 'Atrasado'>('Todos');
   const [pagamentoFiltro, setPagamentoFiltro] = useState<'Todos' | 'Pago' | 'Pendente' | 'Parcial'>('Todos');
   const [ordenacao, setOrdenacao] = useState<'Próxima sessão' | 'Menos sessões restantes' | 'Mais recente' | 'Maior pendência' | 'Nome do pet'>('Próxima sessão');
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(16);
 
@@ -362,21 +362,36 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
     termoBusca.trim() !== ''
   ].filter(Boolean).length;
 
-  const renderFilterPanel = (compact = false) => (
-    <div className={`${compact ? 'space-y-5' : 'rounded-[1.6rem] border border-slate-100 bg-white p-5 shadow-sm space-y-5'}`}>
-      <div className="flex flex-wrap gap-2 md:justify-center">
-        {(['Todos', 'Ativos', 'Finalizados', 'Cancelados', 'A vencer'] as const).map((opt) => (
-          <button key={opt} onClick={() => setStatusFiltro(opt)} className={`px-4 py-2 rounded-xl text-[11px] font-black transition-all ${statusFiltro === opt ? 'bg-[#00897B] text-white shadow-lg shadow-teal-500/20' : 'bg-white border border-slate-100 text-slate-600 hover:border-teal-200'}`}>
-            {opt}
-          </button>
-        ))}
-        {frequenciasDisponiveis.map((freq) => (
-          <button key={freq} onClick={() => setFrequenciaFiltro(frequenciaFiltro === freq ? 'Todos' : freq)} className={`px-4 py-2 rounded-xl text-[11px] font-black transition-all ${frequenciaFiltro === freq ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/10' : 'bg-white border border-slate-100 text-slate-600 hover:border-teal-200'}`}>
-            {freq}
-          </button>
-        ))}
+  const renderFilterPanel = () => (
+    <div className="pt-4 border-t border-slate-100 space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <label className="space-y-2">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</span>
+          <select value={statusFiltro} onChange={(e) => setStatusFiltro(e.target.value as any)} className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl outline-none text-xs font-bold text-slate-700">
+            {(['Todos', 'Ativos', 'Finalizados', 'Cancelados', 'A vencer'] as const).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+          </select>
+        </label>
+        <label className="space-y-2">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo</span>
+          <select value={frequenciaFiltro} onChange={(e) => setFrequenciaFiltro(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl outline-none text-xs font-bold text-slate-700">
+            <option value="Todos">Todos</option>
+            {frequenciasDisponiveis.map((freq) => <option key={freq} value={freq}>{freq}</option>)}
+          </select>
+        </label>
+        <label className="space-y-2">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pagamento</span>
+          <select value={pagamentoFiltro} onChange={(e) => setPagamentoFiltro(e.target.value as any)} className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl outline-none text-xs font-bold text-slate-700">
+            {(['Todos', 'Pago', 'Pendente', 'Parcial'] as const).map(opt => <option key={opt}>{opt}</option>)}
+          </select>
+        </label>
+        <label className="space-y-2">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ordenar por</span>
+          <select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value as any)} className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl outline-none text-xs font-bold text-slate-700">
+            {(['Próxima sessão', 'Menos sessões restantes', 'Mais recente', 'Maior pendência', 'Nome do pet'] as const).map(opt => <option key={opt}>{opt}</option>)}
+          </select>
+        </label>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:max-w-5xl md:mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <label className="space-y-2">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tutor</span>
           <select value={tutorFiltro} onChange={(e) => setTutorFiltro(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl outline-none text-xs font-bold text-slate-700">
@@ -396,23 +411,12 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
             {(['Todos', 'Hoje', 'Próximos 7 dias', 'Sem agendamento', 'Atrasado'] as const).map(opt => <option key={opt}>{opt}</option>)}
           </select>
         </label>
-        <label className="space-y-2">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pagamento</span>
-          <select value={pagamentoFiltro} onChange={(e) => setPagamentoFiltro(e.target.value as any)} className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl outline-none text-xs font-bold text-slate-700">
-            {(['Todos', 'Pago', 'Pendente', 'Parcial'] as const).map(opt => <option key={opt}>{opt}</option>)}
-          </select>
-        </label>
       </div>
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-end sm:justify-center md:max-w-5xl md:mx-auto">
-        <label className="space-y-2 sm:min-w-[220px] md:min-w-[260px]">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ordenar por</span>
-          <select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value as any)} className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl outline-none text-xs font-bold text-slate-700">
-            {(['Próxima sessão', 'Menos sessões restantes', 'Mais recente', 'Maior pendência', 'Nome do pet'] as const).map(opt => <option key={opt}>{opt}</option>)}
-          </select>
-        </label>
+      <div className="flex items-center justify-between gap-3 pt-1">
         <button onClick={clearFilters} className="px-4 py-3 rounded-xl text-[11px] font-black text-slate-500 hover:text-rose-500 hover:bg-rose-50 transition-all">
           <i className="fa-solid fa-broom mr-2"></i>Limpar filtros
         </button>
+        <span className="text-[11px] font-black text-emerald-600">{pacotesFiltrados.length} resultados</span>
       </div>
     </div>
   );
@@ -447,39 +451,45 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
         </div>
       )}
 
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 md:p-6 rounded-[1.8rem] border border-slate-100 shadow-sm">
-        <div className="flex items-center gap-4 min-w-0">
+      <header className="flex flex-wrap items-center gap-4 bg-white p-5 md:p-6 rounded-[1.8rem] border border-slate-100 shadow-sm">
+        <div className="flex items-center gap-4 min-w-0 shrink-0 order-1">
            <div className="w-14 h-14 md:w-16 md:h-16 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center shrink-0 shadow-inner">
              <i className="fa-solid fa-layer-group text-2xl"></i>
            </div>
            <div className="min-w-0">
               <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-tight">Pacotes Ativos</h2>
-              <p className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-[0.22em] truncate">Controle de Fidelidade Igui Birigui</p>
+              <p className="text-slate-400 text-[9px] font-bold uppercase tracking-[0.16em] truncate">Controle de Fidelidade Igui Birigui</p>
            </div>
         </div>
         {!isReadOnly && (
-          <button onClick={() => { setEditingPackageData(null); setIsModalOpen(true); }} className="bg-[#00897B] hover:bg-[#00796f] text-white px-5 md:px-7 py-3.5 rounded-2xl font-black shadow-lg shadow-teal-500/25 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
+          <button onClick={() => { setEditingPackageData(null); setIsModalOpen(true); }} className="order-2 md:order-3 shrink-0 bg-[#00897B] hover:bg-[#00796f] text-white px-5 md:px-7 py-3.5 rounded-2xl font-black shadow-lg shadow-teal-500/25 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
             <i className="fa-solid fa-plus"></i> <span>Novo pacote</span>
           </button>
         )}
+        <div className="relative order-3 md:order-2 w-full md:w-auto md:flex-1 min-w-0">
+          <i className="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input
+            type="text"
+            value={termoBusca}
+            onChange={(e) => setTermoBusca(e.target.value)}
+            placeholder="Buscar por nome do pet, tutor, telefone ou nº do pacote..."
+            className="w-full pl-14 pr-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none font-bold text-slate-700 text-sm transition-all"
+          />
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
         {[
-          { label: 'Pacotes Ativos', value: kpiPacotesAtivos, hint: `${kpiRenovar} para renovar`, icon: 'fa-circle-check' },
-          { label: 'Total em Sessões', value: kpiTotalSessoes, hint: `${packages.length} pacotes cadastrados`, icon: 'fa-calendar-days' },
-          { label: 'Para Renovar', value: kpiRenovar, hint: 'Até 2 sessões restantes', icon: 'fa-rotate' },
-          { label: 'Pendentes', value: kpiPendentes, hint: 'Pagamentos em aberto', icon: 'fa-wallet' },
-          { label: 'Banhos Hoje', value: packages.filter(hasSessionToday).length, hint: 'Agendados para hoje', icon: 'fa-calendar-day' },
-          { label: 'Receita (Ativos)', value: formatCurrency(kpiReceitaAtivos), hint: 'Pacotes em aberto', icon: 'fa-dollar-sign' },
-          { label: 'Receita (Finalizados)', value: formatCurrency(kpiReceitaFinalizados), hint: 'Ciclos concluídos', icon: 'fa-chart-simple' }
+          { label: 'Pacotes Ativos', value: kpiPacotesAtivos, hint: null, icon: 'fa-circle-check', tone: 'teal' },
+          { label: 'Valor dos ativos', value: kpiReceitaAtivosFormatada, hint: 'Pacotes em aberto', icon: 'fa-dollar-sign', tone: 'teal' },
+          { label: 'A receber', value: kpiPendentes, hint: 'Pagamentos em aberto', icon: 'fa-wallet', tone: 'amber' }
         ].map((kpi) => (
-          <div key={kpi.label} className="min-h-[132px] md:min-h-[112px] rounded-[1.45rem] bg-gradient-to-br from-[#00897B] via-[#007F75] to-[#075E59] p-5 md:p-4 shadow-[0_16px_32px_rgba(0,137,123,0.18)] text-white relative overflow-hidden border border-white/10">
+          <div key={kpi.label} className={`min-h-[132px] md:min-h-[112px] rounded-[1.45rem] p-5 md:p-4 text-white relative overflow-hidden border border-white/10 ${kpi.tone === 'amber' ? 'bg-gradient-to-br from-[#F59E0B] via-[#F2860B] to-[#C2570C] shadow-[0_16px_32px_rgba(217,119,6,0.22)]' : 'bg-gradient-to-br from-[#00897B] via-[#007F75] to-[#075E59] shadow-[0_16px_32px_rgba(0,137,123,0.18)]'}`}>
             <div className="relative z-10 flex min-h-[84px] md:min-h-[76px] flex-col justify-between">
               <p className="text-[10px] md:text-[11px] font-black text-white/78 uppercase tracking-[0.14em] leading-tight">{kpi.label}</p>
               <div className="min-w-0">
                 <p className="text-3xl md:text-[1.85rem] font-black tracking-tight leading-none truncate" title={String(kpi.value)}>{kpi.value}</p>
-                <p className="text-[11px] md:text-[11px] font-black text-teal-100/95 mt-2 md:mt-1.5 leading-snug break-words">{kpi.hint}</p>
+                {kpi.hint && <p className={`text-[11px] font-black mt-2 md:mt-1.5 leading-snug break-words ${kpi.tone === 'amber' ? 'text-amber-50/95' : 'text-teal-100/95'}`}>{kpi.hint}</p>}
               </div>
             </div>
             <div className="absolute right-4 top-1/2 -translate-y-1/2 w-14 h-14 md:w-12 md:h-12 rounded-2xl border border-white/10 bg-white/7 flex items-center justify-center opacity-45">
@@ -490,60 +500,34 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
         ))}
       </div>
 
+      <p className="text-center md:text-left text-[11px] font-bold text-slate-400 tracking-wide px-1">
+        {kpiRenovar} para renovar · {packages.filter(hasSessionToday).length} banhos hoje · {kpiTotalSessoes} sessões em {packages.length} pacotes · {kpiReceitaFinalizadosFormatada} em ciclos concluídos
+      </p>
+
       <section className="rounded-[1.7rem] border border-slate-100 bg-white p-4 md:p-5 shadow-sm space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
-          <div className="relative">
-            <i className="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
-            <input 
-              type="text" 
-              value={termoBusca} 
-              onChange={(e) => setTermoBusca(e.target.value)} 
-              placeholder="Buscar por nome do pet, tutor, telefone ou nº do pacote..." 
-              className="w-full pl-14 pr-5 py-4 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-teal-500 outline-none font-bold text-slate-700 transition-all"
-            />
+        <div className="flex items-center gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-1 flex-1 min-w-0">
+            {[
+              { id: 'ativos', label: 'Ativos', icon: 'fa-circle-check' },
+              { id: 'renovar', label: 'Para renovar', icon: 'fa-rotate' },
+              { id: 'pendentes', label: 'Pendentes', icon: 'fa-wallet' },
+              { id: 'hoje', label: 'Banhos de hoje', icon: 'fa-calendar-day' }
+            ].map((item) => (
+              <button key={item.id} onClick={() => applyQuickFilter(item.id as any)} className={`shrink-0 px-4 py-2.5 rounded-xl text-[11px] font-black transition-all flex items-center gap-2 ${quickFilter === item.id ? 'bg-[#00897B] text-white shadow-lg shadow-teal-500/20' : 'bg-slate-50 text-slate-500 border border-slate-100 hover:border-teal-200'}`}>
+                <i className={`fa-solid ${item.icon}`}></i>{item.label}
+              </button>
+            ))}
           </div>
-          <button onClick={() => setShowMobileFilters(true)} className="md:hidden px-4 py-4 rounded-2xl border border-slate-100 bg-white text-slate-700 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2">
-            <i className="fa-solid fa-sliders"></i> Filtros {activeFilterCount > 0 && <span className="bg-teal-600 text-white rounded-full px-2 py-0.5">{activeFilterCount}</span>}
+          <button onClick={() => setShowFilterPanel(v => !v)} className={`shrink-0 px-4 py-2.5 rounded-xl text-[11px] font-black transition-all flex items-center gap-2 border ${showFilterPanel ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-100 hover:border-teal-200'}`}>
+            <i className="fa-solid fa-sliders"></i>
+            <span className="hidden sm:inline">Filtros</span>
+            {activeFilterCount > 0 && <span className="bg-teal-600 text-white rounded-full px-2 py-0.5">{activeFilterCount}</span>}
+            <i className={`fa-solid fa-chevron-down text-[9px] transition-transform ${showFilterPanel ? 'rotate-180' : ''}`}></i>
           </button>
-          <select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value as any)} className="hidden md:block px-4 py-4 bg-white border border-slate-100 rounded-2xl outline-none text-xs font-black text-slate-700">
-            {(['Próxima sessão', 'Menos sessões restantes', 'Mais recente', 'Maior pendência', 'Nome do pet'] as const).map(opt => <option key={opt}>{opt}</option>)}
-          </select>
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {[
-            { id: 'ativos', label: 'Todos Ativos', icon: 'fa-circle-check' },
-            { id: 'renovar', label: 'Para renovar', icon: 'fa-rotate' },
-            { id: 'semProximo', label: 'Sem próximo banho', icon: 'fa-calendar-xmark' },
-            { id: 'pendentes', label: 'Pendentes', icon: 'fa-wallet' },
-            { id: 'hoje', label: 'Banhos de hoje', icon: 'fa-calendar-day' }
-          ].map((item) => (
-            <button key={item.id} onClick={() => applyQuickFilter(item.id as any)} className={`shrink-0 px-4 py-2.5 rounded-xl text-[11px] font-black transition-all flex items-center gap-2 ${quickFilter === item.id ? 'bg-[#00897B] text-white shadow-lg shadow-teal-500/20' : 'bg-slate-50 text-slate-500 border border-slate-100 hover:border-teal-200'}`}>
-              <i className={`fa-solid ${item.icon}`}></i>{item.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="hidden md:block">
-          {renderFilterPanel()}
-        </div>
+        {showFilterPanel && renderFilterPanel()}
       </section>
-
-      {showMobileFilters && (
-        <div className="fixed inset-0 z-[80] md:hidden bg-slate-950/60 backdrop-blur-sm flex items-end">
-          <div className="w-full max-h-[88dvh] overflow-y-auto bg-white rounded-t-[2rem] p-5 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-lg font-black text-slate-900">Filtros</p>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{pacotesFiltrados.length} pacotes encontrados</p>
-              </div>
-              <button onClick={() => setShowMobileFilters(false)} className="w-10 h-10 rounded-2xl bg-slate-50 text-slate-600"><i className="fa-solid fa-xmark"></i></button>
-            </div>
-            {renderFilterPanel(true)}
-            <button onClick={() => setShowMobileFilters(false)} className="w-full py-4 rounded-2xl bg-[#00897B] text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-teal-500/20">Aplicar filtros</button>
-          </div>
-        </div>
-      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="px-3 py-2 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-black border border-emerald-100"><i className="fa-regular fa-circle-check mr-1"></i>Ativos: {kpiPacotesAtivos}</span>
