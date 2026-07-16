@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Unit, UserProfile } from '../types';
 import { registrarAtividade } from '../services/logger';
+import { compareNomePtBr } from '../services/sorting';
 
 interface FiscalSettingsProps {
   supabaseClient: any;
@@ -169,7 +170,7 @@ const FiscalSettings: React.FC<FiscalSettingsProps> = ({ supabaseClient, units, 
       const servicosDaUnidade = (servicesResult.data || [])
         .map((row: any) => row.servico ? { ...row.servico, preco_unidade: row.preco } : null)
         .filter((servico: any) => servico && servico.ativo)
-        .sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+        .sort(compareNomePtBr);
 
       setServices(servicosDaUnidade);
       setFiscalServices(fiscalServicesResult.data || []);

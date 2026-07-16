@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Unit, Client, Pet, Service, UiId, UserProfile } from '../types';
 import { registrarAtividade } from '../services/logger';
+import { compareNomePtBr } from '../services/sorting';
 
 interface PacoteFormModalProps {
   unit: Unit;
@@ -57,7 +58,7 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
   useEffect(() => {
     const fetchDeps = async () => {
       const { data: srvData } = await supabaseClient.from('servicos').select('*').order('nome');
-      setServices(srvData || []);
+      setServices((srvData || []).slice().sort(compareNomePtBr));
 
       const { data: catalogData } = await supabaseClient
         .from('catalogo_pacotes')

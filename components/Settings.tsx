@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { formatarErroWhatsApp } from '../lib/errorParser';
 import FiscalSettings from './FiscalSettings';
 import CustosServicos from './CustosServicos';
+import { compareNomePtBr } from '../services/sorting';
 
 type SettingsTab = 'identity' | 'units' | 'services' | 'packages' | 'custos' | 'fiscal' | 'whatsapp_logs';
 
@@ -173,7 +174,7 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
       if (srvError) throw srvError;
       if (availError) throw availError;
 
-      if (srvData) setServices(srvData);
+      if (srvData) setServices(srvData.slice().sort(compareNomePtBr));
       if (availData) setServiceAvailabilities(availData);
     } catch (err: any) {
       console.error("Erro ao buscar serviços:", err);

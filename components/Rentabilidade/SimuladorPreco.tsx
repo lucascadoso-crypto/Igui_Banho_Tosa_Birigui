@@ -10,6 +10,7 @@ import {
 } from '../../services/rentabilidade';
 import SectionTitle from '../Dashboard/SectionTitle';
 import MargemBadge from './MargemBadge';
+import { compareNomePtBr } from '../../services/sorting';
 
 interface SimuladorPrecoProps {
   servicos: RentabilidadeServico[];
@@ -18,7 +19,7 @@ interface SimuladorPrecoProps {
 
 const SimuladorPreco: React.FC<SimuladorPrecoProps> = ({ servicos, thresholds }) => {
   const opcoes = useMemo(() => (
-    servicos.map((s) => ({ id: `s-${s.servicoId}`, nome: s.servico, custo: s.custoMedio }))
+    servicos.map((s) => ({ id: `s-${s.servicoId}`, nome: s.servico, custo: s.custoMedio })).sort(compareNomePtBr)
   ), [servicos]);
 
   const [selectedId, setSelectedId] = useState<string>('');

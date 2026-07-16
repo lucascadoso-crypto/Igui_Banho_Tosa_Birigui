@@ -1,5 +1,6 @@
 import { toCurrencyNumber } from './appointmentTotals';
 import { getDefaultPeriodo, getTodayBR } from './dashboardGerencial';
+import { compareNomePtBr } from './sorting';
 
 export interface RentabilidadeFiltros {
   unidadeId: number | null; // null = Todas as unidades
@@ -183,7 +184,7 @@ export const fetchServicosComCustoAtual = async (supabaseClient: any): Promise<S
       return { id: s.id, nome: s.nome, custoAtual: toCurrencyNumber(data) };
     })
   );
-  return custos;
+  return custos.slice().sort(compareNomePtBr);
 };
 
 export interface CustoServicoHistoricoItem {

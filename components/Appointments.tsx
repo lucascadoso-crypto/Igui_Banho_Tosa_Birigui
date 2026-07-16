@@ -10,6 +10,7 @@ import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import { calculateAppointmentTotals } from '../services/pricing';
 import { registrarPagamentoPacote, garantirFinanceiroMovimento } from '../services/pacotePayments';
+import { compareNomePtBr } from '../services/sorting';
 
 interface AppointmentsProps {
   unit: Unit;
@@ -411,7 +412,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       setEmployees(empData || []);
 
       const { data: srvData } = await supabaseClient.from('servicos').select('*');
-      setServices(srvData || []);
+      setServices((srvData || []).slice().sort(compareNomePtBr));
 
       const { data: apptData } = await supabaseClient
         .from('agendamentos')

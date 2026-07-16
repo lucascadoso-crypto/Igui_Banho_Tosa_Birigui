@@ -6,6 +6,7 @@ import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import AgendamentoTutorPetPanel from './AgendamentoTutorPetPanel';
 import { calculateAppointmentTotals } from '../services/pricing';
 import NotaFiscalBadge from './NotaFiscalBadge';
+import { compareNomePtBr } from '../services/sorting';
 
 interface AgendamentoDetalhesModalProps {
   appt: any;
@@ -303,7 +304,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   const fetchExtraServices = async () => {
     if (extraServices.length > 0) return;
     const { data } = await supabaseClient.from('servicos').select('*').order('nome');
-    setExtraServices(data || []);
+    setExtraServices((data || []).slice().sort(compareNomePtBr));
   };
 
   const handleAddExtra = async (srv: any) => {
