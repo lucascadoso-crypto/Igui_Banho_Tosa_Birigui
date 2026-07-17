@@ -411,8 +411,10 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       const { data: empData } = await supabaseClient.from('funcionarios').select('*').eq('unidade_id', unit.id);
       setEmployees(empData || []);
 
-      const { data: srvData } = await supabaseClient.from('servicos').select('*');
-      setServices((srvData || []).slice().sort(compareNomePtBr));
+      const { data: srvData, error: srvError } = await supabaseClient.from('servicos').select('*');
+      const sortedSrv = (srvData || []).slice().sort(compareNomePtBr);
+      console.log('[DEBUG-ORDENACAO] erro:', srvError, 'bruto:', (srvData || []).map((s: any) => s.nome), 'ordenado:', sortedSrv.map((s: any) => s.nome));
+      setServices(sortedSrv);
 
       const { data: apptData } = await supabaseClient
         .from('agendamentos')
