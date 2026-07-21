@@ -1,11 +1,16 @@
 // Checklist minimo antes de qualquer rascunho/emissao de NFS-e: dados da
 // empresa preenchidos, servico com configuracao fiscal ativa e cliente com
-// CPF + endereco validos (exigencia da nota fiscal de servico).
+// CPF + endereco validos (exigencia da nota fiscal de servico) - exceto
+// quando o valor fiscal e ate R$100, caso em que o Sistema Nacional NFS-e
+// nao exige identificacao do tomador (toma e opcional no leiaute da DPS).
+
+export const LIMITE_VALOR_SEM_DADOS_CLIENTE = 100;
 
 export interface ChecklistFiscalInput {
   configFiscal?: any | null;
   servicosFiscais: any[];
   cliente?: any | null;
+  valorFiscal?: number;
 }
 
 export interface ChecklistFiscalResultado {
@@ -13,19 +18,22 @@ export interface ChecklistFiscalResultado {
   servicoOk: boolean;
   clienteCpfOk: boolean;
   clienteEnderecoOk: boolean;
+  dadosClienteDispensados: boolean;
   podeEmitir: boolean;
   pendencias: string[];
 }
 
-export const avaliarChecklistFiscal = ({ configFiscal, servicosFiscais, cliente }: ChecklistFiscalInput): ChecklistFiscalResultado => {
+export const avaliarChecklistFiscal = ({ configFiscal, servicosFiscais, cliente, valorFiscal }: ChecklistFiscalInput): ChecklistFiscalResultado => {
   const empresaOk = !!(configFiscal?.cnpj && configFiscal?.inscricao_municipal && configFiscal?.regime_tributario);
 
   const servicoOk = (servicosFiscais || []).length > 0
     && servicosFiscais.every(sf => !!(sf?.codigo_servico_municipal && sf?.codigo_nbs));
 
-  const clienteCpfOk = !!(cliente?.cpf && cliente.cpf.replace(/\D/g, '').length === 11);
+  const dadosClienteDispensados = Number(valorFiscal || 0) > 0 && Number(valorFiscal || 0) <= LIMITE_VALOR_SEM_DADOS_CLIENTE;
 
-  const clienteEnderecoOk = !!(
+  const clienteCpfOk = dadosClienteDispensados || !!(cliente?.cpf && cliente.cpf.replace(/\D/g, '').length === 11);
+
+  const clienteEnderecoOk = dadosClienteDispensados || !!(
     cliente?.logradouro && cliente?.numero && cliente?.cidade && cliente?.estado && cliente?.cep
   );
 
@@ -40,6 +48,7 @@ export const avaliarChecklistFiscal = ({ configFiscal, servicosFiscais, cliente 
     servicoOk,
     clienteCpfOk,
     clienteEnderecoOk,
+    dadosClienteDispensados,
     podeEmitir: empresaOk && servicoOk && clienteCpfOk && clienteEnderecoOk,
     pendencias
   };
