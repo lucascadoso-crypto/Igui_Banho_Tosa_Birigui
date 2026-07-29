@@ -1973,18 +1973,49 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                           )}
                          
                          {/* Lista de Micro-serviços */}
-                         <div className="flex flex-wrap gap-2 mt-3">
-                            {appt.agendamento_itens?.map((it: any) => (
-                               <span key={it.id} className="text-[9px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
-                                  {it.servicos?.nome}
-                               </span>
-                            ))}
-                            {hasTransport && (
-                               <span className="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1">
-                                  🚕 TÁXI
-                               </span>
-                            )}
-                         </div>
+                         {(() => {
+                           const baseItems = appt.agendamento_itens?.filter((it: any) => !it.eh_extra) ?? [];
+                           const extraItems = appt.agendamento_itens?.filter((it: any) => it.eh_extra) ?? [];
+                           const extraTotal = extraItems.reduce((sum: number, it: any) => sum + Number(it.valor_extra || it.valor_cobrado || it.valor || 0), 0);
+                           const extraLabel = extraItems.length === 1
+                             ? extraItems[0].servicos?.nome || extraItems[0].descricao || 'Extra'
+                             : `${extraItems.length} extras`;
+                           return (
+                             <>
+                               {extraItems.length > 0 && (
+                                 <div className="flex items-center justify-between mt-3 px-3 py-2 rounded-lg" style={{ background: '#EAF3DE' }}>
+                                   <span className="text-[10px] font-black uppercase tracking-wide flex items-center gap-1" style={{ color: '#27500A' }}>
+                                     <i className="fa-solid fa-scissors text-[9px]"></i>
+                                     EXTRA HOJE · {extraLabel}
+                                   </span>
+                                   {extraTotal > 0 && (
+                                     <span className="text-[10px] font-black" style={{ color: '#27500A' }}>
+                                       + {extraTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                     </span>
+                                   )}
+                                 </div>
+                               )}
+                               <div className="flex flex-wrap gap-2 mt-2">
+                                 {baseItems.map((it: any) => (
+                                   <span key={it.id} className="text-[9px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                     {it.servicos?.nome}
+                                   </span>
+                                 ))}
+                                 {extraItems.map((it: any) => (
+                                   <span key={it.id} className="text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1" style={{ background: '#D1FADF', color: '#166534' }}>
+                                     <i className="fa-solid fa-scissors text-[8px]"></i>
+                                     EXTRA · {it.servicos?.nome || it.descricao}
+                                   </span>
+                                 ))}
+                                 {hasTransport && (
+                                   <span className="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1">
+                                     🚕 TÁXI
+                                   </span>
+                                 )}
+                               </div>
+                             </>
+                           );
+                         })()}
 
                          {(petObservation || clientObservation) && (
                             <div className="mt-3 grid grid-cols-1 gap-2">

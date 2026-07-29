@@ -35,6 +35,8 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
   const [packageTotalValue, setPackageTotalValue] = useState<number>(0);
   const [valorDesconto, setValorDesconto] = useState<number>(0);
   const [selectedCatalogId, setSelectedCatalogId] = useState<UiId | ''>('');
+  // IDs pré-marcados automaticamente como base do pacote (Tosa Higiênica + Banho do porte)
+  const [autoBaseIds, setAutoBaseIds] = useState<UiId[]>([]);
 
   const [startDate, setStartDate] = useState(getTodayBR());
   const [startTime, setStartTime] = useState('09:00');
@@ -458,15 +460,61 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
     }
   };
 
+  // Retorna os IDs dos serviços-base para o modelo selecionado:
+  // sempre "Tosa Higiênica" + "Banho Porte <porte>" (se porte disponível)
+  const resolveBaseIds = (petPorte?: string): UiId[] => {
+    const ids: UiId[] = [];
+    const tosa = services.find(s => s.nome.toLowerCase().includes('tosa higiênica'));
+    if (tosa) ids.push(tosa.id);
+    if (petPorte) {
+      const banho = services.find(s =>
+        s.nome.toLowerCase().includes('banho') &&
+        s.nome.toLowerCase().includes(petPorte.toLowerCase())
+      );
+      if (banho) ids.push(banho.id);
+    }
+    return ids;
+  };
+
   const applyCatalogPackage = (id: UiId | '') => {
     setSelectedCatalogId(id);
-    if (!id) return;
+    if (!id) {
+      // Personalizado — remove apenas os auto-base, deixa o que o usuário marcou
+      setSelectedServiceIds(prev => prev.filter(sid => !autoBaseIds.includes(sid)));
+      setAutoBaseIds([]);
+      return;
+    }
     const tpl = catalogPackages.find(c => String(c.id) === String(id));
     if (!tpl) return;
     handleIntervalChange(tpl.frequencia);
     setSessionCount(tpl.qtd_sessoes);
     setPackageTotalValue(Number(tpl.valor_base));
+
+    const petPorte = availablePets.find(p => String(p.id) === String(selectedPetId))?.porte;
+    const baseIds = resolveBaseIds(petPorte);
+    setAutoBaseIds(baseIds);
+    setSelectedServiceIds(prev => {
+      const withoutOldBase = prev.filter(sid => !autoBaseIds.includes(sid));
+      const merged = [...withoutOldBase];
+      baseIds.forEach(bid => { if (!merged.includes(bid)) merged.push(bid); });
+      return merged;
+    });
   };
+
+  // Quando o pet muda E há um modelo selecionado, atualiza apenas o banho (porte)
+  useEffect(() => {
+    if (!selectedCatalogId || !selectedPetId) return;
+    const petPorte = availablePets.find(p => String(p.id) === String(selectedPetId))?.porte;
+    const newBaseIds = resolveBaseIds(petPorte);
+    setAutoBaseIds(newBaseIds);
+    setSelectedServiceIds(prev => {
+      const withoutOldBase = prev.filter(sid => !autoBaseIds.includes(sid));
+      const merged = [...withoutOldBase];
+      newBaseIds.forEach(bid => { if (!merged.includes(bid)) merged.push(bid); });
+      return merged;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPetId]);
 
   const toggleService = (id: number | string) => {
     setSelectedServiceIds(prev => {
