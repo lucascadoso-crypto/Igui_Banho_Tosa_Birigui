@@ -461,16 +461,19 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
     }
   };
 
+  const norm = (s: string) =>
+    s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
   // Retorna os IDs dos serviços-base para o modelo selecionado:
   // sempre "Tosa Higiênica" + "Banho Porte <porte>" (se porte disponível)
   const resolveBaseIds = (petPorte?: string): UiId[] => {
     const ids: UiId[] = [];
-    const tosa = services.find(s => s.nome.toLowerCase().includes('tosa higiênica'));
+    const tosa = services.find(s => norm(s.nome).includes('higienica'));
     if (tosa) ids.push(tosa.id);
     if (petPorte) {
       const banho = services.find(s =>
-        s.nome.toLowerCase().includes('banho') &&
-        s.nome.toLowerCase().includes(petPorte.toLowerCase())
+        norm(s.nome).includes('banho') &&
+        norm(s.nome).includes(norm(petPorte))
       );
       if (banho) ids.push(banho.id);
     }
