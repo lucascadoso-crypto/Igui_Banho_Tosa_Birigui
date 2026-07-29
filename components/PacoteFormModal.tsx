@@ -566,32 +566,57 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
                  )}
                </div>
              ) : (
-               <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl flex items-center justify-between gap-4">
-                 <div className="flex items-center gap-3 min-w-0">
-                   <div className="w-10 h-10 rounded-full bg-teal-600 text-white flex items-center justify-center font-black text-sm shrink-0">
-                     {selectedClient.nome.split(' ').filter(Boolean).map((n: string) => n[0]).slice(0, 2).join('')}
+               <div className="space-y-3">
+                 {/* Card do tutor */}
+                 <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl flex items-center justify-between gap-4">
+                   <div className="flex items-center gap-3 min-w-0">
+                     <div className="w-10 h-10 rounded-full bg-teal-600 text-white flex items-center justify-center font-black text-sm shrink-0">
+                       {selectedClient.nome.split(' ').filter(Boolean).map((n: string) => n[0]).slice(0, 2).join('')}
+                     </div>
+                     <div className="min-w-0">
+                       <p className="font-black text-slate-800 text-sm truncate">{selectedClient.nome}</p>
+                       <p className="text-[11px] text-slate-400 font-bold">{selectedClient.telefone}</p>
+                     </div>
                    </div>
-                   <div className="min-w-0">
-                     <p className="font-black text-slate-800 text-sm truncate">
-                       {availablePets.find(p => String(p.id) === String(selectedPetId))?.nome
-                         ? `${availablePets.find(p => String(p.id) === String(selectedPetId))!.nome} · ${selectedClient.nome}`
-                         : selectedClient.nome}
-                     </p>
-                     {(() => {
-                       const pet = availablePets.find(p => String(p.id) === String(selectedPetId));
-                       if (!pet) return null;
-                       const parts = [pet.especie, pet.porte ? `porte ${pet.porte.toLowerCase()}` : ''].filter(Boolean);
-                       return parts.length ? <p className="text-[11px] text-slate-500 font-bold">{parts.join(' · ')}</p> : null;
-                     })()}
-                   </div>
+                   <button onClick={() => setSelectedClient(null)} className="text-[10px] text-teal-600 font-black uppercase underline shrink-0">Trocar</button>
                  </div>
-                 <div className="flex items-center gap-3 shrink-0">
-                   {availablePets.length > 1 && (
-                     <select value={selectedPetId} onChange={(e) => setSelectedPetId(e.target.value)} className="bg-transparent text-xs font-bold text-teal-600 outline-none cursor-pointer">
-                       {availablePets.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                     </select>
+                 {/* Seletor de pet — sempre visível */}
+                 <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pet *</label>
+                   {availablePets.length === 0 ? (
+                     <p className="text-xs text-slate-400 font-bold px-1">Nenhum pet cadastrado para este tutor.</p>
+                   ) : availablePets.length === 1 ? (
+                     <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3">
+                       <i className="fa-solid fa-paw text-teal-400 text-sm"></i>
+                       <div>
+                         <p className="text-sm font-black text-slate-700">{availablePets[0].nome}</p>
+                         {(() => {
+                           const pet = availablePets[0];
+                           const parts = [pet.especie, pet.porte ? `porte ${pet.porte.toLowerCase()}` : ''].filter(Boolean);
+                           return parts.length ? <p className="text-[10px] text-slate-400 font-bold">{parts.join(' · ')}</p> : null;
+                         })()}
+                       </div>
+                     </div>
+                   ) : (
+                     <div className="flex flex-wrap gap-2">
+                       {availablePets.map(p => (
+                         <button
+                           key={p.id}
+                           type="button"
+                           onClick={() => setSelectedPetId(p.id)}
+                           className={`flex items-center gap-2 px-4 py-3 rounded-2xl border font-bold text-sm transition-all ${
+                             String(selectedPetId) === String(p.id)
+                               ? 'bg-teal-600 text-white border-teal-600 shadow-md'
+                               : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-teal-300'
+                           }`}
+                         >
+                           <i className="fa-solid fa-paw text-xs"></i>
+                           <span>{p.nome}</span>
+                           {p.porte && <span className="text-[10px] opacity-70">· {p.porte}</span>}
+                         </button>
+                       ))}
+                     </div>
                    )}
-                   <button onClick={() => setSelectedClient(null)} className="text-[10px] text-teal-600 font-black uppercase underline">Trocar</button>
                  </div>
                </div>
              )}
