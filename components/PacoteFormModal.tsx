@@ -530,185 +530,271 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
            <button onClick={onClose} className="relative z-10 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center hover:bg-white/10 rounded-full text-xl md:text-2xl"><i className="fa-solid fa-xmark"></i></button>
         </header>
 
-        <div className="app-modal-body flex-1 overflow-y-auto p-6 md:p-10 space-y-8 md:space-y-10 custom-scrollbar">
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              <div className="space-y-4">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Tutor e Pet *</label>
-                 {!selectedClient ? (
-                    <div className="relative">
-                       <i className="fa-solid fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                       <input type="text" value={clientSearch} onChange={(e) => handleClientSearch(e.target.value)} className="w-full pl-14 pr-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none font-bold text-slate-700" placeholder="Buscar tutor..."/>
-                       {(clientResults.length > 0 || (clientSearch.length >= 2 && !showQuickAdd)) && (
-                          <div className="absolute w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 py-2 border border-slate-100 overflow-hidden">
-                             {clientResults.map(c => (
-                                <button key={c.id} onClick={() => selectClient(c)} className="w-full text-left px-5 py-3 hover:bg-slate-50 flex items-center space-x-4">
-                                   <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold text-xs">{c.nome.charAt(0)}</div>
-                                   <div><p className="font-bold text-slate-800 text-sm">{c.nome}</p><p className="text-[10px] text-slate-400">{c.telefone}</p></div>
-                                </button>
-                             ))}
-                             <button onClick={() => { setQuickAddData({...quickAddData, nome: clientSearch}); setShowQuickAdd(true); }} className="w-full text-left px-5 py-4 hover:bg-teal-50 flex items-center space-x-4 border-t border-slate-100 text-teal-600"><i className="fa-solid fa-plus-circle text-lg"></i><div><p className="font-black text-sm uppercase">Adicionar "{clientSearch}"</p></div></button>
-                          </div>
-                       )}
-                       {showQuickAdd && (
-                          <div className="mt-4 p-6 bg-slate-50 rounded-3xl border border-slate-200 space-y-4 shadow-xl border-t-4 border-t-teal-500">
-                             <input type="text" value={quickAddData.nome} onChange={(e) => setQuickAddData({...quickAddData, nome: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold" placeholder="Nome do Tutor..."/>
-                             <input type="tel" value={quickAddData.telefone} onChange={(e) => setQuickAddData({...quickAddData, telefone: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold" placeholder="WhatsApp"/>
-                             <input type="text" value={quickAddData.petNome} onChange={(e) => setQuickAddData({...quickAddData, petNome: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold" placeholder="Nome do Animal..."/>
-                             <button onClick={handleQuickAdd} className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-teal-500/20">Criar e Selecionar</button>
-                          </div>
-                       )}
-                    </div>
-                 ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                       <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl flex items-center justify-between">
-                          <span className="font-black text-slate-800 truncate text-sm">{selectedClient.nome}</span>
-                          <button onClick={() => setSelectedClient(null)} className="text-[10px] text-teal-600 font-black uppercase underline shrink-0">Trocar</button>
-                       </div>
-                       <select value={selectedPetId} onChange={(e) => setSelectedPetId(e.target.value)} className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-sm">
-                          <option value="">Selecione o Pet...</option>
-                          {availablePets.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                       </select>
-                    </div>
+        <div className="app-modal-body flex-1 overflow-y-auto p-6 md:p-8 space-y-6 custom-scrollbar">
+
+           {/* ── SEÇÃO 1: Tutor e pet ── */}
+           <section className="space-y-3">
+             <div className="flex items-center gap-3">
+               <span className="w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">1</span>
+               <h4 className="font-black text-slate-700">Tutor e pet</h4>
+             </div>
+             {!selectedClient ? (
+               <div className="relative">
+                 <i className="fa-solid fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                 <input type="text" value={clientSearch} onChange={(e) => handleClientSearch(e.target.value)} className="w-full pl-14 pr-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none font-bold text-slate-700" placeholder="Buscar tutor..."/>
+                 {(clientResults.length > 0 || (clientSearch.length >= 2 && !showQuickAdd)) && (
+                   <div className="absolute w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 py-2 overflow-hidden">
+                     {clientResults.map(c => (
+                       <button key={c.id} onClick={() => selectClient(c)} className="w-full text-left px-5 py-3 hover:bg-slate-50 flex items-center space-x-4">
+                         <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold text-xs">{c.nome.charAt(0)}</div>
+                         <div><p className="font-bold text-slate-800 text-sm">{c.nome}</p><p className="text-[10px] text-slate-400">{c.telefone}</p></div>
+                       </button>
+                     ))}
+                     <button onClick={() => { setQuickAddData({...quickAddData, nome: clientSearch}); setShowQuickAdd(true); }} className="w-full text-left px-5 py-4 hover:bg-teal-50 flex items-center space-x-4 border-t border-slate-100 text-teal-600">
+                       <i className="fa-solid fa-plus-circle text-lg"></i>
+                       <div><p className="font-black text-sm uppercase">Adicionar "{clientSearch}"</p></div>
+                     </button>
+                   </div>
                  )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-2"><label className="text-xs font-black text-slate-400 uppercase tracking-widest">Data Início</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold" /></div>
-                 <div className="space-y-2"><label className="text-xs font-black text-slate-400 uppercase tracking-widest">Hora Padrão</label><input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold" /></div>
-              </div>
-           </div>
+                 {showQuickAdd && (
+                   <div className="mt-4 p-6 bg-slate-50 rounded-3xl border border-slate-200 space-y-4 shadow-xl border-t-4 border-t-teal-500">
+                     <input type="text" value={quickAddData.nome} onChange={(e) => setQuickAddData({...quickAddData, nome: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold" placeholder="Nome do Tutor..."/>
+                     <input type="tel" value={quickAddData.telefone} onChange={(e) => setQuickAddData({...quickAddData, telefone: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold" placeholder="WhatsApp"/>
+                     <input type="text" value={quickAddData.petNome} onChange={(e) => setQuickAddData({...quickAddData, petNome: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm font-bold" placeholder="Nome do Animal..."/>
+                     <button onClick={handleQuickAdd} className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-teal-500/20">Criar e Selecionar</button>
+                   </div>
+                 )}
+               </div>
+             ) : (
+               <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl flex items-center justify-between gap-4">
+                 <div className="flex items-center gap-3 min-w-0">
+                   <div className="w-10 h-10 rounded-full bg-teal-600 text-white flex items-center justify-center font-black text-sm shrink-0">
+                     {selectedClient.nome.split(' ').filter(Boolean).map((n: string) => n[0]).slice(0, 2).join('')}
+                   </div>
+                   <div className="min-w-0">
+                     <p className="font-black text-slate-800 text-sm truncate">
+                       {availablePets.find(p => String(p.id) === String(selectedPetId))?.nome
+                         ? `${availablePets.find(p => String(p.id) === String(selectedPetId))!.nome} · ${selectedClient.nome}`
+                         : selectedClient.nome}
+                     </p>
+                     {(() => {
+                       const pet = availablePets.find(p => String(p.id) === String(selectedPetId));
+                       if (!pet) return null;
+                       const parts = [pet.especie, pet.porte ? `porte ${pet.porte.toLowerCase()}` : ''].filter(Boolean);
+                       return parts.length ? <p className="text-[11px] text-slate-500 font-bold">{parts.join(' · ')}</p> : null;
+                     })()}
+                   </div>
+                 </div>
+                 <div className="flex items-center gap-3 shrink-0">
+                   {availablePets.length > 1 && (
+                     <select value={selectedPetId} onChange={(e) => setSelectedPetId(e.target.value)} className="bg-transparent text-xs font-bold text-teal-600 outline-none cursor-pointer">
+                       {availablePets.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                     </select>
+                   )}
+                   <button onClick={() => setSelectedClient(null)} className="text-[10px] text-teal-600 font-black uppercase underline">Trocar</button>
+                 </div>
+               </div>
+             )}
+           </section>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              <div className="space-y-4">
-                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Serviços Inclusos</h4>
-                 <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto p-1 custom-scrollbar">
-                    {services.map(s => (
+           {/* ── SEÇÃO 2: Modelo e recorrência ── */}
+           <section className="space-y-3">
+             <div className="flex items-center gap-3">
+               <span className="w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">2</span>
+               <h4 className="font-black text-slate-700">Modelo e recorrência</h4>
+             </div>
+             {catalogPackages.length > 0 && (
+               <div className="space-y-3">
+                 <select
+                   value={selectedCatalogId}
+                   onChange={(e) => applyCatalogPackage(e.target.value)}
+                   className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-slate-700"
+                 >
+                   <option value="">Personalizado</option>
+                   {catalogPackages.map(c => (
+                     <option key={c.id} value={c.id}>{c.nome}</option>
+                   ))}
+                 </select>
+                 {selectedCatalogId && (
+                   <p className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
+                     <i className="fa-solid fa-circle-check text-teal-400"></i>
+                     Preenche frequência, sessões e serviços-base automaticamente
+                   </p>
+                 )}
+                 {selectedCatalogId && (
+                   <div className="space-y-2">
+                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Porte do Pet *</label>
+                     <div className="flex gap-2">
+                       {['Pequeno', 'Médio', 'Grande'].map(porte => (
+                         <button
+                           key={porte}
+                           type="button"
+                           onClick={() => handlePorteChange(porte)}
+                           className={`flex-1 py-3 rounded-2xl font-black text-xs uppercase tracking-widest border transition-all ${
+                             selectedPorte === porte
+                               ? 'bg-teal-600 text-white border-teal-600 shadow-md'
+                               : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-teal-300'
+                           }`}
+                         >
+                           {porte === 'Pequeno' ? 'P' : porte === 'Médio' ? 'M' : 'G'} · {porte}
+                         </button>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+               </div>
+             )}
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Frequência</label>
+                 <select value={interval} onChange={(e) => handleIntervalChange(e.target.value as any)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-sm">
+                   <option value="Weekly">Semanal</option>
+                   <option value="Bi-weekly">Quinzenal</option>
+                 </select>
+               </div>
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sessões</label>
+                 <input type="number" value={sessionCount} onChange={(e) => setSessionCount(Number(e.target.value))} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm" />
+               </div>
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Início</label>
+                 <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm" />
+               </div>
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hora</label>
+                 <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm" />
+               </div>
+             </div>
+           </section>
+
+           {/* ── SEÇÃO 3: Serviços ── */}
+           <section className="space-y-3">
+             <div className="flex items-center gap-3">
+               <span className="w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">3</span>
+               <h4 className="font-black text-slate-700">Serviços</h4>
+             </div>
+             {selectedCatalogId ? (
+               <div className="space-y-4">
+                 {autoBaseIds.length > 0 && (
+                   <div className="p-4 bg-teal-50 border border-teal-200 rounded-2xl space-y-3">
+                     <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest flex items-center gap-1">
+                       <i className="fa-solid fa-circle-check"></i> Base do pacote · incluída automaticamente
+                     </p>
+                     <div className="flex flex-wrap gap-2">
+                       {services.filter(s => autoBaseIds.includes(s.id)).map(s => (
+                         <label key={s.id} className={`px-4 py-2 rounded-xl border flex items-center gap-2 cursor-pointer transition-all ${selectedServiceIds.includes(s.id) ? 'bg-teal-100 border-teal-300 ring-1 ring-teal-200' : 'bg-white border-teal-100 opacity-60'}`}>
+                           <input type="checkbox" className="w-4 h-4 accent-teal-600" checked={selectedServiceIds.includes(s.id)} onChange={() => toggleService(s.id)} />
+                           <span className="text-xs font-bold text-teal-800">{s.nome}</span>
+                         </label>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+                 <div className="space-y-2">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Extras (opcional — cobrado à parte)</p>
+                   <div className="grid grid-cols-2 gap-3">
+                     {services.filter(s => !autoBaseIds.includes(s.id)).map(s => (
                        <label key={s.id} className={`p-3 rounded-xl border flex items-center space-x-3 cursor-pointer transition-all ${selectedServiceIds.includes(s.id) ? 'bg-teal-50 border-teal-200 ring-1 ring-teal-100' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
-                          <input type="checkbox" className="w-4 h-4 accent-teal-600" checked={selectedServiceIds.includes(s.id)} onChange={() => toggleService(s.id)} />
-                          <span className="text-xs font-bold text-slate-700">{s.nome}</span>
+                         <input type="checkbox" className="w-4 h-4 accent-teal-600" checked={selectedServiceIds.includes(s.id)} onChange={() => toggleService(s.id)} />
+                         <span className="text-xs font-bold text-slate-700">{s.nome}</span>
                        </label>
-                    ))}
+                     ))}
+                   </div>
                  </div>
-              </div>
-              <div className="space-y-6">
-                  {catalogPackages.length > 0 && (
-                    <div className="space-y-3">
-                       <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Modelo de Pacote</label>
-                       <select
-                         value={selectedCatalogId}
-                         onChange={(e) => applyCatalogPackage(e.target.value)}
-                         className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none"
-                       >
-                          <option value="">Personalizado</option>
-                          {catalogPackages.map(c => (
-                            <option key={c.id} value={c.id}>{c.nome}</option>
-                          ))}
-                       </select>
-                       {selectedCatalogId && (
-                         <div className="space-y-2">
-                           <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Porte do Pet *</label>
-                           <div className="flex gap-2">
-                             {['Pequeno', 'Médio', 'Grande'].map(porte => (
-                               <button
-                                 key={porte}
-                                 type="button"
-                                 onClick={() => handlePorteChange(porte)}
-                                 className={`flex-1 py-3 rounded-2xl font-black text-xs uppercase tracking-widest border transition-all ${
-                                   selectedPorte === porte
-                                     ? 'bg-teal-600 text-white border-teal-600 shadow-md'
-                                     : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-teal-300'
-                                 }`}
-                               >
-                                 {porte === 'Pequeno' ? 'P' : porte === 'Médio' ? 'M' : 'G'} · {porte}
-                               </button>
-                             ))}
-                           </div>
-                         </div>
-                       )}
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-400 uppercase tracking-widest">Frequência</label><select value={interval} onChange={(e) => handleIntervalChange(e.target.value as any)} className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none"><option value="Weekly">Semanal (4 sessões)</option><option value="Bi-weekly">Quinzenal (2 sessões)</option></select></div>
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-400 uppercase tracking-widest">Qtd de Sessões</label><input type="number" value={sessionCount} onChange={(e) => setSessionCount(Number(e.target.value))} className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold" /></div>
-                 </div>
-
-                 {/* NOVO BLOCO: ADICIONAIS (PET TÁXI) */}
-                 <div className="pt-4 space-y-4 border-t border-slate-50">
-                    <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                       <div className="flex items-center space-x-3">
-                          <i className="fa-solid fa-taxi text-teal-500"></i>
-                          <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest">Incluir Pet Táxi (Leva e Traz)</span>
-                       </div>
-                       <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" checked={isPetTaxi} onChange={(e) => setIsPetTaxi(e.target.checked)} />
-                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                       </label>
-                    </div>
-
-                    <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                       <div className="flex items-center space-x-3">
-                          <i className="fa-solid fa-arrows-rotate text-teal-500"></i>
-                          <div>
-                             <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest block">Renovação Automática</span>
-                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">(Gera um novo pacote igual ao finalizar)</span>
-                          </div>
-                       </div>
-                       <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" checked={renovacaoAutomatica} onChange={(e) => setRenovacaoAutomatica(e.target.checked)} />
-                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                       </label>
-                    </div>
-
-                    {isPetTaxi && (
-                       <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Valor do Transporte do Pacote (R$):</label>
-                          <div className="relative">
-                             <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                             <input
-                                type="number"
-                                value={valorTransportePacote}
-                                onChange={(e) => setValorTransportePacote(Number(e.target.value))}
-                                className="w-full pl-14 pr-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-teal-500 transition-all"
-                                placeholder="0.00"
-                             />
-                          </div>
-                       </div>
-                    )}
-                 </div>
-
-                 <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 space-y-3">
-                    <label className="text-[10px] font-black text-teal-400 uppercase tracking-widest block text-center">Valor Total do Pacote</label>
-                    <div className="relative">
-                       <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-teal-400">R$</span>
-                       <input type="number" value={packageTotalValue} onChange={(e) => setPackageTotalValue(Number(e.target.value))} className="w-full pl-20 pr-6 py-5 bg-white border border-teal-200 rounded-[1.5rem] text-4xl font-black text-teal-700 outline-none text-center" placeholder="0.00"/>
-                    </div>
-
-                    <div className="space-y-1">
-                       <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest block text-center">Desconto</label>
-                       <div className="relative">
-                          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-orange-400 font-bold">R$</span>
-                          <input type="number" min={0} value={valorDesconto} onChange={(e) => setValorDesconto(Math.max(0, Number(e.target.value) || 0))} className="w-full pl-12 pr-4 py-3 bg-white border border-orange-200 rounded-2xl font-bold text-orange-600 outline-none text-center" placeholder="0.00"/>
-                       </div>
-                    </div>
-
-                    <div className="pt-3 border-t border-teal-100 text-center">
-                       <p className="text-[10px] font-black text-teal-500 uppercase tracking-widest">Total {isPetTaxi ? 'do Pacote + Transporte' : 'do Pacote'}:</p>
-                       <p className="text-2xl font-black text-slate-800">R$ {(Math.max(0, packageTotalValue - valorDesconto) + (isPetTaxi ? Number(valorTransportePacote) : 0)).toFixed(2)}</p>
-                    </div>
-                 </div>
-              </div>
-           </div>
-
-           <div className="pt-8 border-t border-slate-100">
-              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center"><i className="fa-solid fa-calendar-check mr-2 text-teal-400"></i> Cronograma Sugerido</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                 {generatedDates.map((date, idx) => (
-                    <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
-                       <p className="text-[9px] font-black text-teal-300 uppercase mb-1">{idx + 1}ª Sessão</p>
-                       <input type="date" value={date} onChange={(e) => { const newDates = [...generatedDates]; newDates[idx] = e.target.value; setGeneratedDates(newDates); }} className="bg-transparent border-none p-0 text-xs font-bold text-slate-600 focus:ring-0 w-full text-center"/>
-                    </div>
+               </div>
+             ) : (
+               <div className="grid grid-cols-2 gap-3">
+                 {services.map(s => (
+                   <label key={s.id} className={`p-3 rounded-xl border flex items-center space-x-3 cursor-pointer transition-all ${selectedServiceIds.includes(s.id) ? 'bg-teal-50 border-teal-200 ring-1 ring-teal-100' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
+                     <input type="checkbox" className="w-4 h-4 accent-teal-600" checked={selectedServiceIds.includes(s.id)} onChange={() => toggleService(s.id)} />
+                     <span className="text-xs font-bold text-slate-700">{s.nome}</span>
+                   </label>
                  ))}
-              </div>
+               </div>
+             )}
+           </section>
+
+           {/* ── SEÇÃO 4: Logística ── */}
+           <section className="space-y-3">
+             <div className="flex items-center gap-3">
+               <span className="w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">4</span>
+               <h4 className="font-black text-slate-700">Logística</h4>
+             </div>
+             <div className="space-y-3">
+               <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                 <div className="flex items-center space-x-3">
+                   <i className="fa-solid fa-taxi text-teal-500"></i>
+                   <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest">Incluir Pet Táxi (Leva e Traz)</span>
+                 </div>
+                 <label className="relative inline-flex items-center cursor-pointer">
+                   <input type="checkbox" className="sr-only peer" checked={isPetTaxi} onChange={(e) => setIsPetTaxi(e.target.checked)} />
+                   <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                 </label>
+               </div>
+               {isPetTaxi && (
+                 <div className="space-y-1 px-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor do Transporte (R$)</label>
+                   <div className="relative">
+                     <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                     <input type="number" value={valorTransportePacote} onChange={(e) => setValorTransportePacote(Number(e.target.value))} className="w-full pl-14 pr-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-teal-500 transition-all" placeholder="0.00"/>
+                   </div>
+                 </div>
+               )}
+               <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                 <div className="flex items-center space-x-3">
+                   <i className="fa-solid fa-arrows-rotate text-teal-500"></i>
+                   <div>
+                     <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest block">Renovação Automática</span>
+                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">(Gera um novo pacote igual ao finalizar)</span>
+                   </div>
+                 </div>
+                 <label className="relative inline-flex items-center cursor-pointer">
+                   <input type="checkbox" className="sr-only peer" checked={renovacaoAutomatica} onChange={(e) => setRenovacaoAutomatica(e.target.checked)} />
+                   <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                 </label>
+               </div>
+             </div>
+           </section>
+
+           {/* ── RESUMO: Valor + Cronograma ── */}
+           <div className="bg-teal-50 p-6 rounded-[2rem] border border-teal-100 space-y-5">
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black text-teal-500 uppercase tracking-widest block">Valor do Pacote</label>
+                 <div className="relative">
+                   <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-teal-400">R$</span>
+                   <input type="number" value={packageTotalValue} onChange={(e) => setPackageTotalValue(Number(e.target.value))} className="w-full pl-12 pr-4 py-4 bg-white border border-teal-200 rounded-2xl text-xl font-black text-teal-700 outline-none" placeholder="0.00"/>
+                 </div>
+               </div>
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest block">Desconto</label>
+                 <div className="relative">
+                   <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-orange-400">R$</span>
+                   <input type="number" min={0} value={valorDesconto} onChange={(e) => setValorDesconto(Math.max(0, Number(e.target.value) || 0))} className="w-full pl-12 pr-4 py-4 bg-white border border-orange-200 rounded-2xl font-bold text-orange-600 outline-none" placeholder="0.00"/>
+                 </div>
+               </div>
+               <div className="space-y-1 text-center md:text-right">
+                 <p className="text-[10px] font-black text-teal-500 uppercase tracking-widest">Total {isPetTaxi ? 'c/ Transporte' : 'do Pacote'}</p>
+                 <p className="text-3xl font-black text-slate-800">
+                   R$ {(Math.max(0, packageTotalValue - valorDesconto) + (isPetTaxi ? Number(valorTransportePacote) : 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                 </p>
+               </div>
+             </div>
+             <div className="pt-4 border-t border-teal-100 space-y-3">
+               <h4 className="text-[10px] font-black text-teal-500 uppercase tracking-widest flex items-center gap-2">
+                 <i className="fa-solid fa-calendar-check"></i> Cronograma Sugerido
+               </h4>
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                 {generatedDates.map((date, idx) => (
+                   <div key={idx} className="p-3 bg-white border border-teal-100 rounded-xl text-center">
+                     <p className="text-[9px] font-black text-teal-400 uppercase mb-1">{idx + 1}ª · {idx === 0 ? new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</p>
+                     <input type="date" value={date} onChange={(e) => { const newDates = [...generatedDates]; newDates[idx] = e.target.value; setGeneratedDates(newDates); }} className="bg-transparent border-none p-0 text-xs font-bold text-slate-600 focus:ring-0 w-full text-center"/>
+                   </div>
+                 ))}
+               </div>
+             </div>
            </div>
+
         </div>
 
         <footer className="app-modal-footer p-4 md:p-8 bg-slate-50 border-t border-slate-100 flex flex-row justify-end gap-2 md:gap-4">
