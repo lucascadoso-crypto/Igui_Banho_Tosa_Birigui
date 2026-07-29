@@ -37,6 +37,7 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
   const [selectedCatalogId, setSelectedCatalogId] = useState<UiId | ''>('');
   // IDs pré-marcados automaticamente como base do pacote (Tosa Higiênica + Banho do porte)
   const [autoBaseIds, setAutoBaseIds] = useState<UiId[]>([]);
+  const [selectedPorte, setSelectedPorte] = useState<string>('');
 
   const [startDate, setStartDate] = useState(getTodayBR());
   const [startTime, setStartTime] = useState('09:00');
@@ -479,9 +480,10 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
   const applyCatalogPackage = (id: UiId | '') => {
     setSelectedCatalogId(id);
     if (!id) {
-      // Personalizado — remove apenas os auto-base, deixa o que o usuário marcou
+      // Personalizado — remove apenas os auto-base, limpa porte
       setSelectedServiceIds(prev => prev.filter(sid => !autoBaseIds.includes(sid)));
       setAutoBaseIds([]);
+      setSelectedPorte('');
       return;
     }
     const tpl = catalogPackages.find(c => String(c.id) === String(id));
@@ -489,23 +491,15 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
     handleIntervalChange(tpl.frequencia);
     setSessionCount(tpl.qtd_sessoes);
     setPackageTotalValue(Number(tpl.valor_base));
-
-    const petPorte = availablePets.find(p => String(p.id) === String(selectedPetId))?.porte;
-    const baseIds = resolveBaseIds(petPorte);
-    setAutoBaseIds(baseIds);
-    setSelectedServiceIds(prev => {
-      const withoutOldBase = prev.filter(sid => !autoBaseIds.includes(sid));
-      const merged = [...withoutOldBase];
-      baseIds.forEach(bid => { if (!merged.includes(bid)) merged.push(bid); });
-      return merged;
-    });
+    // Porte será escolhido manualmente — limpa base anterior até o usuário selecionar
+    setSelectedServiceIds(prev => prev.filter(sid => !autoBaseIds.includes(sid)));
+    setAutoBaseIds([]);
+    setSelectedPorte('');
   };
 
-  // Quando o pet muda E há um modelo selecionado, atualiza apenas o banho (porte)
-  useEffect(() => {
-    if (!selectedCatalogId || !selectedPetId) return;
-    const petPorte = availablePets.find(p => String(p.id) === String(selectedPetId))?.porte;
-    const newBaseIds = resolveBaseIds(petPorte);
+  const handlePorteChange = (porte: string) => {
+    setSelectedPorte(porte);
+    const newBaseIds = resolveBaseIds(porte);
     setAutoBaseIds(newBaseIds);
     setSelectedServiceIds(prev => {
       const withoutOldBase = prev.filter(sid => !autoBaseIds.includes(sid));
@@ -513,8 +507,7 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
       newBaseIds.forEach(bid => { if (!merged.includes(bid)) merged.push(bid); });
       return merged;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPetId]);
+  };
 
   const toggleService = (id: number | string) => {
     setSelectedServiceIds(prev => {
@@ -598,7 +591,7 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
               </div>
               <div className="space-y-6">
                   {catalogPackages.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Modelo de Pacote</label>
                        <select
                          value={selectedCatalogId}
@@ -610,6 +603,27 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
                             <option key={c.id} value={c.id}>{c.nome}</option>
                           ))}
                        </select>
+                       {selectedCatalogId && (
+                         <div className="space-y-2">
+                           <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Porte do Pet *</label>
+                           <div className="flex gap-2">
+                             {['Pequeno', 'Médio', 'Grande'].map(porte => (
+                               <button
+                                 key={porte}
+                                 type="button"
+                                 onClick={() => handlePorteChange(porte)}
+                                 className={`flex-1 py-3 rounded-2xl font-black text-xs uppercase tracking-widest border transition-all ${
+                                   selectedPorte === porte
+                                     ? 'bg-teal-600 text-white border-teal-600 shadow-md'
+                                     : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-teal-300'
+                                 }`}
+                               >
+                                 {porte === 'Pequeno' ? 'P' : porte === 'Médio' ? 'M' : 'G'} · {porte}
+                               </button>
+                             ))}
+                           </div>
+                         </div>
+                       )}
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-4">
