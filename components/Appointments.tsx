@@ -2135,7 +2135,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                   </button>
                                )}
                                
-                               {!appt.pago && !isCancelledStatus(appt.status) && !isReadOnly && (
+                               {!(appt.pacote_id ? appt.pacotes?.pago : appt.pago) && !isCancelledStatus(appt.status) && !isReadOnly && (
                                   <button onClick={() => { setViewingAppt(appt); setShowPaymentSelector(true); setIsDetailModalOpen(true); setActiveCardMenuId(null); }} className="w-full flex items-center px-5 py-3 text-xs font-bold text-emerald-600 hover:bg-emerald-50 transition-colors">
                                      <i className="fa-solid fa-dollar-sign mr-3 text-emerald-500"></i> Receber Agora
                                   </button>

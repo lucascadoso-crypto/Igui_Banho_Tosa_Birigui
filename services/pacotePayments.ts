@@ -183,6 +183,13 @@ export async function registrarPagamentoPacote(params: RegistrarPagamentoPacoteP
 
   if (error) throw error;
 
+  // Propaga pago=true para todos os agendamentos do pacote, para que o card
+  // de agendamento reflita o status sem depender exclusivamente do join.
+  await supabaseClient
+    .from('agendamentos')
+    .update({ pago: true })
+    .eq('pacote_id', pacoteId);
+
   const pacoteLabel = nomePacote || pacoteId;
 
   await garantirFinanceiroMovimento({
