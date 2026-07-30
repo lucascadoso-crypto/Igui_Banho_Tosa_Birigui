@@ -607,6 +607,20 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
         .eq('id', viewingAppt.id);
 
       if (error) throw error;
+
+      // Se o agendamento pertence a um pacote, marca o pacote como pago e
+      // propaga pago=true para todos os outros agendamentos do mesmo pacote.
+      if (viewingAppt.pacote_id) {
+        await supabaseClient
+          .from('pacotes')
+          .update({ pago: true, forma_pagamento: data.method1, data_pagamento: viewingAppt.data_agendamento })
+          .eq('id', viewingAppt.pacote_id);
+        await supabaseClient
+          .from('agendamentos')
+          .update({ pago: true })
+          .eq('pacote_id', viewingAppt.pacote_id);
+      }
+
       setShowPaymentSelector(false);
 
       // Nota fiscal manual (Fase 2) so vale para agendamento avulso
