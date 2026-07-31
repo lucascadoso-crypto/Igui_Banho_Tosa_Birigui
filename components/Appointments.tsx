@@ -1814,8 +1814,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                     const routeAddress = hasTransport ? buildMapsDestination(appt) : '';
 
                     return (
-                     <div key={appt.id} className={`relative ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'}`}>
-                       <div className="rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative isolate z-10 p-6 group">
+                     <div key={appt.id} className={`relative h-full ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'}`}>
+                       <div className="h-full rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative isolate z-10 p-6 group">
 
                        {/* Faixa de status no canto (recorte isolado nesta caixinha, não no card inteiro,
                            para não cortar o menu de Ações que precisa aparecer por cima do card) */}
@@ -1993,8 +1993,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                          )}
                       </div>
 
-                      {/* Rodapé: Valor/Pagamento + Ações */}
-                      <div className="relative z-[2] mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                      {/* Rodapé: Valor/Pagamento + Ações (mt-auto gruda no rodapé do card, pra todo card ficar do mesmo tamanho na mesma linha independente da quantidade de conteúdo) */}
+                      <div className="relative z-[2] mt-auto pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
                          <div>
                             <p className="font-black text-xl text-slate-800 tracking-tighter leading-none">R$ {(parseFloat(appt.valor_total) || 0).toFixed(2)}</p>
                             <p className={`text-[9px] font-black uppercase tracking-widest mt-1.5 flex items-center ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'text-emerald-500' : 'text-rose-500'}`}>
