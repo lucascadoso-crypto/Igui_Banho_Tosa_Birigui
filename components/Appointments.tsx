@@ -1960,7 +1960,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                    <PetSpeciesTag especie={appt.pets?.especie} raca={appt.pets?.raca} />
                                 </div>
                                 <p className="text-xs text-slate-400 font-bold truncate flex items-center">
-                                   <i className="fa-solid fa-user-tag mr-2 opacity-50 text-[10px]"></i> {cardClient.nome}
+                                   <i className="fa-solid fa-user-tag mr-2 opacity-50 text-[10px]"></i> {String(cardClient.nome || '').trim().split(' ')[0] || cardClient.nome}
                                 </p>
                              </div>
                           </div>
@@ -1984,11 +1984,11 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                           </div>
 
                           {hasTransport && (
-                             <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-2">
-                                <p className="text-xs text-slate-400 font-bold truncate flex items-center min-w-0">
-                                   <i className="fa-solid fa-location-dot mr-2 opacity-50 text-[10px] text-amber-500"></i>
+                             <div className="mt-1 flex flex-col gap-2">
+                                <p className="text-xs text-slate-400 font-bold flex items-start min-w-0">
+                                   <i className="fa-solid fa-location-dot mr-2 opacity-50 text-[10px] text-amber-500 mt-0.5 shrink-0"></i>
                                    <span className="mr-1 shrink-0">Endereço:</span>
-                                   <span className="text-slate-500 truncate">
+                                   <span className="text-slate-500 break-words">
                                       {routeAddress || 'Endereço não cadastrado'}
                                    </span>
                                 </p>
