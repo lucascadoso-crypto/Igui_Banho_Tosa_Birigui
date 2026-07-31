@@ -1286,6 +1286,63 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     });
   };
 
+  // Cobrança amigável via WhatsApp: se o agendamento é de pacote, cobra o pacote
+  // (mesmo texto usado em Pacotes.tsx); se é avulso, cobra só este atendimento.
+  const handleSendCobranca = (appt: any) => {
+    const clientPhone = appt.pets?.clientes?.telefone?.replace(/\D/g, '');
+    if (!clientPhone) {
+      setConfirmacao({ visivel: true, acao: 'erro', mensagem: 'Cliente sem telefone cadastrado.' });
+      return;
+    }
+
+    const clientName = appt.pets?.clientes?.nome || 'Cliente';
+    const petName = appt.pets?.nome || 'seu Pet';
+
+    let message: string;
+    if (appt.pacote_id) {
+      const valor = (parseFloat(appt.pacotes?.valor_total) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const sessaoAtual = appt.numero_sessao || '?';
+      const totalSessoes = appt.pacotes?.qtd_sessoes || '?';
+      message = `Oi ${clientName}! 🐾 Passando por aqui só pra lembrar que o pacote do(a) ${petName} (${sessaoAtual}/${totalSessoes} banhos) ainda está em aberto, no valor de R$ ${valor}. Se precisar do link de pagamento ou da chave Pix, me chama que te mando! 💛`;
+    } else {
+      const valor = (parseFloat(appt.valor_total) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const [, m, d] = String(appt.data_agendamento || '').split('-');
+      const dataFormatada = m && d ? `${d}/${m}` : '';
+      message = `Oi ${clientName}! 🐾 Passando pra lembrar que o atendimento do(a) ${petName}${dataFormatada ? ` do dia ${dataFormatada}` : ''} ainda está em aberto, no valor de R$ ${valor}. Se precisar do link de pagamento ou da chave Pix, me chama que te mando! 💛`;
+    }
+
+    showToast('Enviando cobrança...', 'info');
+
+    enviarNotificacaoWhatsApp({
+      telefone: clientPhone,
+      mensagem: message,
+      unidadeId: unit.id,
+      supabaseClient,
+      agendamentoId: appt.id,
+      tipo: 'manual',
+      origem: 'manual',
+      forceDirect: true
+    }).then(result => {
+      if (result?.ok) {
+        showToast('Cobrança enviada!', 'sucesso');
+        registrarAtividade(
+          unit.id,
+          userProfile?.email || 'sistema',
+          'Cobrança de Agendamento',
+          `Enviou cobrança amigável via WhatsApp para ${clientName} (Pet: ${petName})`,
+          userProfile?.nome,
+          userProfile?.cargo
+        );
+      } else {
+        console.error('Falha ao enviar cobrança:', result?.error);
+        showToast(result?.error || 'Cobrança não enviada.', 'info');
+      }
+    }).catch(err => {
+      console.error('Erro ao enviar cobrança:', err);
+      showToast('Erro no WhatsApp.', 'info');
+    });
+  };
+
   const generateCalendarDays = () => {
     const year = viewMonth.getFullYear();
     const month = viewMonth.getMonth();
@@ -2018,6 +2075,15 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                             >
                                <i className="fa-brands fa-whatsapp"></i>
                             </button>
+                            {!(appt.pacote_id ? appt.pacotes?.pago : appt.pago) && !isCancelledStatus(appt.status) && !isReadOnly && (
+                               <button
+                                  onClick={(e) => { e.stopPropagation(); handleSendCobranca(appt); }}
+                                  title="Cobrar via WhatsApp"
+                                  className="w-10 h-10 shrink-0 rounded-xl bg-white border border-amber-100 text-amber-500 hover:text-amber-600 hover:bg-amber-50 transition-all flex items-center justify-center"
+                               >
+                                  <i className="fa-solid fa-hand-holding-dollar"></i>
+                               </button>
+                            )}
                             {!isFinalizedStatus(appt.status) && !isCancelledStatus(appt.status) && !isReadOnly && (
                                <button
                                   onClick={(e) => { e.stopPropagation(); handleStartEdit(appt); }}
