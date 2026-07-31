@@ -78,6 +78,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
   const extraItems = services.filter(isExtraItem);
   const valorTransporte = Number(appt.valor_transporte || 0);
   const valorDesconto = Number(appt.valor_desconto || appt.desconto || 0);
+  const valorAcrescimo = Number(appt.valor_acrescimo || 0);
   const totalBaseAgendamento = Number(appt.valor_total || 0);
   const totalMainItems = mainItems.reduce((acc: number, item: any) => acc + getItemValue(item), 0);
   const valorServicosSalvo = Number(appt.valor_servicos || 0);
@@ -86,6 +87,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
     extraItemValues: extraItems.map(getItemValue),
     valorTransporte,
     valorDesconto,
+    valorAcrescimo,
     isPacote: !!appt.pacote_id,
     valorTotalSalvo: totalBaseAgendamento,
     valorServicosSalvo
@@ -164,7 +166,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
         valor_total: Number(packageTotalValue),
         valor_transporte: 0,
         ativo: true,
-        renovacao_automatica: false,
+        renovacao_automatica: true,
         status: 'ATIVO',
         pago: shouldUseCredit,
         forma_pagamento: shouldUseCredit ? (appt.forma_pagamento || 'Crédito de agendamento') : null,
@@ -826,7 +828,13 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
                   {valorDesconto > 0 && (
                     <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                        <p className="text-[9px] font-black text-orange-500 uppercase mb-1">Desconto</p>
-                       <p className="font-black text-orange-500">R$ {valorDesconto.toFixed(2)}</p>
+                       <p className="font-black text-orange-500">− R$ {valorDesconto.toFixed(2)}</p>
+                    </div>
+                  )}
+                  {valorAcrescimo > 0 && (
+                    <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                       <p className="text-[9px] font-black text-emerald-500 uppercase mb-1">Acréscimo</p>
+                       <p className="font-black text-emerald-500">+ R$ {valorAcrescimo.toFixed(2)}</p>
                     </div>
                   )}
                </div>
