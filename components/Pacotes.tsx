@@ -292,8 +292,10 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
   const filteredByRules = packages.filter((p) => {
     const status = getPackageStatus(p);
     const nextSession = getNextSession(p);
-    const searchMatch = !termoBusca.trim() || packageSearchText(p).includes(normalizeText(termoBusca));
+    const isSearching = termoBusca.trim() !== '';
+    const searchMatch = !isSearching || packageSearchText(p).includes(normalizeText(termoBusca));
     const statusMatch =
+      isSearching ||
       statusFiltro === 'Todos' ||
       (statusFiltro === 'Ativos' && isActivePackage(p)) ||
       (statusFiltro === 'Finalizados' && status === 'Finalizado') ||
@@ -316,7 +318,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
     const payment = getPaymentStatus(p);
     const paymentMatch = pagamentoFiltro === 'Todos' || payment === pagamentoFiltro;
 
-    const quickMatch =
+    const quickMatch = isSearching ? true :
       quickFilter === 'ativos' ? isActivePackage(p) :
       quickFilter === 'renovar' ? isRenewSoon(p) :
       quickFilter === 'semProximo' ? hasNoNextSession(p) :
