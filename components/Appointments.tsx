@@ -2122,15 +2122,6 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                   <i className="fa-solid fa-hand-holding-dollar"></i>
                                </button>
                             )}
-                            {!isFinalizedStatus(appt.status) && !isCancelledStatus(appt.status) && !isReadOnly && (
-                               <button
-                                  onClick={(e) => { e.stopPropagation(); handleStartEdit(appt); }}
-                                  title="Alterar dados"
-                                  className="w-10 h-10 shrink-0 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-amber-600 hover:border-amber-100 transition-all flex items-center justify-center"
-                               >
-                                  <i className="fa-solid fa-pen-to-square"></i>
-                               </button>
-                            )}
                             <button
                                onClick={(e) => { e.stopPropagation(); openNotaEditor(appt); }}
                                title={appt.nota_interna ? 'Editar nota deste banho' : 'Adicionar nota deste banho'}
@@ -2174,15 +2165,6 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                             >
                                <i className="fa-solid fa-gear"></i>
                             </button>
-                            {!isCancelledStatus(appt.status) && !isReadOnly && (
-                               <button
-                                  onClick={(e) => { e.stopPropagation(); performCancelAppointment(appt); }}
-                                  title="Cancelar atendimento"
-                                  className="w-10 h-10 shrink-0 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all flex items-center justify-center"
-                               >
-                                  <i className="fa-solid fa-trash-can"></i>
-                               </button>
-                            )}
 
                             {/* Dropdown de Ações */}
                             {activeCardMenuId === appt.id && (
