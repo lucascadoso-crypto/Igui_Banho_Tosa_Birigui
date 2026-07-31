@@ -262,65 +262,6 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     return `${hours}h${rest ? ` ${rest}min` : ''}`;
   };
 
-  const getAppointmentStatusAccent = (status?: string) => {
-    const normalizedStatus = String(status || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim()
-      .toUpperCase();
-
-    if (normalizedStatus === 'CANCELADO' || normalizedStatus === 'CANCELADA') {
-      return 'cancelado';
-    }
-
-    if (normalizedStatus === 'EM ANDAMENTO' || normalizedStatus === 'INICIADO' || normalizedStatus === 'INICIADA') {
-      return 'andamento';
-    }
-
-    if (normalizedStatus === 'FINALIZADO' || normalizedStatus === 'FINALIZADA' || normalizedStatus === 'CONCLUIDO' || normalizedStatus === 'CONCLUIDA') {
-      return 'finalizado';
-    }
-
-    return '';
-  };
-
-  const getAppointmentStatusBackdropStyle = (statusAccent: string): React.CSSProperties => {
-    const baseStyle: React.CSSProperties = {
-      position: 'absolute',
-      pointerEvents: 'none',
-      top: 8,
-      right: 6,
-      bottom: -6,
-      left: -6,
-      zIndex: 0,
-      borderRadius: '2rem',
-      opacity: 0.9,
-      transform: 'translateZ(0)'
-    };
-
-    if (statusAccent === 'cancelado') {
-      return {
-        ...baseStyle,
-        background: 'linear-gradient(145deg, rgba(185, 28, 28, 0.76), rgba(239, 68, 68, 0.42))',
-        boxShadow: '0 16px 32px rgba(185, 28, 28, 0.28)'
-      };
-    }
-
-    if (statusAccent === 'andamento') {
-      return {
-        ...baseStyle,
-        background: 'linear-gradient(145deg, rgba(217, 119, 6, 0.78), rgba(245, 158, 11, 0.44))',
-        boxShadow: '0 16px 32px rgba(217, 119, 6, 0.28)'
-      };
-    }
-
-    return {
-      ...baseStyle,
-      background: 'linear-gradient(145deg, rgba(4, 120, 87, 0.76), rgba(16, 185, 129, 0.42))',
-      boxShadow: '0 16px 32px rgba(4, 120, 87, 0.28)'
-    };
-  };
-
   const getTodayBR = () => {
     const dataLocalBR = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     const [dia, mes, ano] = dataLocalBR.split('/');
@@ -1864,26 +1805,16 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
               });
 
               return agendamentosFiltrados.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {agendamentosFiltrados.map(appt => {
                     const cardClient = appt.cardClient || appt.clientes || appt.pets?.clientes || {};
                     const petObservation = appt.petObservacoes || '';
                     const clientObservation = appt.clienteRestricoes || '';
                     const hasTransport = appt.tem_taxi || appt.pet_taxi || appt.agendamento_itens?.some((it: any) => it.servicos?.nome?.toUpperCase().includes('TÁXI'));
                     const routeAddress = hasTransport ? buildMapsDestination(appt) : '';
-                    const statusAccentClass = getAppointmentStatusAccent(appt.status);
-                    const statusBackdropStyle = statusAccentClass ? getAppointmentStatusBackdropStyle(statusAccentClass) : undefined;
 
                     return (
                      <div key={appt.id} className={`relative ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'}`}>
-                       {statusAccentClass && (
-                          <div
-                             aria-hidden="true"
-                             className="appointment-status-backdrop"
-                             data-status={statusAccentClass}
-                             style={statusBackdropStyle}
-                          ></div>
-                       )}
                        <div className="rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative isolate z-10 p-6 group">
 
                        {/* Faixa de status no canto (recorte isolado nesta caixinha, não no card inteiro,
