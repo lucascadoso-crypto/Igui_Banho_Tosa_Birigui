@@ -2098,7 +2098,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                             </p>
                          </div>
 
-                         <div className="relative flex items-center gap-1.5 shrink-0">
+                         <div className="relative flex flex-wrap items-center justify-end gap-1.5 max-w-full shrink-0">
                             <button
                                onClick={(e) => { e.stopPropagation(); handleOpenDetail(appt); }}
                                title="Ver detalhes"
