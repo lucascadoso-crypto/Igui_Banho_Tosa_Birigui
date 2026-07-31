@@ -1864,7 +1864,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
               });
 
               return agendamentosFiltrados.length > 0 ? (
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {agendamentosFiltrados.map(appt => {
                     const cardClient = appt.cardClient || appt.clientes || appt.pets?.clientes || {};
                     const petObservation = appt.petObservacoes || '';
@@ -1884,27 +1884,59 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                              style={statusBackdropStyle}
                           ></div>
                        )}
-                       <div className="rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col md:flex-row md:items-center relative isolate z-10 p-6 group">
+                       <div className="rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative isolate z-10 overflow-hidden p-6 group">
 
-                       {/* Horário */}
-                       <div className="relative z-[2] w-24 text-center border-r border-slate-100 mr-8 hidden md:block shrink-0">
-                          <p className="text-2xl font-black text-slate-800 tracking-tighter">{String(appt.horario_inicio).substring(0, 5)}</p>
-                          <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${
-                            appt.status === 'Em Andamento' ? 'text-amber-500' : 
-                            appt.status === 'Finalizado' ? 'text-emerald-500' : 
-                            appt.status === 'Cancelado' ? 'text-slate-500' : 'text-slate-400'
+                       {/* Faixa de status no canto */}
+                       {(appt.status === 'Em Andamento' || appt.status === 'Finalizado' || appt.status === 'Cancelado') && (
+                          <div className={`absolute -right-12 top-5 w-40 rotate-45 text-center text-[9px] font-black uppercase tracking-widest py-1.5 shadow-md pointer-events-none z-[2] ${
+                             appt.status === 'Em Andamento'
+                                ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white'
+                                : appt.status === 'Finalizado'
+                                ? 'bg-gradient-to-r from-emerald-600 to-emerald-800 text-white'
+                                : 'bg-gradient-to-r from-slate-400 to-slate-500 text-white'
                           }`}>
-                            {appt.status === 'Em Andamento' ? 'Andamento' : appt.status === 'Finalizado' ? 'Finalizado' : appt.status === 'Cancelado' ? 'Cancelado' : 'Início'}
-                          </p>
-                       </div>
+                             {appt.status === 'Em Andamento' ? 'Em andamento' : appt.status}
+                          </div>
+                       )}
 
                        {/* Informações do Pet e Cliente */}
-                       <div className="relative z-[2] flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenDetail(appt)}>
-                          <div className="flex flex-wrap items-center gap-2 pr-10 md:pr-0 mb-1">
-                             <h4 className="font-black text-xl text-slate-800 truncate group-hover:text-amber-600 transition-colors">
-                                {appt.pets?.nome}
-                             </h4>
-                             <PetSpeciesTag especie={appt.pets?.especie} raca={appt.pets?.raca} />
+                       <div className="relative z-[2] min-w-0 cursor-pointer" onClick={() => handleOpenDetail(appt)}>
+                          <div className="flex items-start gap-4">
+                             {/* Horário */}
+                             <div className="text-center shrink-0 pr-4 border-r border-slate-100">
+                                <p className="text-2xl font-black text-slate-800 tracking-tighter leading-none">{String(appt.horario_inicio).substring(0, 5)}</p>
+                                <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${
+                                  appt.status === 'Em Andamento' ? 'text-amber-500' :
+                                  appt.status === 'Finalizado' ? 'text-emerald-500' :
+                                  appt.status === 'Cancelado' ? 'text-slate-500' : 'text-slate-400'
+                                }`}>
+                                  {appt.status === 'Em Andamento' ? 'andamento' : appt.status === 'Finalizado' ? 'finalizado' : appt.status === 'Cancelado' ? 'cancelado' : 'início'}
+                                </p>
+                             </div>
+
+                             {/* Avatar do pet */}
+                             <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 font-black text-lg border-2 border-white shadow-sm shrink-0 overflow-hidden">
+                                {appt.pets?.foto_url ? (
+                                   <img src={appt.pets.foto_url} alt={appt.pets?.nome || 'Pet'} className="w-full h-full object-cover" />
+                                ) : (
+                                   appt.pets?.nome?.charAt(0) || <i className="fa-solid fa-paw"></i>
+                                )}
+                             </div>
+
+                             <div className="min-w-0 flex-1 pr-10">
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
+                                   <h4 className="font-black text-lg text-slate-800 truncate group-hover:text-amber-600 transition-colors">
+                                      {appt.pets?.nome}
+                                   </h4>
+                                   <PetSpeciesTag especie={appt.pets?.especie} raca={appt.pets?.raca} />
+                                </div>
+                                <p className="text-xs text-slate-400 font-bold truncate flex items-center">
+                                   <i className="fa-solid fa-user-tag mr-2 opacity-50 text-[10px]"></i> {cardClient.nome}
+                                </p>
+                             </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 mt-3">
                              {appt.pacote_id && (
                                 <span className="shrink-0 bg-indigo-50 text-indigo-500 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter border border-indigo-100">
                                    Sessão {appt.numero_sessao || '?'}/{appt.pacotes?.qtd_sessoes || '?'}
@@ -1921,26 +1953,6 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                 </span>
                              )}
                           </div>
-                          <div className="md:hidden mb-2 flex items-center gap-2">
-                             <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-sky-50 px-3 py-1.5 text-[11px] font-black text-sky-700 shadow-sm shadow-sky-100/60">
-                                <i className="fa-regular fa-clock text-[10px]"></i>
-                                {String(appt.horario_inicio || '').substring(0, 5) || '--:--'}
-                             </span>
-                             <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest border ${
-                                appt.status === 'Em Andamento'
-                                   ? 'bg-amber-50 text-amber-600 border-amber-100'
-                                   : appt.status === 'Finalizado'
-                                   ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                   : appt.status === 'Cancelado'
-                                   ? 'bg-slate-100 text-slate-500 border-slate-200'
-                                   : 'bg-slate-50 text-slate-600 border-slate-100'
-                             }`}>
-                                {appt.status === 'Agendado' ? 'Pendente' : appt.status}
-                             </span>
-                          </div>
-                          <p className="text-xs text-slate-400 font-bold truncate flex items-center">
-                             <i className="fa-solid fa-user-tag mr-2 opacity-50 text-[10px]"></i> {cardClient.nome}
-                          </p>
 
                           {hasTransport && (
                              <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-2">
@@ -2047,45 +2059,36 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                          )}
                       </div>
 
-                      {/* Financeiro e Status */}
-                      <div className="relative z-[2] mt-4 md:mt-0 md:text-right flex items-center md:flex-col justify-between md:justify-center md:items-end gap-2 shrink-0 md:ml-8">
-                         <div className="flex items-center gap-3">
-                            <div className="text-right">
-                               <p className="font-black text-xl text-slate-800 tracking-tighter leading-none">R$ {(parseFloat(appt.valor_total) || 0).toFixed(2)}</p>
-                               <p className={`text-[9px] font-black uppercase tracking-widest mt-1.5 flex items-center justify-end ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                  <i className={`fa-solid ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'fa-circle-check' : 'fa-circle-exclamation'} mr-1 text-[8px]`}></i>
-                                  {(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'PAGO' : 'PENDENTE'}
-                               </p>
-                            </div>
+                      {/* Rodapé: Valor/Pagamento + Ações */}
+                      <div className="relative z-[2] mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                         <div>
+                            <p className="font-black text-xl text-slate-800 tracking-tighter leading-none">R$ {(parseFloat(appt.valor_total) || 0).toFixed(2)}</p>
+                            <p className={`text-[9px] font-black uppercase tracking-widest mt-1.5 flex items-center ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'text-emerald-500' : 'text-rose-500'}`}>
+                               <i className={`fa-solid ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'fa-circle-check' : 'fa-circle-exclamation'} mr-1 text-[8px]`}></i>
+                               {(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'PAGO' : 'PENDENTE'}
+                            </p>
                          </div>
-                         <span className={`inline-block px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${
-                            appt.status === 'Finalizado' 
-                               ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                               : appt.status === 'Em Andamento'
-                               ? 'bg-amber-50 text-amber-600 border-amber-200'
-                               : appt.status === 'Cancelado'
-                               ? 'bg-slate-100 text-slate-400 border-slate-200'
-                               : 'bg-slate-50 text-slate-600 border-slate-100'
-                         }`}>
-                            {appt.status === 'Agendado' ? 'Pendente' : appt.status}
-                         </span>
-                      </div>
 
-                      {/* Botão de Ação (3 Pontinhos) */}
-                      <div className="z-[3] absolute top-4 right-4 md:static md:ml-6 md:mt-0">
-                         <button 
-                            onClick={(e) => {
-                               e.stopPropagation();
-                               setActiveCardMenuId(activeCardMenuId === appt.id ? null : appt.id);
-                            }}
-                            className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 group-hover:text-slate-600 transition-all"
-                         >
-                            <i className="fa-solid fa-ellipsis-vertical text-lg"></i>
-                         </button>
+                         <div className="relative flex items-center gap-2 shrink-0">
+                            <button
+                               onClick={(e) => { e.stopPropagation(); handleOpenDetail(appt); }}
+                               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-wide hover:bg-slate-50 transition-all"
+                            >
+                               <i className="fa-solid fa-file-lines text-[10px]"></i> Detalhes
+                            </button>
+                            <button
+                               onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveCardMenuId(activeCardMenuId === appt.id ? null : appt.id);
+                               }}
+                               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-wide hover:bg-slate-50 transition-all"
+                            >
+                               <i className="fa-solid fa-gear text-[10px]"></i> Ações
+                            </button>
 
-                         {/* Dropdown de Ações */}
-                         {activeCardMenuId === appt.id && (
-                            <div className="absolute right-6 mt-2 w-52 bg-white !opacity-100 rounded-2xl shadow-2xl border border-slate-100 z-[9999] py-3 animate-in fade-in zoom-in duration-200 ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>
+                            {/* Dropdown de Ações */}
+                            {activeCardMenuId === appt.id && (
+                               <div className="absolute right-0 top-full mt-2 w-52 bg-white !opacity-100 rounded-2xl shadow-2xl border border-slate-100 z-[9999] py-3 animate-in fade-in zoom-in duration-200 ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>
                                <div className="px-4 py-2 border-b border-slate-50 mb-1">
                                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ações do Agendamento</p>
                                </div>
@@ -2158,6 +2161,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                )}
                             </div>
                          )}
+                      </div>
                       </div>
                    </div>
                   </div>
