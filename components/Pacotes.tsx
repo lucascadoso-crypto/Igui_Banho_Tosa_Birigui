@@ -146,12 +146,23 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
       return;
     }
 
+    // A Edge Function lembrete-24h exige um agendamentoId (ela deriva cliente/pet/
+    // telefone/unidade a partir do agendamento) - usamos qualquer sessão do pacote,
+    // já que todas pertencem ao mesmo pet/cliente/unidade.
+    const anyAgendamentoId = getSortedAppointments(p)[0]?.id;
+
+    if (!anyAgendamentoId) {
+      alert('Este pacote não tem nenhum agendamento vinculado para enviar a cobrança.');
+      return;
+    }
+
     (async () => {
       const result = await enviarNotificacaoWhatsApp({
         telefone: phone,
         mensagem: msg,
         unidadeId: unit.id,
         supabaseClient,
+        agendamentoId: anyAgendamentoId,
         tipo: 'manual'
       });
 

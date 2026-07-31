@@ -239,12 +239,21 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
       return;
     }
 
+    // A Edge Function lembrete-24h exige um agendamentoId (deriva cliente/pet/
+    // telefone/unidade a partir dele) - usamos qualquer sessão do pacote.
+    const anyAgendamentoId = sessions[0]?.id;
+    if (!anyAgendamentoId) {
+      setConfirmacao({ visivel: true, acao: 'erro', mensagem: 'Este pacote não tem nenhum agendamento vinculado para enviar a cobrança.' });
+      return;
+    }
+
     (async () => {
       const result = await enviarNotificacaoWhatsApp({
         telefone: phone,
         mensagem: msg,
         unidadeId: pack.unidade_id,
         supabaseClient,
+        agendamentoId: anyAgendamentoId,
         tipo: 'manual',
         forceDirect: true,
         whatsapp_nome_instancia: unit.whatsapp_nome_instancia,
