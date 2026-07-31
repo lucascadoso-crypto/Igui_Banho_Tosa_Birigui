@@ -2003,22 +2003,49 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                             </p>
                          </div>
 
-                         <div className="relative flex items-center gap-2 shrink-0">
+                         <div className="relative flex items-center gap-1.5 shrink-0">
                             <button
                                onClick={(e) => { e.stopPropagation(); handleOpenDetail(appt); }}
-                               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-wide hover:bg-slate-50 transition-all"
+                               title="Ver detalhes"
+                               className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-500 text-white text-[11px] font-black uppercase tracking-wide shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all"
                             >
                                <i className="fa-solid fa-file-lines text-[10px]"></i> Detalhes
                             </button>
+                            <button
+                               onClick={(e) => { e.stopPropagation(); handleRemindWhatsApp(appt); }}
+                               title="Enviar lembrete via WhatsApp"
+                               className="w-10 h-10 shrink-0 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-emerald-500 hover:border-emerald-100 transition-all flex items-center justify-center"
+                            >
+                               <i className="fa-brands fa-whatsapp"></i>
+                            </button>
+                            {!isFinalizedStatus(appt.status) && !isCancelledStatus(appt.status) && !isReadOnly && (
+                               <button
+                                  onClick={(e) => { e.stopPropagation(); handleStartEdit(appt); }}
+                                  title="Alterar dados"
+                                  className="w-10 h-10 shrink-0 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-amber-600 hover:border-amber-100 transition-all flex items-center justify-center"
+                               >
+                                  <i className="fa-solid fa-pen-to-square"></i>
+                               </button>
+                            )}
                             <button
                                onClick={(e) => {
                                   e.stopPropagation();
                                   setActiveCardMenuId(activeCardMenuId === appt.id ? null : appt.id);
                                }}
-                               className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-wide hover:bg-slate-50 transition-all"
+                               title="Mais ações"
+                               className="w-10 h-10 shrink-0 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-slate-700 hover:border-slate-200 transition-all flex items-center justify-center"
                             >
-                               <i className="fa-solid fa-gear text-[10px]"></i> Ações
+                               <i className="fa-solid fa-gear"></i>
                             </button>
+                            {!isCancelledStatus(appt.status) && !isReadOnly && (
+                               <button
+                                  onClick={(e) => { e.stopPropagation(); performCancelAppointment(appt); }}
+                                  title="Cancelar atendimento"
+                                  className="w-10 h-10 shrink-0 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all flex items-center justify-center"
+                               >
+                                  <i className="fa-solid fa-trash-can"></i>
+                               </button>
+                            )}
 
                             {/* Dropdown de Ações */}
                             {activeCardMenuId === appt.id && (
