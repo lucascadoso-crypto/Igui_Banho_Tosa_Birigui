@@ -1884,18 +1884,21 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                              style={statusBackdropStyle}
                           ></div>
                        )}
-                       <div className="rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative isolate z-10 overflow-hidden p-6 group">
+                       <div className="rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative isolate z-10 p-6 group">
 
-                       {/* Faixa de status no canto */}
+                       {/* Faixa de status no canto (recorte isolado nesta caixinha, não no card inteiro,
+                           para não cortar o menu de Ações que precisa aparecer por cima do card) */}
                        {(appt.status === 'Em Andamento' || appt.status === 'Finalizado' || appt.status === 'Cancelado') && (
-                          <div className={`absolute -right-12 top-5 w-40 rotate-45 text-center text-[9px] font-black uppercase tracking-widest py-1.5 shadow-md pointer-events-none z-[2] ${
-                             appt.status === 'Em Andamento'
-                                ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white'
-                                : appt.status === 'Finalizado'
-                                ? 'bg-gradient-to-r from-emerald-600 to-emerald-800 text-white'
-                                : 'bg-gradient-to-r from-slate-400 to-slate-500 text-white'
-                          }`}>
-                             {appt.status === 'Em Andamento' ? 'Em andamento' : appt.status}
+                          <div className="absolute top-0 right-0 w-28 h-28 overflow-hidden pointer-events-none rounded-tr-[2rem] z-[2]" aria-hidden="true">
+                             <div className={`absolute -right-12 top-5 w-40 rotate-45 text-center text-[9px] font-black uppercase tracking-widest py-1.5 shadow-md ${
+                                appt.status === 'Em Andamento'
+                                   ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white'
+                                   : appt.status === 'Finalizado'
+                                   ? 'bg-gradient-to-r from-emerald-600 to-emerald-800 text-white'
+                                   : 'bg-gradient-to-r from-slate-400 to-slate-500 text-white'
+                             }`}>
+                                {appt.status === 'Em Andamento' ? 'Em andamento' : appt.status}
+                             </div>
                           </div>
                        )}
 
