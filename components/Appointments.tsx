@@ -31,6 +31,9 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const [services, setServices] = useState<Service[]>([]);
   const [viewingAppt, setViewingAppt] = useState<any>(null);
   const [activeCardMenuId, setActiveCardMenuId] = useState<number | string | null>(null);
+  const [notaEditId, setNotaEditId] = useState<number | string | null>(null);
+  const [notaText, setNotaText] = useState('');
+  const [savingNota, setSavingNota] = useState(false);
   const [expandedObservationId, setExpandedObservationId] = useState<string | null>(null);
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
   const [showTaxiRouteMenu, setShowTaxiRouteMenu] = useState(false);
@@ -262,65 +265,6 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     return `${hours}h${rest ? ` ${rest}min` : ''}`;
   };
 
-  const getAppointmentStatusAccent = (status?: string) => {
-    const normalizedStatus = String(status || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim()
-      .toUpperCase();
-
-    if (normalizedStatus === 'CANCELADO' || normalizedStatus === 'CANCELADA') {
-      return 'cancelado';
-    }
-
-    if (normalizedStatus === 'EM ANDAMENTO' || normalizedStatus === 'INICIADO' || normalizedStatus === 'INICIADA') {
-      return 'andamento';
-    }
-
-    if (normalizedStatus === 'FINALIZADO' || normalizedStatus === 'FINALIZADA' || normalizedStatus === 'CONCLUIDO' || normalizedStatus === 'CONCLUIDA') {
-      return 'finalizado';
-    }
-
-    return '';
-  };
-
-  const getAppointmentStatusBackdropStyle = (statusAccent: string): React.CSSProperties => {
-    const baseStyle: React.CSSProperties = {
-      position: 'absolute',
-      pointerEvents: 'none',
-      top: 8,
-      right: 6,
-      bottom: -6,
-      left: -6,
-      zIndex: 0,
-      borderRadius: '2rem',
-      opacity: 0.9,
-      transform: 'translateZ(0)'
-    };
-
-    if (statusAccent === 'cancelado') {
-      return {
-        ...baseStyle,
-        background: 'linear-gradient(145deg, rgba(185, 28, 28, 0.76), rgba(239, 68, 68, 0.42))',
-        boxShadow: '0 16px 32px rgba(185, 28, 28, 0.28)'
-      };
-    }
-
-    if (statusAccent === 'andamento') {
-      return {
-        ...baseStyle,
-        background: 'linear-gradient(145deg, rgba(217, 119, 6, 0.78), rgba(245, 158, 11, 0.44))',
-        boxShadow: '0 16px 32px rgba(217, 119, 6, 0.28)'
-      };
-    }
-
-    return {
-      ...baseStyle,
-      background: 'linear-gradient(145deg, rgba(4, 120, 87, 0.76), rgba(16, 185, 129, 0.42))',
-      boxShadow: '0 16px 32px rgba(4, 120, 87, 0.28)'
-    };
-  };
-
   const getTodayBR = () => {
     const dataLocalBR = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     const [dia, mes, ano] = dataLocalBR.split('/');
@@ -382,7 +326,10 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   }, [unit.id, selectedDate]);
 
   useEffect(() => {
-    const handleClickOutside = () => setActiveCardMenuId(null);
+    const handleClickOutside = () => {
+      setActiveCardMenuId(null);
+      setNotaEditId(null);
+    };
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
@@ -1345,6 +1292,95 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     });
   };
 
+  // Cobrança amigável via WhatsApp: se o agendamento é de pacote, cobra o pacote
+  // (mesmo texto usado em Pacotes.tsx); se é avulso, cobra só este atendimento.
+  const handleSendCobranca = (appt: any) => {
+    const clientPhone = appt.pets?.clientes?.telefone?.replace(/\D/g, '');
+    if (!clientPhone) {
+      setConfirmacao({ visivel: true, acao: 'erro', mensagem: 'Cliente sem telefone cadastrado.' });
+      return;
+    }
+
+    const clientName = appt.pets?.clientes?.nome || 'Cliente';
+    const petName = appt.pets?.nome || 'seu Pet';
+
+    let message: string;
+    if (appt.pacote_id) {
+      const valor = (parseFloat(appt.pacotes?.valor_total) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const sessaoAtual = appt.numero_sessao || '?';
+      const totalSessoes = appt.pacotes?.qtd_sessoes || '?';
+      message = `Oi ${clientName}! 🐾 Passando por aqui só pra lembrar que o pacote do(a) ${petName} (${sessaoAtual}/${totalSessoes} banhos) ainda está em aberto, no valor de R$ ${valor}. Se precisar do link de pagamento ou da chave Pix, me chama que te mando! 💛`;
+    } else {
+      const valor = (parseFloat(appt.valor_total) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const [, m, d] = String(appt.data_agendamento || '').split('-');
+      const dataFormatada = m && d ? `${d}/${m}` : '';
+      message = `Oi ${clientName}! 🐾 Passando pra lembrar que o atendimento do(a) ${petName}${dataFormatada ? ` do dia ${dataFormatada}` : ''} ainda está em aberto, no valor de R$ ${valor}. Se precisar do link de pagamento ou da chave Pix, me chama que te mando! 💛`;
+    }
+
+    showToast('Enviando cobrança...', 'info');
+
+    enviarNotificacaoWhatsApp({
+      telefone: clientPhone,
+      mensagem: message,
+      unidadeId: unit.id,
+      supabaseClient,
+      agendamentoId: appt.id,
+      tipo: 'manual',
+      origem: 'manual',
+      forceDirect: true
+    }).then(result => {
+      if (result?.ok) {
+        showToast('Cobrança enviada!', 'sucesso');
+        registrarAtividade(
+          unit.id,
+          userProfile?.email || 'sistema',
+          'Cobrança de Agendamento',
+          `Enviou cobrança amigável via WhatsApp para ${clientName} (Pet: ${petName})`,
+          userProfile?.nome,
+          userProfile?.cargo
+        );
+      } else {
+        console.error('Falha ao enviar cobrança:', result?.error);
+        showToast(result?.error || 'Cobrança não enviada.', 'info');
+      }
+    }).catch(err => {
+      console.error('Erro ao enviar cobrança:', err);
+      showToast('Erro no WhatsApp.', 'info');
+    });
+  };
+
+  const openNotaEditor = (appt: any) => {
+    setNotaEditId(appt.id);
+    setNotaText(appt.nota_interna || '');
+  };
+
+  const closeNotaEditor = () => {
+    setNotaEditId(null);
+    setNotaText('');
+  };
+
+  const saveNotaInterna = async (appt: any) => {
+    setSavingNota(true);
+    try {
+      const valor = notaText.trim() || null;
+      const { error } = await supabaseClient
+        .from('agendamentos')
+        .update({ nota_interna: valor })
+        .eq('id', appt.id);
+
+      if (error) throw error;
+
+      setAppointments(prev => prev.map(a => (a.id === appt.id ? { ...a, nota_interna: valor } : a)));
+      showToast('Nota salva!', 'sucesso');
+      closeNotaEditor();
+    } catch (err: any) {
+      console.error('Erro ao salvar nota interna:', err);
+      showToast(`Falha ao salvar nota: ${err?.message || 'erro desconhecido.'}`, 'erro');
+    } finally {
+      setSavingNota(false);
+    }
+  };
+
   const generateCalendarDays = () => {
     const year = viewMonth.getFullYear();
     const month = viewMonth.getMonth();
@@ -1864,47 +1900,72 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
               });
 
               return agendamentosFiltrados.length > 0 ? (
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {agendamentosFiltrados.map(appt => {
                     const cardClient = appt.cardClient || appt.clientes || appt.pets?.clientes || {};
                     const petObservation = appt.petObservacoes || '';
                     const clientObservation = appt.clienteRestricoes || '';
                     const hasTransport = appt.tem_taxi || appt.pet_taxi || appt.agendamento_itens?.some((it: any) => it.servicos?.nome?.toUpperCase().includes('TÁXI'));
                     const routeAddress = hasTransport ? buildMapsDestination(appt) : '';
-                    const statusAccentClass = getAppointmentStatusAccent(appt.status);
-                    const statusBackdropStyle = statusAccentClass ? getAppointmentStatusBackdropStyle(statusAccentClass) : undefined;
 
                     return (
-                     <div key={appt.id} className={`relative ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'}`}>
-                       {statusAccentClass && (
-                          <div
-                             aria-hidden="true"
-                             className="appointment-status-backdrop"
-                             data-status={statusAccentClass}
-                             style={statusBackdropStyle}
-                          ></div>
-                       )}
-                       <div className="rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col md:flex-row md:items-center relative isolate z-10 p-6 group">
+                     <div key={appt.id} className={`relative h-full ${(activeCardMenuId === appt.id || notaEditId === appt.id) ? 'z-[100]' : 'z-10'}`}>
+                       <div className="h-full rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative isolate z-10 p-6 group">
 
-                       {/* Horário */}
-                       <div className="relative z-[2] w-24 text-center border-r border-slate-100 mr-8 hidden md:block shrink-0">
-                          <p className="text-2xl font-black text-slate-800 tracking-tighter">{String(appt.horario_inicio).substring(0, 5)}</p>
-                          <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${
-                            appt.status === 'Em Andamento' ? 'text-amber-500' : 
-                            appt.status === 'Finalizado' ? 'text-emerald-500' : 
-                            appt.status === 'Cancelado' ? 'text-slate-500' : 'text-slate-400'
-                          }`}>
-                            {appt.status === 'Em Andamento' ? 'Andamento' : appt.status === 'Finalizado' ? 'Finalizado' : appt.status === 'Cancelado' ? 'Cancelado' : 'Início'}
-                          </p>
-                       </div>
+                       {/* Faixa de status no canto (recorte isolado nesta caixinha, não no card inteiro,
+                           para não cortar o menu de Ações que precisa aparecer por cima do card) */}
+                       {(appt.status === 'Em Andamento' || appt.status === 'Finalizado' || appt.status === 'Cancelado') && (
+                          <div className="absolute top-0 right-0 w-28 h-28 overflow-hidden pointer-events-none rounded-tr-[2rem] z-[2]" aria-hidden="true">
+                             <div className={`absolute -right-12 top-5 w-40 rotate-45 text-center text-[9px] font-black uppercase tracking-widest py-1.5 shadow-md ${
+                                appt.status === 'Em Andamento'
+                                   ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white'
+                                   : appt.status === 'Finalizado'
+                                   ? 'bg-gradient-to-r from-emerald-600 to-emerald-800 text-white'
+                                   : 'bg-gradient-to-r from-slate-400 to-slate-500 text-white'
+                             }`}>
+                                {appt.status === 'Em Andamento' ? 'Em andamento' : appt.status}
+                             </div>
+                          </div>
+                       )}
 
                        {/* Informações do Pet e Cliente */}
-                       <div className="relative z-[2] flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenDetail(appt)}>
-                          <div className="flex flex-wrap items-center gap-2 pr-10 md:pr-0 mb-1">
-                             <h4 className="font-black text-xl text-slate-800 truncate group-hover:text-amber-600 transition-colors">
-                                {appt.pets?.nome}
-                             </h4>
-                             <PetSpeciesTag especie={appt.pets?.especie} raca={appt.pets?.raca} />
+                       <div className="relative z-[2] min-w-0 cursor-pointer" onClick={() => handleOpenDetail(appt)}>
+                          <div className="flex items-start gap-4">
+                             {/* Horário */}
+                             <div className="text-center shrink-0 pr-4 border-r border-slate-100">
+                                <p className="text-2xl font-black text-slate-800 tracking-tighter leading-none">{String(appt.horario_inicio).substring(0, 5)}</p>
+                                <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${
+                                  appt.status === 'Em Andamento' ? 'text-amber-500' :
+                                  appt.status === 'Finalizado' ? 'text-emerald-500' :
+                                  appt.status === 'Cancelado' ? 'text-slate-500' : 'text-slate-400'
+                                }`}>
+                                  {appt.status === 'Em Andamento' ? 'andamento' : appt.status === 'Finalizado' ? 'finalizado' : appt.status === 'Cancelado' ? 'cancelado' : 'início'}
+                                </p>
+                             </div>
+
+                             {/* Avatar do pet */}
+                             <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 font-black text-lg border-2 border-white shadow-sm shrink-0 overflow-hidden">
+                                {appt.pets?.foto_url ? (
+                                   <img src={appt.pets.foto_url} alt={appt.pets?.nome || 'Pet'} className="w-full h-full object-cover" />
+                                ) : (
+                                   appt.pets?.nome?.charAt(0) || <i className="fa-solid fa-paw"></i>
+                                )}
+                             </div>
+
+                             <div className="min-w-0 flex-1 pr-10">
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
+                                   <h4 className="min-w-0 max-w-full font-black text-lg text-slate-800 truncate group-hover:text-amber-600 transition-colors">
+                                      {appt.pets?.nome}
+                                   </h4>
+                                   <PetSpeciesTag especie={appt.pets?.especie} raca={appt.pets?.raca} />
+                                </div>
+                                <p className="text-xs text-slate-400 font-bold truncate flex items-center">
+                                   <i className="fa-solid fa-user-tag mr-2 opacity-50 text-[10px]"></i> {cardClient.nome}
+                                </p>
+                             </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 mt-3">
                              {appt.pacote_id && (
                                 <span className="shrink-0 bg-indigo-50 text-indigo-500 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter border border-indigo-100">
                                    Sessão {appt.numero_sessao || '?'}/{appt.pacotes?.qtd_sessoes || '?'}
@@ -1921,26 +1982,6 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                 </span>
                              )}
                           </div>
-                          <div className="md:hidden mb-2 flex items-center gap-2">
-                             <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-sky-50 px-3 py-1.5 text-[11px] font-black text-sky-700 shadow-sm shadow-sky-100/60">
-                                <i className="fa-regular fa-clock text-[10px]"></i>
-                                {String(appt.horario_inicio || '').substring(0, 5) || '--:--'}
-                             </span>
-                             <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest border ${
-                                appt.status === 'Em Andamento'
-                                   ? 'bg-amber-50 text-amber-600 border-amber-100'
-                                   : appt.status === 'Finalizado'
-                                   ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                   : appt.status === 'Cancelado'
-                                   ? 'bg-slate-100 text-slate-500 border-slate-200'
-                                   : 'bg-slate-50 text-slate-600 border-slate-100'
-                             }`}>
-                                {appt.status === 'Agendado' ? 'Pendente' : appt.status}
-                             </span>
-                          </div>
-                          <p className="text-xs text-slate-400 font-bold truncate flex items-center">
-                             <i className="fa-solid fa-user-tag mr-2 opacity-50 text-[10px]"></i> {cardClient.nome}
-                          </p>
 
                           {hasTransport && (
                              <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-2">
@@ -2047,45 +2088,105 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                          )}
                       </div>
 
-                      {/* Financeiro e Status */}
-                      <div className="relative z-[2] mt-4 md:mt-0 md:text-right flex items-center md:flex-col justify-between md:justify-center md:items-end gap-2 shrink-0 md:ml-8">
-                         <div className="flex items-center gap-3">
-                            <div className="text-right">
-                               <p className="font-black text-xl text-slate-800 tracking-tighter leading-none">R$ {(parseFloat(appt.valor_total) || 0).toFixed(2)}</p>
-                               <p className={`text-[9px] font-black uppercase tracking-widest mt-1.5 flex items-center justify-end ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                  <i className={`fa-solid ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'fa-circle-check' : 'fa-circle-exclamation'} mr-1 text-[8px]`}></i>
-                                  {(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'PAGO' : 'PENDENTE'}
-                               </p>
-                            </div>
+                      {/* Rodapé: Valor/Pagamento + Ações (mt-auto gruda no rodapé do card, pra todo card ficar do mesmo tamanho na mesma linha independente da quantidade de conteúdo) */}
+                      <div className="relative z-[2] mt-auto pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                         <div className="min-w-0">
+                            <p className="font-black text-xl text-slate-800 tracking-tighter leading-none">R$ {(parseFloat(appt.valor_total) || 0).toFixed(2)}</p>
+                            <p className={`text-[9px] font-black uppercase tracking-widest mt-1.5 flex items-center ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'text-emerald-500' : 'text-rose-500'}`}>
+                               <i className={`fa-solid ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'fa-circle-check' : 'fa-circle-exclamation'} mr-1 text-[8px]`}></i>
+                               {(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'PAGO' : 'PENDENTE'}
+                            </p>
                          </div>
-                         <span className={`inline-block px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${
-                            appt.status === 'Finalizado' 
-                               ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                               : appt.status === 'Em Andamento'
-                               ? 'bg-amber-50 text-amber-600 border-amber-200'
-                               : appt.status === 'Cancelado'
-                               ? 'bg-slate-100 text-slate-400 border-slate-200'
-                               : 'bg-slate-50 text-slate-600 border-slate-100'
-                         }`}>
-                            {appt.status === 'Agendado' ? 'Pendente' : appt.status}
-                         </span>
-                      </div>
 
-                      {/* Botão de Ação (3 Pontinhos) */}
-                      <div className="z-[3] absolute top-4 right-4 md:static md:ml-6 md:mt-0">
-                         <button 
-                            onClick={(e) => {
-                               e.stopPropagation();
-                               setActiveCardMenuId(activeCardMenuId === appt.id ? null : appt.id);
-                            }}
-                            className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 group-hover:text-slate-600 transition-all"
-                         >
-                            <i className="fa-solid fa-ellipsis-vertical text-lg"></i>
-                         </button>
+                         <div className="relative flex flex-wrap items-center justify-end gap-1.5 max-w-full shrink-0">
+                            <button
+                               onClick={(e) => { e.stopPropagation(); handleOpenDetail(appt); }}
+                               title="Ver detalhes"
+                               className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-500 text-white text-[11px] font-black uppercase tracking-wide shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all"
+                            >
+                               <i className="fa-solid fa-file-lines text-[10px]"></i> Detalhes
+                            </button>
+                            <button
+                               onClick={(e) => { e.stopPropagation(); handleRemindWhatsApp(appt); }}
+                               title="Enviar lembrete via WhatsApp"
+                               className="w-10 h-10 shrink-0 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-emerald-500 hover:border-emerald-100 transition-all flex items-center justify-center"
+                            >
+                               <i className="fa-brands fa-whatsapp"></i>
+                            </button>
+                            {!(appt.pacote_id ? appt.pacotes?.pago : appt.pago) && !isCancelledStatus(appt.status) && !isReadOnly && (
+                               <button
+                                  onClick={(e) => { e.stopPropagation(); handleSendCobranca(appt); }}
+                                  title="Cobrar via WhatsApp"
+                                  className="w-10 h-10 shrink-0 rounded-xl bg-white border border-amber-100 text-amber-500 hover:text-amber-600 hover:bg-amber-50 transition-all flex items-center justify-center"
+                               >
+                                  <i className="fa-solid fa-hand-holding-dollar"></i>
+                               </button>
+                            )}
+                            {!isFinalizedStatus(appt.status) && !isCancelledStatus(appt.status) && !isReadOnly && (
+                               <button
+                                  onClick={(e) => { e.stopPropagation(); handleStartEdit(appt); }}
+                                  title="Alterar dados"
+                                  className="w-10 h-10 shrink-0 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-amber-600 hover:border-amber-100 transition-all flex items-center justify-center"
+                               >
+                                  <i className="fa-solid fa-pen-to-square"></i>
+                               </button>
+                            )}
+                            <button
+                               onClick={(e) => { e.stopPropagation(); openNotaEditor(appt); }}
+                               title={appt.nota_interna ? 'Editar nota deste banho' : 'Adicionar nota deste banho'}
+                               className={`w-10 h-10 shrink-0 rounded-xl border transition-all flex items-center justify-center ${
+                                  appt.nota_interna
+                                     ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20'
+                                     : 'bg-white border-slate-100 text-slate-500 hover:text-amber-600 hover:border-amber-100'
+                               }`}
+                            >
+                               <i className="fa-solid fa-note-sticky"></i>
+                            </button>
+                            {notaEditId === appt.id && (
+                               <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[9999] p-4 animate-in fade-in zoom-in duration-200 ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>
+                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Nota deste banho</p>
+                                  <textarea
+                                     value={notaText}
+                                     onChange={(e) => setNotaText(e.target.value)}
+                                     rows={3}
+                                     placeholder="Ex: pet estava agitado, tosa demorou mais que o normal..."
+                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                                  />
+                                  <div className="flex items-center justify-end gap-2 mt-3">
+                                     <button onClick={closeNotaEditor} className="px-3 py-2 rounded-xl text-[11px] font-black uppercase text-slate-500 hover:bg-slate-50 transition-all">Cancelar</button>
+                                     <button
+                                        onClick={() => saveNotaInterna(appt)}
+                                        disabled={savingNota}
+                                        className="px-4 py-2 rounded-xl text-[11px] font-black uppercase bg-amber-500 text-white hover:bg-amber-600 transition-all disabled:opacity-50"
+                                     >
+                                        {savingNota ? 'Salvando...' : 'Salvar'}
+                                     </button>
+                                  </div>
+                               </div>
+                            )}
+                            <button
+                               onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveCardMenuId(activeCardMenuId === appt.id ? null : appt.id);
+                               }}
+                               title="Mais ações"
+                               className="w-10 h-10 shrink-0 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-slate-700 hover:border-slate-200 transition-all flex items-center justify-center"
+                            >
+                               <i className="fa-solid fa-gear"></i>
+                            </button>
+                            {!isCancelledStatus(appt.status) && !isReadOnly && (
+                               <button
+                                  onClick={(e) => { e.stopPropagation(); performCancelAppointment(appt); }}
+                                  title="Cancelar atendimento"
+                                  className="w-10 h-10 shrink-0 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all flex items-center justify-center"
+                               >
+                                  <i className="fa-solid fa-trash-can"></i>
+                               </button>
+                            )}
 
-                         {/* Dropdown de Ações */}
-                         {activeCardMenuId === appt.id && (
-                            <div className="absolute right-6 mt-2 w-52 bg-white !opacity-100 rounded-2xl shadow-2xl border border-slate-100 z-[9999] py-3 animate-in fade-in zoom-in duration-200 ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>
+                            {/* Dropdown de Ações */}
+                            {activeCardMenuId === appt.id && (
+                               <div className="absolute right-0 top-full mt-2 w-52 bg-white !opacity-100 rounded-2xl shadow-2xl border border-slate-100 z-[9999] py-3 animate-in fade-in zoom-in duration-200 ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>
                                <div className="px-4 py-2 border-b border-slate-50 mb-1">
                                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ações do Agendamento</p>
                                </div>
@@ -2158,6 +2259,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                )}
                             </div>
                          )}
+                      </div>
                       </div>
                    </div>
                   </div>

@@ -34,9 +34,9 @@ const PetSpeciesTag: React.FC<PetSpeciesTagProps> = ({ especie, raca, className 
   const text = racaTrim ? `${label} · ${racaTrim}` : label;
 
   return (
-    <span className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black border ${colorClass} ${className}`}>
-      <i className={`fa-solid ${icon} text-[10px]`}></i>
-      {text}
+    <span className={`min-w-0 max-w-full inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black border ${colorClass} ${className}`}>
+      <i className={`fa-solid ${icon} text-[10px] shrink-0`}></i>
+      <span className="truncate">{text}</span>
     </span>
   );
 };
