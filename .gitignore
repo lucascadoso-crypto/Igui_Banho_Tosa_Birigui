@@ -34,3 +34,5 @@ supabase/.temp/
 *.pem
 *.key
 *.crt
+.vercel
+.env*
