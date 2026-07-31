@@ -283,21 +283,8 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
     });
   };
 
-  const triggerRenewPack = () => {
-    setConfirmacao({
-      visivel: true,
-      acao: 'renovar',
-      mensagem: 'Deseja renovar este pacote antecipadamente?',
-      callback: () => performRenew()
-    });
-  };
-
   const performCancel = async () => {
     setConfirmacao({ visivel: true, acao: 'info', mensagem: 'Lógica de exclusão em cascata já implementada no componente pai (Pacotes.tsx). Feche este modal para excluir na lista principal.' });
-  };
-
-  const performRenew = () => {
-    setConfirmacao({ visivel: true, acao: 'info', mensagem: 'A funcionalidade de renovação automática está sendo processada pela rede.' });
   };
 
   const handleRenovacaoManual = async () => {
@@ -331,18 +318,9 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
       
       if (updateErr) throw updateErr;
 
-      // 3. Calcular intervalo (padrão 7 dias)
-      let intervalDays = 7;
-      if (sessions.length >= 2) {
-        try {
-          const d1 = new Date(sessions[0].data_agendamento + 'T12:00:00');
-          const d2 = new Date(sessions[1].data_agendamento + 'T12:00:00');
-          const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
-          if (diff > 0) intervalDays = diff;
-        } catch (e) {
-          console.error("Erro ao calcular intervalo:", e);
-        }
-      }
+      // 3. Intervalo derivado da frequência do pacote (4 sessões = semanal, 2 sessões = quinzenal).
+      // Não usar a distância observada entre a 1ª e a 2ª sessão: remarcações manuais corrompem esse cálculo.
+      const intervalDays = pack.qtd_sessoes === 4 ? 7 : pack.qtd_sessoes === 2 ? 14 : 7;
 
       const lastSession = sessions[sessions.length - 1];
       const newCiclo = (Number(pack.ciclo_renovacao) || 1) + 1;
@@ -450,25 +428,6 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
 
     } catch (err: any) {
       setConfirmacao({ visivel: true, acao: 'erro', mensagem: 'Erro na renovação manual: ' + err.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleToggleRenovacao = async (val: boolean) => {
-    setLoading(true);
-    try {
-      const { error } = await supabaseClient
-        .from('pacotes')
-        .update({ renovacao_automatica: val })
-        .eq('id', pack.id);
-
-      if (error) throw error;
-      
-      setPack({ ...pack, renovacao_automatica: val });
-      onRefresh();
-    } catch (err: any) {
-      alert('Erro ao atualizar renovação automática: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -796,21 +755,6 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
             </button>
            </div>
 
-           <div className="w-full md:w-auto flex items-center justify-between md:justify-start md:space-x-4 bg-slate-50 px-4 md:px-6 py-3 rounded-2xl border border-slate-100">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Renovação Automática</span>
-                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">Gera novo pacote ao finalizar</span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer" 
-                    checked={pack.renovacao_automatica || false} 
-                    onChange={(e) => handleToggleRenovacao(e.target.checked)} 
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-              </label>
-           </div>
         </footer>
       </div>
 
