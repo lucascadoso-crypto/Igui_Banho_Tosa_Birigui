@@ -1805,7 +1805,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
               });
 
               return agendamentosFiltrados.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {agendamentosFiltrados.map(appt => {
                     const cardClient = appt.cardClient || appt.clientes || appt.pets?.clientes || {};
                     const petObservation = appt.petObservacoes || '';
@@ -1859,7 +1859,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
                              <div className="min-w-0 flex-1 pr-10">
                                 <div className="flex flex-wrap items-center gap-2 mb-1">
-                                   <h4 className="font-black text-lg text-slate-800 truncate group-hover:text-amber-600 transition-colors">
+                                   <h4 className="min-w-0 max-w-full font-black text-lg text-slate-800 truncate group-hover:text-amber-600 transition-colors">
                                       {appt.pets?.nome}
                                    </h4>
                                    <PetSpeciesTag especie={appt.pets?.especie} raca={appt.pets?.raca} />
@@ -1994,8 +1994,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                       </div>
 
                       {/* Rodapé: Valor/Pagamento + Ações (mt-auto gruda no rodapé do card, pra todo card ficar do mesmo tamanho na mesma linha independente da quantidade de conteúdo) */}
-                      <div className="relative z-[2] mt-auto pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
-                         <div>
+                      <div className="relative z-[2] mt-auto pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                         <div className="min-w-0">
                             <p className="font-black text-xl text-slate-800 tracking-tighter leading-none">R$ {(parseFloat(appt.valor_total) || 0).toFixed(2)}</p>
                             <p className={`text-[9px] font-black uppercase tracking-widest mt-1.5 flex items-center ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'text-emerald-500' : 'text-rose-500'}`}>
                                <i className={`fa-solid ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'fa-circle-check' : 'fa-circle-exclamation'} mr-1 text-[8px]`}></i>
