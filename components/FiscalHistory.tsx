@@ -243,7 +243,8 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
 
   const formatDate = (date?: string) => date ? new Date(`${date}T12:00:00`).toLocaleDateString('pt-BR') : '-';
   const formatDateTime = (date?: string) => date ? new Date(date).toLocaleString('pt-BR') : '-';
-  const formatCurrency = (value: any) => `R$ ${Number(value || 0).toFixed(2)}`;
+  const formatCurrency = (value: any) =>
+    Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const getOrigin = (note: any) => {
     if (note.agendamento_id) return `Agendamento #${note.agendamento_id}`;
