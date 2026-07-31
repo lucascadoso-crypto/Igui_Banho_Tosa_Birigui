@@ -225,6 +225,70 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
     }
   };
 
+  const handleSendCobranca = () => {
+    const clientName = pack.clientes?.nome || 'Cliente';
+    const petName = pack.pets?.nome || 'seu pet';
+    const phoneRaw = pack.clientes?.telefone?.replace(/\D/g, '') || '';
+    const phone = phoneRaw.startsWith('55') ? phoneRaw : `55${phoneRaw}`;
+    const valor = (parseFloat(pack.valor_total) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const msg = `Oi ${clientName}! 🐾 Passando por aqui só pra lembrar que o pacote do(a) ${petName} (${concludedCount}/${totalCount} banhos) ainda está em aberto, no valor de R$ ${valor}. Se precisar do link de pagamento ou da chave Pix, me chama que te mando! 💛`;
+
+    if (!phone) {
+      setConfirmacao({ visivel: true, acao: 'erro', mensagem: 'Telefone do cliente não encontrado para enviar o WhatsApp.' });
+      return;
+    }
+
+    // A Edge Function lembrete-24h exige um agendamentoId (deriva cliente/pet/
+    // telefone/unidade a partir dele) - usamos qualquer sessão do pacote.
+    const anyAgendamentoId = sessions[0]?.id;
+    if (!anyAgendamentoId) {
+      setConfirmacao({ visivel: true, acao: 'erro', mensagem: 'Este pacote não tem nenhum agendamento vinculado para enviar a cobrança.' });
+      return;
+    }
+
+    (async () => {
+      const result = await enviarNotificacaoWhatsApp({
+        telefone: phone,
+        mensagem: msg,
+        unidadeId: pack.unidade_id,
+        supabaseClient,
+        agendamentoId: anyAgendamentoId,
+        tipo: 'manual',
+        forceDirect: true,
+        whatsapp_nome_instancia: unit.whatsapp_nome_instancia,
+        whatsapp_token: unit.whatsapp_token,
+        whatsapp_ativo: unit.whatsapp_ativo
+      });
+
+      try {
+        await supabaseClient.from('whatsapp_mensagens').insert([{
+          status: result?.ok ? 'SUCESSO' : 'ERRO',
+          nome_cliente: clientName,
+          nome_pet: petName,
+          telefone: phone,
+          unidade_id: pack.unidade_id,
+          detalhe_erro: result?.ok ? null : result?.error,
+          tipo_agendamento: 'COBRANCA',
+          criado_em: new Date().toISOString()
+        }]);
+      } catch (logErr) {
+        console.error("Erro ao gravar log_whatsapp de cobrança:", logErr);
+      }
+
+      registrarAtividade(
+        unit.id,
+        userProfile?.email || 'sistema',
+        'Cobrança de Pacote',
+        `Pet: ${petName} - Enviou cobrança amigável para pacote ${pack.nome_pacote || pack.id}`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+    })();
+
+    setConfirmacao({ visivel: true, acao: 'info', mensagem: 'Cobrança enviada via WhatsApp!' });
+  };
+
   const handleRegisterPayment = async () => {
     setLoading(true);
 
@@ -283,21 +347,8 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
     });
   };
 
-  const triggerRenewPack = () => {
-    setConfirmacao({
-      visivel: true,
-      acao: 'renovar',
-      mensagem: 'Deseja renovar este pacote antecipadamente?',
-      callback: () => performRenew()
-    });
-  };
-
   const performCancel = async () => {
     setConfirmacao({ visivel: true, acao: 'info', mensagem: 'Lógica de exclusão em cascata já implementada no componente pai (Pacotes.tsx). Feche este modal para excluir na lista principal.' });
-  };
-
-  const performRenew = () => {
-    setConfirmacao({ visivel: true, acao: 'info', mensagem: 'A funcionalidade de renovação automática está sendo processada pela rede.' });
   };
 
   const handleRenovacaoManual = async () => {
@@ -331,18 +382,9 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
       
       if (updateErr) throw updateErr;
 
-      // 3. Calcular intervalo (padrão 7 dias)
-      let intervalDays = 7;
-      if (sessions.length >= 2) {
-        try {
-          const d1 = new Date(sessions[0].data_agendamento + 'T12:00:00');
-          const d2 = new Date(sessions[1].data_agendamento + 'T12:00:00');
-          const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
-          if (diff > 0) intervalDays = diff;
-        } catch (e) {
-          console.error("Erro ao calcular intervalo:", e);
-        }
-      }
+      // 3. Intervalo derivado da frequência do pacote (4 sessões = semanal, 2 sessões = quinzenal).
+      // Não usar a distância observada entre a 1ª e a 2ª sessão: remarcações manuais corrompem esse cálculo.
+      const intervalDays = pack.qtd_sessoes === 4 ? 7 : pack.qtd_sessoes === 2 ? 14 : 7;
 
       const lastSession = sessions[sessions.length - 1];
       const newCiclo = (Number(pack.ciclo_renovacao) || 1) + 1;
@@ -450,25 +492,6 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
 
     } catch (err: any) {
       setConfirmacao({ visivel: true, acao: 'erro', mensagem: 'Erro na renovação manual: ' + err.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleToggleRenovacao = async (val: boolean) => {
-    setLoading(true);
-    try {
-      const { error } = await supabaseClient
-        .from('pacotes')
-        .update({ renovacao_automatica: val })
-        .eq('id', pack.id);
-
-      if (error) throw error;
-      
-      setPack({ ...pack, renovacao_automatica: val });
-      onRefresh();
-    } catch (err: any) {
-      alert('Erro ao atualizar renovação automática: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -728,12 +751,22 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
 
               {/* BOTÃO MANUAL DE RENOVAÇÃO (Se todas concluídas e pacote ainda Ativo) */}
               {concludedCount === totalCount && (pack.status === 'ATIVO' || pack.status === 'Em Execução' || !pack.status) && (
-                <button 
+                <button
                   onClick={handleRenovacaoManual}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4 md:px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase shadow-xl animate-bounce flex items-center space-x-2"
                 >
                   <i className="fa-solid fa-arrows-rotate"></i>
                   <span>Finalizar e Renovar</span>
+                </button>
+              )}
+
+              {!pack.pago && (
+                <button
+                  onClick={handleSendCobranca}
+                  className="bg-amber-500 hover:bg-amber-600 text-white px-4 md:px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-amber-500/20 flex items-center space-x-2"
+                >
+                  <i className="fa-brands fa-whatsapp"></i>
+                  <span>Cobrar</span>
                 </button>
               )}
             </div>
@@ -796,21 +829,6 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
             </button>
            </div>
 
-           <div className="w-full md:w-auto flex items-center justify-between md:justify-start md:space-x-4 bg-slate-50 px-4 md:px-6 py-3 rounded-2xl border border-slate-100">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Renovação Automática</span>
-                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">Gera novo pacote ao finalizar</span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer" 
-                    checked={pack.renovacao_automatica || false} 
-                    onChange={(e) => handleToggleRenovacao(e.target.checked)} 
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-              </label>
-           </div>
         </footer>
       </div>
 

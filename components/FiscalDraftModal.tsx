@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Unit, UserProfile } from '../types';
-import { avaliarChecklistFiscal, montarLinkCadastroWhatsapp } from '../services/fiscalValidation';
+import { avaliarChecklistFiscal, montarLinkCadastroWhatsapp, LIMITE_VALOR_SEM_DADOS_CLIENTE } from '../services/fiscalValidation';
 
 interface FiscalDraftModalProps {
   supabaseClient: any;
@@ -13,7 +13,7 @@ interface FiscalDraftModalProps {
 
 const DEFAULT_FISCAL_BASE_DESCRIPTION = 'Prestação de serviços de higiene, embelezamento e cuidados de animais domésticos.';
 const DEFAULT_MUNICIPAL_SERVICE_CODE = '050801';
-const DEFAULT_NBS_CODE = '11405600';
+const DEFAULT_NBS_CODE = '114056000';
 
 const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, unit, transaction, userProfile, onClose, onCreated }) => {
   const [loading, setLoading] = useState(true);
@@ -71,7 +71,16 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
         setSourceData(data);
         setCompetenceDate('');
         setDescription(buildPackageDescription(data));
-        await loadFiscalServices([data.servico_id || data.servicos?.id].filter(Boolean));
+        const pacoteServiceId = data.servico_id || data.servicos?.id;
+        if (pacoteServiceId) {
+          await loadFiscalServices([pacoteServiceId]);
+        } else {
+          // Pacote de fidelidade (catalogo_pacotes) nao tem servico_id -
+          // usa qualquer configuracao fiscal ativa da unidade, ja que todo
+          // servico desta unidade resolve para o mesmo codigo fiscal
+          // (mesmo fallback aplicado em criar_rascunho_fiscal_por_movimento).
+          await loadAnyActiveFiscalService();
+        }
       } else {
         throw new Error('Origem nao suportada para rascunho fiscal nesta fase.');
       }
@@ -94,6 +103,21 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
       .select('*')
       .eq('unidade_id', unit.id)
       .in('servico_id', serviceIds);
+
+    if (fiscalError) throw fiscalError;
+    setFiscalServices(data || []);
+  };
+
+  const loadAnyActiveFiscalService = async () => {
+    const { data, error: fiscalError } = await supabaseClient
+      .from('servicos_fiscais')
+      .select('*')
+      .eq('unidade_id', unit.id)
+      .eq('ativo', true)
+      .not('codigo_servico_municipal', 'is', null)
+      .not('codigo_nbs', 'is', null)
+      .order('id', { ascending: true })
+      .limit(1);
 
     if (fiscalError) throw fiscalError;
     setFiscalServices(data || []);
@@ -145,14 +169,22 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
       if (items.length > 0) return items;
     }
 
+    const pacoteServiceId = sourceData.servico_id || sourceData.servicos?.id || null;
+    // Pacote de fidelidade sem servico_id: usa a config fiscal generica
+    // carregada via loadAnyActiveFiscalService (mesmo fallback do backend).
+    // So se aplica a pacotes sem servico - nao muda nada para agendamento.
+    const fiscalFallback = !pacoteServiceId && transaction.sourceTable === 'pacotes'
+      ? (fiscalServices[0] || null)
+      : null;
+
     return [{
-      servico_id: sourceData.servico_id || sourceData.servicos?.id || null,
+      servico_id: pacoteServiceId,
       descricao: transaction.sourceTable === 'pacotes' ? 'Pacote de fidelidade banho e tosa' : 'Servico de banho e tosa',
       quantidade: 1,
       valor_unitario: totalValue,
       valor_desconto: 0,
       valor_total: totalValue,
-      fiscal: fiscalForService(sourceData.servico_id || sourceData.servicos?.id)
+      fiscal: fiscalForService(pacoteServiceId) || fiscalFallback
     }];
   }, [sourceData, transaction, totalValue, fiscalServices]);
 
@@ -175,8 +207,9 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
   const checklist = useMemo(() => avaliarChecklistFiscal({
     configFiscal,
     servicosFiscais: taxItems.map((item: any) => item.fiscal).filter(Boolean),
-    cliente: client
-  }), [configFiscal, taxItems, client]);
+    cliente: client,
+    valorFiscal: serviceValue
+  }), [configFiscal, taxItems, client, serviceValue]);
 
   const handleEnviarLinkCadastro = () => {
     const { whatsappUrl } = montarLinkCadastroWhatsapp(unit.id, client?.telefone, client?.nome);
@@ -304,6 +337,12 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
             ) : (
               <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4 text-sm font-bold text-amber-800">
                 Rascunho fiscal criado. A emissao oficial ainda nao esta configurada.
+                {checklist.dadosClienteDispensados && (
+                  <p className="mt-2 text-xs font-bold text-amber-700">
+                    <i className="fa-solid fa-circle-info mr-1"></i>
+                    Valor ate R$ {LIMITE_VALOR_SEM_DADOS_CLIENTE.toFixed(2)} - CPF e endereco do cliente dispensados.
+                  </p>
+                )}
               </div>
             )}
 

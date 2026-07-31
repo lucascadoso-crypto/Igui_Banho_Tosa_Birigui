@@ -36,6 +36,10 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
   const [selectedDate, setSelectedDate] = useState(getTodayBR());
   
   const [transactions, setTransactions] = useState<any[]>([]);
+  // Chaves "agendamento-<id>" / "pacote-<id>" das transacoes que ja tem
+  // rascunho fiscal criado (RASCUNHO ou EMITIDA) - usado so pra colorir o
+  // botao "Criar rascunho fiscal" (laranja = falta criar, verde = ja existe).
+  const [fiscalDraftsExistentes, setFiscalDraftsExistentes] = useState<Set<string>>(new Set());
   const [totals, setTotals] = useState({
     bruto: 0,
     avulso: 0,
@@ -325,6 +329,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
       combined.sort((a, b) => (a?.natureza || '').localeCompare(b?.natureza || ''));
 
       setTransactions(combined);
+      await fetchFiscalDraftsExistentes(combined);
       setTotals({
         bruto: sumAvulso + sumPacotes + sumTransporte,
         avulso: sumAvulso,
@@ -341,6 +346,53 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchFiscalDraftsExistentes = async (combinedTransactions: any[]) => {
+    const agendamentoIds = combinedTransactions
+      .filter(t => t.sourceTable === 'agendamentos')
+      .map(t => Number(t.originalData?.id))
+      .filter(Boolean);
+    const pacoteIds = combinedTransactions
+      .filter(t => t.sourceTable === 'pacotes')
+      .map(t => Number(t.originalData?.id))
+      .filter(Boolean);
+
+    if (agendamentoIds.length === 0 && pacoteIds.length === 0) {
+      setFiscalDraftsExistentes(new Set());
+      return;
+    }
+
+    try {
+      const filtros: string[] = [];
+      if (agendamentoIds.length > 0) filtros.push(`agendamento_id.in.(${agendamentoIds.join(',')})`);
+      if (pacoteIds.length > 0) filtros.push(`pacote_id.in.(${pacoteIds.join(',')})`);
+
+      const { data, error } = await supabaseClient
+        .from('notas_fiscais')
+        .select('agendamento_id, pacote_id, status')
+        .eq('unidade_id', unit.id)
+        .neq('status', 'CANCELADA')
+        .or(filtros.join(','));
+
+      if (error) throw error;
+
+      const chaves = new Set<string>();
+      (data || []).forEach((nota: any) => {
+        if (nota.agendamento_id) chaves.add(`agendamento-${nota.agendamento_id}`);
+        if (nota.pacote_id) chaves.add(`pacote-${nota.pacote_id}`);
+      });
+      setFiscalDraftsExistentes(chaves);
+    } catch (err) {
+      console.error('Erro ao verificar rascunhos fiscais existentes:', err);
+      setFiscalDraftsExistentes(new Set());
+    }
+  };
+
+  const temRascunhoFiscal = (transaction: any) => {
+    if (!['agendamentos', 'pacotes'].includes(transaction?.sourceTable)) return false;
+    const prefixo = transaction.sourceTable === 'agendamentos' ? 'agendamento' : 'pacote';
+    return fiscalDraftsExistentes.has(`${prefixo}-${transaction.originalData?.id}`);
   };
 
   const formatDateBR = (dateStr: string) => {
@@ -896,11 +948,15 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
                                     {canShowFiscalDraftAction(t) && (
                                        <button
                                           onClick={() => setFiscalDraftTransaction(t)}
-                                          className="h-8 px-3 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm group-hover:scale-105 font-black text-[9px] uppercase tracking-widest"
-                                          title="Criar rascunho fiscal"
+                                          className={`h-8 px-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm group-hover:scale-105 font-black text-[9px] uppercase tracking-widest ${
+                                             temRascunhoFiscal(t)
+                                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600'
+                                                : 'bg-orange-50 hover:bg-orange-100 text-orange-600'
+                                          }`}
+                                          title={temRascunhoFiscal(t) ? 'Rascunho fiscal ja criado' : 'Criar rascunho fiscal'}
                                        >
                                           <i className="fa-solid fa-file-invoice-dollar text-xs"></i>
-                                          <span className="hidden xl:inline">Criar rascunho fiscal</span>
+                                          <span className="hidden xl:inline">{temRascunhoFiscal(t) ? 'Rascunho criado' : 'Criar rascunho fiscal'}</span>
                                        </button>
                                     )}
                                  </div>

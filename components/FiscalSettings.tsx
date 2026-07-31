@@ -36,7 +36,9 @@ const emptyConfig = {
 
 const DEFAULT_FISCAL_DESCRIPTION = 'Prestação de serviços de higiene, embelezamento e cuidados de animais domésticos, incluindo banho, tosa e serviços complementares.';
 const DEFAULT_MUNICIPAL_SERVICE_CODE = '050801';
-const DEFAULT_NBS_CODE = '11405600';
+// NBS 1.1405.60.00 - Servicos de guarda, adestramento, embelezamento e
+// alojamento (confirmado na planilha oficial do Portal NFS-e / gov.br/nfse).
+const DEFAULT_NBS_CODE = '114056000';
 
 const REGIME_TRIBUTARIO_OPTIONS = [
   { value: '', label: 'Selecione...' },

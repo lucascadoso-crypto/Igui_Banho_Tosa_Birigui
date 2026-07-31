@@ -53,7 +53,6 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
 
   const [isPetTaxi, setIsPetTaxi] = useState(false);
   const [valorTransportePacote, setValorTransportePacote] = useState<number>(0);
-  const [renovacaoAutomatica, setRenovacaoAutomatica] = useState(false);
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddData, setQuickAddData] = useState({ nome: '', telefone: '', petNome: '' });
@@ -107,7 +106,6 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
       setPackageTotalValue(Number(p.valor_total) - taxiVal + Number(p.valor_desconto || 0));
       setSelectedCatalogId('');
 
-      setRenovacaoAutomatica(p.renovacao_automatica || false);
       const initialInterval = p.qtd_sessoes === 4 ? 'Weekly' : 'Bi-weekly';
       setInterval(initialInterval);
 
@@ -249,8 +247,7 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
             qtd_sessoes: sessionCount,
             valor_total: finalTotal,
             valor_transporte: taxiVal,
-            valor_desconto: valorDesconto,
-            renovacao_automatica: renovacaoAutomatica
+            valor_desconto: valorDesconto
           })
           .eq('id', editingPackageId);
 
@@ -406,7 +403,7 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
             valor_desconto: valorDesconto,
             catalogo_pacote_id: selectedCatalogId || null,
             ativo: true,
-            renovacao_automatica: renovacaoAutomatica
+            renovacao_automatica: true
           }])
           .select().single();
 
@@ -768,19 +765,6 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
                    </div>
                  </div>
                )}
-               <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                 <div className="flex items-center space-x-3">
-                   <i className="fa-solid fa-arrows-rotate text-teal-500"></i>
-                   <div>
-                     <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest block">Renovação Automática</span>
-                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">(Gera um novo pacote igual ao finalizar)</span>
-                   </div>
-                 </div>
-                 <label className="relative inline-flex items-center cursor-pointer">
-                   <input type="checkbox" className="sr-only peer" checked={renovacaoAutomatica} onChange={(e) => setRenovacaoAutomatica(e.target.checked)} />
-                   <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                 </label>
-               </div>
              </div>
            </section>
 

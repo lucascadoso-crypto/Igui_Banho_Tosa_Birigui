@@ -340,6 +340,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   
   const [selectedServiceIds, setSelectedServiceIds] = useState<Array<number | string>>([]);
   const [valorDesconto, setValorDesconto] = useState<number>(0);
+  const [valorAcrescimo, setValorAcrescimo] = useState<number>(0);
 
   const [paymentMethod, setPaymentMethod] = useState('');
   const [isPaidModal, setIsPaidModal] = useState(false);
@@ -353,6 +354,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     extraItemValues: [],
     valorTransporte: isPetTaxi ? valorTransporte : 0,
     valorDesconto,
+    valorAcrescimo,
     isPacote: false,
     valorTotalSalvo: 0,
     valorServicosSalvo: 0
@@ -530,6 +532,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     setAppointmentTime('09:00');
     setSelectedServiceIds([]);
     setValorDesconto(0);
+    setValorAcrescimo(0);
     setPaymentMethod('');
     setIsPaidModal(false);
     setIsPetTaxi(false);
@@ -570,6 +573,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       .map((it: any) => it.servico_id);
     setSelectedServiceIds(initialServiceIds);
     setValorDesconto(Number(target.valor_desconto || 0));
+    setValorAcrescimo(Number(target.valor_acrescimo || 0));
 
     setPaymentMethod(target.forma_pagamento || '');
     setIsPaidModal(target.pago || false);
@@ -971,19 +975,10 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     if (!sessionData || sessionData.length < 1) return;
 
     const lastSession = sessionData[sessionData.length - 1];
-    
-    // Calcular intervalo dinâmico entre sessões (se houver pelo menos 2)
-    let intervalDays = 7; // Padrão semanal
-    if (sessionData.length >= 2) {
-      try {
-        const d1 = new Date(sessionData[0].data_agendamento + 'T12:00:00');
-        const d2 = new Date(sessionData[1].data_agendamento + 'T12:00:00');
-        const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
-        if (diff > 0) intervalDays = diff;
-      } catch (e) {
-        console.error("Erro ao calcular intervalo:", e);
-      }
-    }
+
+    // Intervalo derivado da frequência do pacote (4 sessões = semanal, 2 sessões = quinzenal).
+    // Não usar a distância observada entre a 1ª e a 2ª sessão: remarcações manuais corrompem esse cálculo.
+    const intervalDays = pacoteAtual.qtd_sessoes === 4 ? 7 : pacoteAtual.qtd_sessoes === 2 ? 14 : 7;
 
     // 3. Clonar Pacote
     const newCiclo = (Number(pacoteAtual.ciclo_renovacao) || 1) + 1;
@@ -1172,6 +1167,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
         valor_total: finalTotal,
         valor_servicos: appointmentTotals.valorServicos,
         valor_desconto: valorDesconto,
+        valor_acrescimo: valorAcrescimo,
         valor_transporte: taxiVal,
         tem_taxi: isPetTaxi,
         endereco_busca: isPetTaxi ? petTaxiEndereco : null,
@@ -2330,13 +2326,27 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                         <div className="bg-white p-4 rounded-2xl border border-amber-100">
                            <label className="text-[9px] font-black text-orange-500 uppercase mb-1 block">Desconto</label>
                            <div className="relative">
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-orange-400 font-black text-sm">R$</span>
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-orange-400 font-black text-sm">− R$</span>
                               <input
                                 type="number"
                                 min={0}
                                 value={valorDesconto}
                                 onChange={(e) => setValorDesconto(Math.max(0, Number(e.target.value) || 0))}
-                                className="w-full pl-7 pr-1 py-0.5 bg-transparent outline-none font-black text-orange-600 text-lg"
+                                className="w-full pl-11 pr-1 py-0.5 bg-transparent outline-none font-black text-orange-600 text-lg"
+                                placeholder="0.00"
+                              />
+                           </div>
+                        </div>
+                        <div className="bg-white p-4 rounded-2xl border border-amber-100">
+                           <label className="text-[9px] font-black text-emerald-500 uppercase mb-1 block">Acréscimo</label>
+                           <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-emerald-400 font-black text-sm">+ R$</span>
+                              <input
+                                type="number"
+                                min={0}
+                                value={valorAcrescimo}
+                                onChange={(e) => setValorAcrescimo(Math.max(0, Number(e.target.value) || 0))}
+                                className="w-full pl-11 pr-1 py-0.5 bg-transparent outline-none font-black text-emerald-600 text-lg"
                                 placeholder="0.00"
                               />
                            </div>

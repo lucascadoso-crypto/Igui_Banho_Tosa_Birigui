@@ -47,6 +47,9 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
   const [deletingSaving, setDeletingSaving] = useState(false);
   const [deletingError, setDeletingError] = useState('');
 
+  const [apiEmittingNoteId, setApiEmittingNoteId] = useState<number | null>(null);
+  const [apiEmitResult, setApiEmitResult] = useState<{ noteId: number; ok: boolean; mensagem: string; chaveAcesso?: string; erros?: { Codigo: string; Descricao: string; Complemento?: string }[] } | null>(null);
+
   useEffect(() => {
     fetchNotes();
   }, [unit?.id, clientId, statusFilter, periodStart, periodEnd]);
@@ -144,6 +147,57 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
     }
   };
 
+  const handleEmitirViaApi = async (note: any) => {
+    setApiEmittingNoteId(note.id);
+    setApiEmitResult(null);
+    try {
+      const { data, error } = await supabaseClient.functions.invoke('nfse-emitir-dps', {
+        body: { notaFiscalId: note.id }
+      });
+      if (error) throw error;
+
+      if (data?.ok && data?.notaAtualizada) {
+        setApiEmitResult({
+          noteId: note.id,
+          ok: true,
+          mensagem: `NFS-e emitida com sucesso (numero ${data.notaAtualizada.numero_nota}).`,
+          chaveAcesso: data.notaAtualizada.chave_acesso
+        });
+        await fetchNotes();
+      } else if (data?.ok && data?.erroGravacao) {
+        setApiEmitResult({
+          noteId: note.id,
+          ok: false,
+          mensagem: `A NFS-e foi emitida na Sefin Nacional (chave ${data.resposta?.chaveAcesso || '-'}), mas nao foi possivel salvar aqui: ${data.erroGravacao}. Anote a chave antes de tentar de novo.`,
+          chaveAcesso: data.resposta?.chaveAcesso
+        });
+      } else {
+        setApiEmitResult({
+          noteId: note.id,
+          ok: false,
+          mensagem: data?.erro || 'A Sefin Nacional rejeitou a DPS.',
+          erros: data?.resposta?.erros
+        });
+      }
+    } catch (err: any) {
+      console.error('Erro ao emitir NFS-e via API:', err);
+      // Quando a Edge Function responde com status != 2xx (ex.: validacao
+      // antes de chegar na Sefin Nacional), supabase-js so da uma mensagem
+      // generica ("Edge Function returned a non-2xx status code") - o corpo
+      // de verdade fica em err.context (a Response crua), precisa ler aqui.
+      let mensagem = err.message || 'Falha ao chamar a emissao via API.';
+      try {
+        const corpo = await err.context?.json?.();
+        if (corpo?.erro) mensagem = corpo.erro;
+      } catch (_) {
+        // corpo nao veio em JSON ou context nao existe - mantem a mensagem generica
+      }
+      setApiEmitResult({ noteId: note.id, ok: false, mensagem });
+    } finally {
+      setApiEmittingNoteId(null);
+    }
+  };
+
   const openCancelModal = (note: any) => {
     setCancelingError('');
     setMotivoCancelamento('');
@@ -205,7 +259,7 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
         <header className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-5 md:p-8">
           <p className="text-[10px] font-black text-teal-600 uppercase tracking-[0.2em]">Financeiro &gt; Notas Fiscais</p>
           <h3 className="text-2xl font-black text-slate-900 mt-1">Historico Fiscal</h3>
-          <p className="text-sm font-bold text-slate-400 mt-1">Rascunhos e historico interno. Nenhuma NFS-e real e emitida nesta fase.</p>
+          <p className="text-sm font-bold text-slate-400 mt-1">Rascunhos, historico e emissao real (homologacao) via Sistema Nacional NFS-e.</p>
         </header>
       )}
 
@@ -258,48 +312,56 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
               <table className="w-full text-left border-collapse">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cliente</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Origem</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Competencia</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Valor</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Numero</th>
-                    <th className="px-6 py-4"></th>
+                    <th className="px-2 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-wide">Status</th>
+                    <th className="px-2 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-wide">Cliente</th>
+                    <th className="px-2 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-wide">Origem</th>
+                    <th className="px-2 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-wide">Compet.</th>
+                    <th className="px-2 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-wide text-right">Valor</th>
+                    <th className="px-2 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-wide">Num.</th>
+                    <th className="px-2 py-2.5"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filteredNotes.map(note => (
                     <tr key={note.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${statusClasses[note.status] || statusClasses.RASCUNHO}`}>
+                      <td className="px-2 py-2.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wide whitespace-nowrap ${statusClasses[note.status] || statusClasses.RASCUNHO}`}>
                           {note.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-black text-slate-800">{note.tomador_nome || note.clientes?.nome || 'Cliente nao informado'}</p>
-                        <p className="text-[10px] font-bold text-slate-400">{note.tomador_cpf_cnpj || note.clientes?.cpf || 'CPF/CNPJ pendente'}</p>
+                      <td className="px-2 py-2.5 max-w-[140px]">
+                        <p className="text-xs font-black text-slate-800 truncate">{note.tomador_nome || note.clientes?.nome || 'Cliente nao informado'}</p>
+                        <p className="text-[9px] font-bold text-slate-400 truncate">{note.tomador_cpf_cnpj || note.clientes?.cpf || 'CPF/CNPJ pendente'}</p>
                       </td>
-                      <td className="px-6 py-4 text-xs font-bold text-slate-500">{getOrigin(note)}</td>
-                      <td className="px-6 py-4 text-xs font-bold text-slate-500">{formatDate(note.data_competencia)}</td>
-                      <td className="px-6 py-4 text-right font-black text-slate-900">{formatCurrency(note.valor_total)}</td>
-                      <td className="px-6 py-4 text-xs font-bold text-slate-400">{note.numero_nota || 'Futuro'}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <button onClick={() => setSelectedNote(note)} className="px-4 py-2 rounded-xl bg-teal-50 text-teal-700 font-black text-[10px] uppercase tracking-widest">
-                            Ver rascunho
+                      <td className="px-2 py-2.5 text-[11px] font-bold text-slate-500 whitespace-nowrap">{getOrigin(note)}</td>
+                      <td className="px-2 py-2.5 text-[11px] font-bold text-slate-500 whitespace-nowrap">{formatDate(note.data_competencia)}</td>
+                      <td className="px-2 py-2.5 text-right text-xs font-black text-slate-900 whitespace-nowrap">{formatCurrency(note.valor_total)}</td>
+                      <td className="px-2 py-2.5 text-[11px] font-bold text-slate-400">{note.numero_nota || 'Futuro'}</td>
+                      <td className="px-2 py-2.5">
+                        <div className="flex flex-wrap justify-end gap-1">
+                          <button onClick={() => setSelectedNote(note)} className="px-2 py-1 rounded-lg bg-teal-50 text-teal-700 font-black text-[8px] uppercase tracking-wide whitespace-nowrap">
+                            Ver
                           </button>
                           {canManageNotes && note.status === 'RASCUNHO' && (
                             <>
-                              <button onClick={() => openIssueModal(note)} className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 font-black text-[10px] uppercase tracking-widest">
-                                Marcar como emitida
+                              <button
+                                onClick={() => handleEmitirViaApi(note)}
+                                disabled={apiEmittingNoteId === note.id}
+                                className="px-2 py-1 rounded-lg bg-teal-600 text-white font-black text-[8px] uppercase tracking-wide disabled:opacity-50 whitespace-nowrap"
+                                title="Envia a DPS de verdade para o Sistema Nacional NFS-e"
+                              >
+                                {apiEmittingNoteId === note.id ? 'Emitindo...' : 'Emitir API'}
                               </button>
-                              <button onClick={() => setDeletingNote(note)} className="px-4 py-2 rounded-xl bg-rose-50 text-rose-700 font-black text-[10px] uppercase tracking-widest">
+                              <button onClick={() => openIssueModal(note)} className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-black text-[8px] uppercase tracking-wide whitespace-nowrap">
+                                Emitida manual
+                              </button>
+                              <button onClick={() => setDeletingNote(note)} className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 font-black text-[8px] uppercase tracking-wide whitespace-nowrap">
                                 Excluir
                               </button>
                             </>
                           )}
                           {canManageNotes && note.status === 'EMITIDA' && (
-                            <button onClick={() => openCancelModal(note)} className="px-4 py-2 rounded-xl bg-rose-50 text-rose-700 font-black text-[10px] uppercase tracking-widest">
+                            <button onClick={() => openCancelModal(note)} className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 font-black text-[8px] uppercase tracking-wide whitespace-nowrap">
                               Cancelar
                             </button>
                           )}
@@ -335,6 +397,13 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
                     <div className="mt-3 flex flex-wrap gap-2">
                       {note.status === 'RASCUNHO' && (
                         <>
+                          <button
+                            onClick={() => handleEmitirViaApi(note)}
+                            disabled={apiEmittingNoteId === note.id}
+                            className="px-3 py-2 rounded-xl bg-teal-600 text-white font-black text-[10px] uppercase tracking-widest disabled:opacity-50"
+                          >
+                            {apiEmittingNoteId === note.id ? 'Emitindo...' : 'Emitir via API'}
+                          </button>
                           <button onClick={() => openIssueModal(note)} className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 font-black text-[10px] uppercase tracking-widest">
                             Marcar como emitida
                           </button>
@@ -445,6 +514,52 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {apiEmitResult && (
+        <div className="app-modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="app-modal-panel w-full max-w-lg bg-white rounded-[2rem] shadow-2xl max-h-[calc(100dvh-24px)] overflow-y-auto">
+            <header className="sticky top-0 bg-white p-6 border-b border-slate-100 flex items-start justify-between gap-4 rounded-t-[2rem]">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">
+                  {apiEmitResult.ok ? 'NFS-e emitida' : 'Nao foi possivel emitir'}
+                </h3>
+                <p className="text-xs font-bold text-slate-400 mt-1">Nota #{apiEmitResult.noteId} - emissao via API (homologacao)</p>
+              </div>
+              <button onClick={() => setApiEmitResult(null)} className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-500 shrink-0">
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </header>
+            <div className="p-6 space-y-4">
+              <div className={`rounded-2xl border p-4 font-bold text-sm ${apiEmitResult.ok ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`}>
+                {apiEmitResult.mensagem}
+              </div>
+              {apiEmitResult.chaveAcesso && (
+                <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chave de acesso</p>
+                  <p className="text-sm font-black text-slate-800 break-all">{apiEmitResult.chaveAcesso}</p>
+                </div>
+              )}
+              {apiEmitResult.erros && apiEmitResult.erros.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Erros retornados pela Sefin Nacional</p>
+                  {apiEmitResult.erros.map((erro, idx) => (
+                    <div key={idx} className="rounded-2xl bg-rose-50 border border-rose-100 p-4 text-sm">
+                      <p className="font-black text-rose-700">{erro.Codigo}</p>
+                      <p className="font-bold text-rose-600 mt-1">{erro.Descricao}</p>
+                      {erro.Complemento && (
+                        <p className="font-bold text-rose-500 mt-1 text-xs">{erro.Complemento}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => setApiEmitResult(null)} className="w-full py-4 rounded-2xl bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest">
+                Fechar
+              </button>
             </div>
           </div>
         </div>
