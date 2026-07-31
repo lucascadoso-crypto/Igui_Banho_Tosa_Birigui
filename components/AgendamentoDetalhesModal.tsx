@@ -668,6 +668,67 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
     }
   };
 
+  const handleSendCobranca = async () => {
+    const clientPhone = appt.pets?.clientes?.telefone?.replace(/\D/g, '');
+    if (!clientPhone) {
+      alert('Cliente sem telefone cadastrado.');
+      return;
+    }
+
+    const clientName = appt.pets?.clientes?.nome || 'Cliente';
+    const petName = appt.pets?.nome || 'seu Pet';
+    const [y, m, d] = appt.data_agendamento.split('-');
+    const dataFormatada = `${d}/${m}`;
+    const valor = (parseFloat(appt.valor_total) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const message = `Oi ${clientName}! 🐾 Passando pra lembrar que o atendimento do(a) ${petName} do dia ${dataFormatada} ainda está em aberto, no valor de R$ ${valor}. Se precisar do link de pagamento ou da chave Pix, me chama que te mando! 💛`;
+
+    setToast({ visivel: true, mensagem: 'Enviando cobrança...', tipo: 'carregando' });
+    setLoadingReminder(true);
+
+    try {
+      const result = await enviarNotificacaoWhatsApp({
+        telefone: clientPhone,
+        mensagem: message,
+        unidadeId: appt.unidade_id,
+        supabaseClient,
+        agendamentoId: appt.id,
+        tipo: 'manual',
+        origem: 'manual',
+        forceDirect: true
+      });
+
+      if (result?.ok) {
+        setToast({ visivel: true, mensagem: 'COBRANÇA ENVIADA', tipo: 'sucesso' });
+
+        registrarAtividade(
+          appt.unidade_id,
+          userProfile?.email || 'sistema',
+          'Cobrança de Agendamento',
+          `Enviou cobrança amigável via WhatsApp para ${clientName} (Pet: ${petName})`,
+          userProfile?.nome,
+          userProfile?.cargo
+        );
+      } else {
+        const detalhe = result?.detalhe ? ` Motivo: ${result.detalhe}` : '';
+        console.error('Falha no WhatsApp ao enviar cobrança:', result?.error, result?.detalhe);
+        setToast({
+          visivel: true,
+          mensagem: `${result?.error || 'Nao foi possivel enviar a mensagem.'}${detalhe}`,
+          tipo: 'erro'
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      setToast({ visivel: true, mensagem: 'Erro inesperado ao enviar.', tipo: 'erro' });
+    } finally {
+      setLoadingReminder(false);
+      setTimeout(() => {
+        setToast(prev => ({ ...prev, visivel: false }));
+      }, 3000);
+    }
+  };
+
   return (
     <div className="app-modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="app-modal-panel bg-white w-[95%] mx-auto md:max-w-4xl md:w-full rounded-[1.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
@@ -1114,6 +1175,17 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
               )}
               {isAppointmentFinished ? 'AVISAR CLIENTE' : 'ENVIAR LEMBRETE'}
             </button>
+
+            {!appt.pacote_id && !appt.pago && (
+              <button
+                onClick={handleSendCobranca}
+                disabled={loadingReminder}
+                className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-3 md:px-8 md:py-3.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-[0.15em] shadow-lg shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center disabled:opacity-50"
+              >
+                <i className="fa-brands fa-whatsapp mr-2 text-sm"></i>
+                COBRAR
+              </button>
+            )}
 
             {canTurnIntoPackage && (
               <button

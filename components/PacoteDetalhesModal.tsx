@@ -225,6 +225,61 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
     }
   };
 
+  const handleSendCobranca = () => {
+    const clientName = pack.clientes?.nome || 'Cliente';
+    const petName = pack.pets?.nome || 'seu pet';
+    const phoneRaw = pack.clientes?.telefone?.replace(/\D/g, '') || '';
+    const phone = phoneRaw.startsWith('55') ? phoneRaw : `55${phoneRaw}`;
+    const valor = (parseFloat(pack.valor_total) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const msg = `Oi ${clientName}! 🐾 Passando por aqui só pra lembrar que o pacote do(a) ${petName} (${concludedCount}/${totalCount} banhos) ainda está em aberto, no valor de R$ ${valor}. Se precisar do link de pagamento ou da chave Pix, me chama que te mando! 💛`;
+
+    if (!phone) {
+      setConfirmacao({ visivel: true, acao: 'erro', mensagem: 'Telefone do cliente não encontrado para enviar o WhatsApp.' });
+      return;
+    }
+
+    (async () => {
+      const result = await enviarNotificacaoWhatsApp({
+        telefone: phone,
+        mensagem: msg,
+        unidadeId: pack.unidade_id,
+        supabaseClient,
+        tipo: 'manual',
+        forceDirect: true,
+        whatsapp_nome_instancia: unit.whatsapp_nome_instancia,
+        whatsapp_token: unit.whatsapp_token,
+        whatsapp_ativo: unit.whatsapp_ativo
+      });
+
+      try {
+        await supabaseClient.from('whatsapp_mensagens').insert([{
+          status: result?.ok ? 'SUCESSO' : 'ERRO',
+          nome_cliente: clientName,
+          nome_pet: petName,
+          telefone: phone,
+          unidade_id: pack.unidade_id,
+          detalhe_erro: result?.ok ? null : result?.error,
+          tipo_agendamento: 'COBRANCA',
+          criado_em: new Date().toISOString()
+        }]);
+      } catch (logErr) {
+        console.error("Erro ao gravar log_whatsapp de cobrança:", logErr);
+      }
+
+      registrarAtividade(
+        unit.id,
+        userProfile?.email || 'sistema',
+        'Cobrança de Pacote',
+        `Pet: ${petName} - Enviou cobrança amigável para pacote ${pack.nome_pacote || pack.id}`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+    })();
+
+    setConfirmacao({ visivel: true, acao: 'info', mensagem: 'Cobrança enviada via WhatsApp!' });
+  };
+
   const handleRegisterPayment = async () => {
     setLoading(true);
 
@@ -687,12 +742,22 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
 
               {/* BOTÃO MANUAL DE RENOVAÇÃO (Se todas concluídas e pacote ainda Ativo) */}
               {concludedCount === totalCount && (pack.status === 'ATIVO' || pack.status === 'Em Execução' || !pack.status) && (
-                <button 
+                <button
                   onClick={handleRenovacaoManual}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4 md:px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase shadow-xl animate-bounce flex items-center space-x-2"
                 >
                   <i className="fa-solid fa-arrows-rotate"></i>
                   <span>Finalizar e Renovar</span>
+                </button>
+              )}
+
+              {!pack.pago && (
+                <button
+                  onClick={handleSendCobranca}
+                  className="bg-amber-500 hover:bg-amber-600 text-white px-4 md:px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-amber-500/20 flex items-center space-x-2"
+                >
+                  <i className="fa-brands fa-whatsapp"></i>
+                  <span>Cobrar</span>
                 </button>
               )}
             </div>

@@ -129,6 +129,60 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
     }
   };
 
+  // Função para enviar cobrança amigável de pacote em aberto
+  const handleSendCobranca = (p: any) => {
+    const clientName = p.clientes?.nome || 'Cliente';
+    const petName = p.pets?.nome || 'seu pet';
+    const phoneRaw = p.clientes?.telefone?.replace(/\D/g, '') || '';
+    const phone = phoneRaw.startsWith('55') ? phoneRaw : `55${phoneRaw}`;
+    const concluidas = getCompletedCount(p);
+    const total = p.qtd_sessoes || 0;
+    const valor = toMoney(p.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const msg = `Oi ${clientName}! 🐾 Passando por aqui só pra lembrar que o pacote do(a) ${petName} (${concluidas}/${total} banhos) ainda está em aberto, no valor de R$ ${valor}. Se precisar do link de pagamento ou da chave Pix, me chama que te mando! 💛`;
+
+    if (!phone) {
+      alert('Telefone do cliente não encontrado para enviar o WhatsApp.');
+      return;
+    }
+
+    (async () => {
+      const result = await enviarNotificacaoWhatsApp({
+        telefone: phone,
+        mensagem: msg,
+        unidadeId: unit.id,
+        supabaseClient,
+        tipo: 'manual'
+      });
+
+      try {
+        await supabaseClient.from('whatsapp_mensagens').insert([{
+          status: result?.ok ? 'SUCESSO' : 'ERRO',
+          nome_cliente: clientName,
+          nome_pet: petName,
+          telefone: phone,
+          unidade_id: unit.id,
+          detalhe_erro: result?.ok ? null : result?.error,
+          tipo_agendamento: 'COBRANCA',
+          criado_em: new Date().toISOString()
+        }]);
+      } catch (logErr) {
+        console.error("Erro ao gravar log_whatsapp de cobrança:", logErr);
+      }
+
+      registrarAtividade(
+        unit.id,
+        userProfile?.email || 'sistema',
+        'Cobrança de Pacote',
+        `Pet: ${petName} - Enviou cobrança amigável para pacote ${p.nome_pacote || p.id}`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+    })();
+
+    console.log("Cobrança enviada via API em background");
+  };
+
   // Função Real de Cancelamento/Exclusão em Cascata
   const confirmCancelPackage = async () => {
     if (!pacoteParaCancelar) return;
@@ -624,6 +678,9 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
               <div className="px-4 md:px-5 py-4 bg-slate-50/70 border-t border-slate-100 flex items-center gap-2">
                 <button onClick={() => openDetails(p)} className="flex-1 py-3 rounded-xl bg-[#00897B] text-white text-[11px] font-black shadow-lg shadow-teal-500/20 hover:bg-[#00796f] transition-all">Ver detalhes</button>
                 <button onClick={() => handleSendPackageReminder(p)} title="WhatsApp" className="w-11 h-11 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-emerald-500 hover:border-emerald-100 transition-all"><i className="fa-brands fa-whatsapp"></i></button>
+                {payment !== 'Pago' && (
+                  <button onClick={() => handleSendCobranca(p)} title="Cobrar via WhatsApp" className="w-11 h-11 rounded-xl bg-white border border-amber-100 text-amber-500 hover:text-amber-600 hover:bg-amber-50 transition-all"><i className="fa-solid fa-hand-holding-dollar"></i></button>
+                )}
                 <button onClick={() => openDetails(p)} title="Agendar / sessões" className="w-11 h-11 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-teal-600 hover:border-teal-100 transition-all"><i className="fa-regular fa-calendar"></i></button>
                 {!isReadOnly && (
                   <button onClick={() => setPacoteParaCancelar(p)} title="Cancelar pacote" className="w-11 h-11 rounded-xl bg-white border border-slate-100 text-slate-500 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all"><i className="fa-solid fa-trash-can"></i></button>
