@@ -3,6 +3,7 @@ export interface AppointmentTotalsInput {
   extraItemValues: number[];
   valorTransporte: number;
   valorDesconto: number;
+  valorAcrescimo: number;
   isPacote: boolean;
   valorTotalSalvo: number;
   valorServicosSalvo: number;
@@ -13,6 +14,7 @@ export interface AppointmentTotalsResult {
   totalExtra: number;
   valorTransporte: number;
   valorDesconto: number;
+  valorAcrescimo: number;
   totalGeral: number;
 }
 
@@ -22,6 +24,7 @@ export function calculateAppointmentTotals(input: AppointmentTotalsInput): Appoi
     extraItemValues,
     valorTransporte,
     valorDesconto,
+    valorAcrescimo,
     isPacote,
     valorTotalSalvo,
     valorServicosSalvo
@@ -34,8 +37,8 @@ export function calculateAppointmentTotals(input: AppointmentTotalsInput): Appoi
   const valorServicosSalvoNum = Number(valorServicosSalvo || 0);
 
   const valorServicosDireto = valorServicosSalvoNum > 0 ? valorServicosSalvoNum : totalMainItems;
-  const totalDireto = valorServicosDireto + valorTransporte + totalExtra - valorDesconto;
-  const valorServicosCalculado = Math.max(0, totalBaseAgendamento - valorTransporte - totalExtra + valorDesconto);
+  const totalDireto = valorServicosDireto + valorTransporte + totalExtra - valorDesconto + valorAcrescimo;
+  const valorServicosCalculado = Math.max(0, totalBaseAgendamento - valorTransporte - totalExtra + valorDesconto - valorAcrescimo);
   const deveUsarFallbackDoTotal = totalBaseAgendamento > 0 && (valorServicosDireto <= 0 || Math.abs(totalDireto - totalBaseAgendamento) > 0.01);
 
   const valorServicos = isPacote
@@ -44,13 +47,14 @@ export function calculateAppointmentTotals(input: AppointmentTotalsInput): Appoi
 
   const totalGeral = isPacote
     ? totalBaseAgendamento
-    : Math.max(0, valorServicos + valorTransporte + totalExtra - valorDesconto);
+    : Math.max(0, valorServicos + valorTransporte + totalExtra - valorDesconto + valorAcrescimo);
 
   return {
     valorServicos,
     totalExtra,
     valorTransporte,
     valorDesconto,
+    valorAcrescimo,
     totalGeral
   };
 }

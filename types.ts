@@ -162,8 +162,10 @@ export interface Appointment {
   data_agendamento: string; 
   horario_inicio: string; 
   horario_fim?: string;
-  valor_total: number; 
+  valor_total: number;
   valor_transporte?: number;
+  valor_desconto?: number;
+  valor_acrescimo?: number;
   tem_taxi?: boolean;
   status: string; 
   pago?: boolean;
