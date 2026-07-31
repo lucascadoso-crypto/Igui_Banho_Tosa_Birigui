@@ -31,6 +31,9 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   const [services, setServices] = useState<Service[]>([]);
   const [viewingAppt, setViewingAppt] = useState<any>(null);
   const [activeCardMenuId, setActiveCardMenuId] = useState<number | string | null>(null);
+  const [notaEditId, setNotaEditId] = useState<number | string | null>(null);
+  const [notaText, setNotaText] = useState('');
+  const [savingNota, setSavingNota] = useState(false);
   const [expandedObservationId, setExpandedObservationId] = useState<string | null>(null);
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
   const [showTaxiRouteMenu, setShowTaxiRouteMenu] = useState(false);
@@ -323,7 +326,10 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   }, [unit.id, selectedDate]);
 
   useEffect(() => {
-    const handleClickOutside = () => setActiveCardMenuId(null);
+    const handleClickOutside = () => {
+      setActiveCardMenuId(null);
+      setNotaEditId(null);
+    };
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
@@ -1343,6 +1349,38 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
     });
   };
 
+  const openNotaEditor = (appt: any) => {
+    setNotaEditId(appt.id);
+    setNotaText(appt.nota_interna || '');
+  };
+
+  const closeNotaEditor = () => {
+    setNotaEditId(null);
+    setNotaText('');
+  };
+
+  const saveNotaInterna = async (appt: any) => {
+    setSavingNota(true);
+    try {
+      const valor = notaText.trim() || null;
+      const { error } = await supabaseClient
+        .from('agendamentos')
+        .update({ nota_interna: valor })
+        .eq('id', appt.id);
+
+      if (error) throw error;
+
+      setAppointments(prev => prev.map(a => (a.id === appt.id ? { ...a, nota_interna: valor } : a)));
+      showToast('Nota salva!', 'sucesso');
+      closeNotaEditor();
+    } catch (err: any) {
+      console.error('Erro ao salvar nota interna:', err);
+      showToast(`Falha ao salvar nota: ${err?.message || 'erro desconhecido.'}`, 'erro');
+    } finally {
+      setSavingNota(false);
+    }
+  };
+
   const generateCalendarDays = () => {
     const year = viewMonth.getFullYear();
     const month = viewMonth.getMonth();
@@ -1871,7 +1909,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                     const routeAddress = hasTransport ? buildMapsDestination(appt) : '';
 
                     return (
-                     <div key={appt.id} className={`relative h-full ${activeCardMenuId === appt.id ? 'z-[100]' : 'z-10'}`}>
+                     <div key={appt.id} className={`relative h-full ${(activeCardMenuId === appt.id || notaEditId === appt.id) ? 'z-[100]' : 'z-10'}`}>
                        <div className="h-full rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.11),0_4px_10px_rgba(15,23,42,0.05)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.14),0_6px_14px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative isolate z-10 p-6 group">
 
                        {/* Faixa de status no canto (recorte isolado nesta caixinha, não no card inteiro,
@@ -2092,6 +2130,39 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                >
                                   <i className="fa-solid fa-pen-to-square"></i>
                                </button>
+                            )}
+                            <button
+                               onClick={(e) => { e.stopPropagation(); openNotaEditor(appt); }}
+                               title={appt.nota_interna ? 'Editar nota deste banho' : 'Adicionar nota deste banho'}
+                               className={`w-10 h-10 shrink-0 rounded-xl border transition-all flex items-center justify-center ${
+                                  appt.nota_interna
+                                     ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20'
+                                     : 'bg-white border-slate-100 text-slate-500 hover:text-amber-600 hover:border-amber-100'
+                               }`}
+                            >
+                               <i className="fa-solid fa-note-sticky"></i>
+                            </button>
+                            {notaEditId === appt.id && (
+                               <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[9999] p-4 animate-in fade-in zoom-in duration-200 ring-1 ring-black/5" onClick={(e) => e.stopPropagation()}>
+                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Nota deste banho</p>
+                                  <textarea
+                                     value={notaText}
+                                     onChange={(e) => setNotaText(e.target.value)}
+                                     rows={3}
+                                     placeholder="Ex: pet estava agitado, tosa demorou mais que o normal..."
+                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                                  />
+                                  <div className="flex items-center justify-end gap-2 mt-3">
+                                     <button onClick={closeNotaEditor} className="px-3 py-2 rounded-xl text-[11px] font-black uppercase text-slate-500 hover:bg-slate-50 transition-all">Cancelar</button>
+                                     <button
+                                        onClick={() => saveNotaInterna(appt)}
+                                        disabled={savingNota}
+                                        className="px-4 py-2 rounded-xl text-[11px] font-black uppercase bg-amber-500 text-white hover:bg-amber-600 transition-all disabled:opacity-50"
+                                     >
+                                        {savingNota ? 'Salvando...' : 'Salvar'}
+                                     </button>
+                                  </div>
+                               </div>
                             )}
                             <button
                                onClick={(e) => {
