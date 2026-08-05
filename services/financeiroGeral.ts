@@ -42,18 +42,12 @@ const rpcParams = (filtros: FinanceiroFiltros) => ({
 });
 
 export interface FinanceiroKpis {
-  faturamentoAtual: number;
-  faturamentoAnterior: number;
   recebidoAtual: number;
   recebidoAnterior: number;
-  aReceberPeriodo: number;
   custosAtual: number;
   custosAnterior: number;
   lucroAtual: number;
   lucroAnterior: number;
-  inadimplenciaPct: number;
-  vencidoTotal: number;
-  vencidoCount: number;
 }
 
 export const fetchFinanceiroKpis = async (supabaseClient: any, filtros: FinanceiroFiltros): Promise<FinanceiroKpis> => {
@@ -65,18 +59,12 @@ export const fetchFinanceiroKpis = async (supabaseClient: any, filtros: Financei
   });
   if (error) throw error;
   return {
-    faturamentoAtual: toCurrencyNumber(data?.faturamento_atual),
-    faturamentoAnterior: toCurrencyNumber(data?.faturamento_anterior),
     recebidoAtual: toCurrencyNumber(data?.recebido_atual),
     recebidoAnterior: toCurrencyNumber(data?.recebido_anterior),
-    aReceberPeriodo: toCurrencyNumber(data?.a_receber_periodo),
     custosAtual: toCurrencyNumber(data?.custos_atual),
     custosAnterior: toCurrencyNumber(data?.custos_anterior),
     lucroAtual: toCurrencyNumber(data?.lucro_atual),
-    lucroAnterior: toCurrencyNumber(data?.lucro_anterior),
-    inadimplenciaPct: toCurrencyNumber(data?.inadimplencia_pct),
-    vencidoTotal: toCurrencyNumber(data?.vencido_total),
-    vencidoCount: toCurrencyNumber(data?.vencido_count)
+    lucroAnterior: toCurrencyNumber(data?.lucro_anterior)
   };
 };
 
@@ -133,35 +121,4 @@ export const fetchFidelidade = async (supabaseClient: any, filtros: FinanceiroFi
     avulsosValor: toCurrencyNumber(data?.avulsos_valor),
     avulsosAtendimentos: toCurrencyNumber(data?.avulsos_atendimentos)
   };
-};
-
-export interface ContaPendente {
-  origem: 'avulso' | 'pacote' | 'adicional';
-  referenciaId: number;
-  clienteNome: string;
-  descricao: string;
-  vencimento: string;
-  valor: number;
-  vencido: boolean;
-}
-
-export const fetchContasPendentes = async (
-  supabaseClient: any,
-  filtros: FinanceiroFiltros,
-  limite = 200
-): Promise<ContaPendente[]> => {
-  const { data, error } = await supabaseClient.rpc('fn_financeiro_contas_pendentes_lista', {
-    ...rpcParams(filtros),
-    p_limite: limite
-  });
-  if (error) throw error;
-  return (data || []).map((row: any) => ({
-    origem: row.origem,
-    referenciaId: row.referencia_id,
-    clienteNome: row.cliente_nome,
-    descricao: row.descricao,
-    vencimento: row.vencimento,
-    valor: toCurrencyNumber(row.valor),
-    vencido: Boolean(row.vencido)
-  }));
 };

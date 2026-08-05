@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Unit } from '../types';
-import { formatCurrencyBR, formatDecimalBR } from '../services/appointmentTotals';
+import { formatCurrencyBR } from '../services/appointmentTotals';
 import {
   FinanceiroFiltros,
   FinanceiroKpis,
@@ -8,15 +8,13 @@ import {
   LinhaServicoValor,
   FormaPagamentoValor,
   Fidelidade,
-  ContaPendente,
   getFiltrosDefault,
   calcularVariacao,
   fetchFinanceiroKpis,
   fetchFluxoDiario,
   fetchFaturamentoPorLinha,
   fetchFormasPagamentoFinanceiro,
-  fetchFidelidade,
-  fetchContasPendentes
+  fetchFidelidade
 } from '../services/financeiroGeral';
 import FinanceStatusBar from './FinanceiroGeral/FinanceStatusBar';
 import FinanceiroFiltersCard from './FinanceiroGeral/FinanceiroFiltersCard';
@@ -24,8 +22,6 @@ import FinanceKpiCard from './FinanceiroGeral/FinanceKpiCard';
 import CashFlowLineChart from './FinanceiroGeral/CashFlowLineChart';
 import ServiceTypeBarChart from './FinanceiroGeral/ServiceTypeBarChart';
 import FidelidadeCard from './FinanceiroGeral/FidelidadeCard';
-import ContasReceberCard from './FinanceiroGeral/ContasReceberCard';
-import ContasReceberModal from './FinanceiroGeral/ContasReceberModal';
 import CardSkeleton from './Dashboard/CardSkeleton';
 import SectionTitle from './Dashboard/SectionTitle';
 import SimpleDonut from './Dashboard/SimpleDonut';
@@ -53,7 +49,6 @@ const trendFrom = (atual: number, anterior: number) => ({
 const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClient }) => {
   const [filtros, setFiltros] = useState<FinanceiroFiltros>(() => getFiltrosDefault(units.length === 1 ? units[0].id : null));
   const [syncing, setSyncing] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
 
   const [kpis, setKpis] = useState<FinanceiroKpis | null>(null);
   const [kpisLoading, setKpisLoading] = useState(true);
@@ -70,9 +65,6 @@ const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClie
 
   const [fidelidade, setFidelidade] = useState<Fidelidade | null>(null);
   const [fidelidadeLoading, setFidelidadeLoading] = useState(true);
-
-  const [contasPendentes, setContasPendentes] = useState<ContaPendente[]>([]);
-  const [contasPendentesLoading, setContasPendentesLoading] = useState(true);
 
   const carregarTudo = useCallback(() => {
     setKpisLoading(true);
@@ -105,12 +97,6 @@ const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClie
       .then(setFidelidade)
       .catch((err) => console.error('Erro ao carregar fidelidade pacotes x avulsos:', err))
       .finally(() => setFidelidadeLoading(false));
-
-    setContasPendentesLoading(true);
-    fetchContasPendentes(supabaseClient, filtros)
-      .then(setContasPendentes)
-      .catch((err) => console.error('Erro ao carregar contas a receber:', err))
-      .finally(() => setContasPendentesLoading(false));
   }, [supabaseClient, filtros]);
 
   useEffect(() => {
@@ -135,31 +121,16 @@ const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClie
         </div>
       )}
 
-      {/* Linha: 6 KPIs */}
+      {/* Linha: KPIs (somente valores já recebidos) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
         <FinanceKpiCard
           label="Faturamento"
-          value={formatCurrencyBR(kpis?.faturamentoAtual ?? 0)}
-          icon="fa-sack-dollar"
-          barColor="purple"
-          loading={kpisLoading}
-          trend={kpis ? trendFrom(kpis.faturamentoAtual, kpis.faturamentoAnterior) : undefined}
-        />
-        <FinanceKpiCard
-          label="Recebido"
           value={formatCurrencyBR(kpis?.recebidoAtual ?? 0)}
+          subtext="Valores já recebidos"
           icon="fa-hand-holding-dollar"
           barColor="green"
           loading={kpisLoading}
           trend={kpis ? trendFrom(kpis.recebidoAtual, kpis.recebidoAnterior) : undefined}
-        />
-        <FinanceKpiCard
-          label="A Receber"
-          value={formatCurrencyBR(kpis?.aReceberPeriodo ?? 0)}
-          subtext="Previsão de entrada"
-          icon="fa-hourglass-half"
-          barColor="orange"
-          loading={kpisLoading}
         />
         <FinanceKpiCard
           label="Custos"
@@ -179,16 +150,6 @@ const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClie
           valueTone="green"
           loading={kpisLoading}
           trend={kpis ? trendFrom(kpis.lucroAtual, kpis.lucroAnterior) : undefined}
-        />
-        <FinanceKpiCard
-          label="Inadimplência"
-          value={`${formatDecimalBR(kpis?.inadimplenciaPct ?? 0)}%`}
-          subtext={`${formatCurrencyBR(kpis?.vencidoTotal ?? 0)} em aberto`}
-          subtextTone="red"
-          icon="fa-triangle-exclamation"
-          barColor="red"
-          valueTone="red"
-          loading={kpisLoading}
         />
       </div>
 
@@ -231,19 +192,6 @@ const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClie
         </div>
       </div>
 
-      {/* Linha: Contas a Receber */}
-      <ContasReceberCard
-        items={contasPendentes}
-        loading={contasPendentesLoading}
-        onVerTodas={() => setModalOpen(true)}
-      />
-
-      <ContasReceberModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        items={contasPendentes}
-        loading={contasPendentesLoading}
-      />
     </div>
   );
 };
