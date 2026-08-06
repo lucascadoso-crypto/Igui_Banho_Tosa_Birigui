@@ -89,7 +89,7 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
     let msg = "";
     if (nextSess) {
       const hora = String(nextSess.horario_inicio || '').substring(0, 5);
-      msg = `Olá ${clientName}! 🐾 Passando para confirmar o banho do(a) ${petName} amanhã às ${hora}. Confirmado?`;
+      msg = `Olá ${clientName}! 🐾 Passando para confirmar o banho do(a) ${petName} no dia ${formatDateBR(nextSess.data_agendamento)} às ${hora}. Confirmado?`;
     } else {
       msg = `Olá ${clientName}! O pacote do ${petName} está concluído ou não tem agendamentos futuros. Vamos renovar? 🐾`;
     }

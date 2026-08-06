@@ -1258,7 +1258,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       it.servicos?.nome?.toLowerCase().includes('taxi')
     );
 
-    const message = `Olá! 🐾 Passando para confirmar o banho do(a) ${petName} amanhã às ${horaFormatada}. Confirmado?`;
+    const message = `Olá! 🐾 Passando para confirmar o banho do(a) ${petName} no dia ${dataFormatada} às ${horaFormatada}. Confirmado?`;
 
     showToast('Enviando lembrete...', 'info');
     

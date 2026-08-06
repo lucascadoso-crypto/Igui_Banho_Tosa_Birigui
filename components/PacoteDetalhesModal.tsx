@@ -184,7 +184,7 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
     const phoneRaw = pack.clientes?.telefone?.replace(/\D/g, '') || '';
     const phone = phoneRaw.startsWith('55') ? phoneRaw : `55${phoneRaw}`;
 
-    const msg = `Olá ${clientName}! 🐾 Passando para confirmar o banho do(a) ${petName} amanhã às ${hora}. Confirmado?`;
+    const msg = `Olá ${clientName}! 🐾 Passando para confirmar o banho do(a) ${petName} no dia ${formatDateBR(s.data_agendamento)} às ${hora}. Confirmado?`;
     
     if (phone) {
       // Envio assíncrono com registro de log

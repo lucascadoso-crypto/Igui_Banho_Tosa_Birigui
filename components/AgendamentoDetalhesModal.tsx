@@ -620,7 +620,7 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
       it.servicos?.nome?.toLowerCase().includes('taxi')
     );
 
-    const message = `Olá! 🐾 Passando para confirmar o banho do(a) ${petName} amanhã às ${horaFormatada}. Confirmado?`;
+    const message = `Olá! 🐾 Passando para confirmar o banho do(a) ${petName} no dia ${dataFormatada} às ${horaFormatada}. Confirmado?`;
 
     setToast({ visivel: true, mensagem: 'Enviando lembrete...', tipo: 'carregando' });
     setLoadingReminder(true);
