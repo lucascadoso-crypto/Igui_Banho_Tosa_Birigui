@@ -11,6 +11,7 @@ import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import { calculateAppointmentTotals } from '../services/pricing';
 import { registrarPagamentoPacote, garantirFinanceiroMovimento } from '../services/pacotePayments';
 import { compareNomePtBr } from '../services/sorting';
+import { getIntervaloDias, getDiaSemanaPreferido, proximaDataSessao } from '../services/pacoteScheduling';
 
 interface AppointmentsProps {
   unit: Unit;
@@ -923,9 +924,10 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
     const lastSession = sessionData[sessionData.length - 1];
 
-    // Intervalo derivado da frequência do pacote (4 sessões = semanal, 2 sessões = quinzenal).
-    // Não usar a distância observada entre a 1ª e a 2ª sessão: remarcações manuais corrompem esse cálculo.
-    const intervalDays = pacoteAtual.qtd_sessoes === 4 ? 7 : pacoteAtual.qtd_sessoes === 2 ? 14 : 7;
+    // Intervalo e dia da semana fixados na criação do pacote (fallback pela 1ª sessão
+    // para pacotes antigos que ainda não têm esses campos preenchidos).
+    const intervalDays = getIntervaloDias(pacoteAtual);
+    const diaSemanaPreferido = getDiaSemanaPreferido(pacoteAtual, sessionData);
 
     // 3. Clonar Pacote
     const newCiclo = (Number(pacoteAtual.ciclo_renovacao) || 1) + 1;
@@ -943,7 +945,9 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       renovacao_automatica: true,
       status: 'ATIVO',
       pacote_anterior_id: pacoteAtual.id,
-      ciclo_renovacao: newCiclo
+      ciclo_renovacao: newCiclo,
+      intervalo_dias: intervalDays,
+      dia_semana_preferido: diaSemanaPreferido
     };
 
     const { data: newPack, error: pErr } = await supabaseClient
@@ -953,14 +957,15 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
     if (pErr) throw pErr;
 
-    // 4. Gerar novos agendamentos baseado no intervalo
+    // 4. Gerar novos agendamentos — sempre realinhados ao dia da semana original do
+    // pacote, mesmo que a última sessão tenha sido remarcada manualmente.
     const newApptsPayload = [];
-    let nextDate = new Date(lastSession.data_agendamento + 'T12:00:00');
-    
+    let cursorDate = lastSession.data_agendamento;
+
     for (let i = 1; i <= pacoteAtual.qtd_sessoes; i++) {
-        nextDate.setDate(nextDate.getDate() + intervalDays);
-        const dateStr = nextDate.toISOString().split('T')[0];
-        
+        cursorDate = proximaDataSessao(cursorDate, intervalDays, diaSemanaPreferido);
+        const dateStr = cursorDate;
+
         newApptsPayload.push({
             pet_id: pacoteAtual.pet_id,
             cliente_id: clientId,

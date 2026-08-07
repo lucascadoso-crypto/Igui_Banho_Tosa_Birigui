@@ -4,6 +4,7 @@ import { Pet, Client, Service, Unit, UserProfile } from '../types';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 import { registrarAtividade } from '../services/logger';
 import { registrarPagamentoPacote } from '../services/pacotePayments';
+import { getIntervaloDias, getDiaSemanaPreferido, proximaDataSessao, NOMES_DIA_SEMANA } from '../services/pacoteScheduling';
 import NotaFiscalBadge from './NotaFiscalBadge';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -323,19 +324,39 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
     }
   };
 
-  const handleUpdateSessionDate = async (sessionId: number | string, newDate: string) => {
+  const salvarNovaDataSessao = async (sessionId: number | string, newDate: string) => {
     try {
       const { error } = await supabaseClient
         .from('agendamentos')
         .update({ data_agendamento: newDate })
         .eq('id', sessionId);
-      
+
       if (error) throw error;
       fetchSessionDetails();
       onRefresh();
     } catch (err) {
       setConfirmacao({ visivel: true, acao: 'erro', mensagem: 'Erro ao atualizar data da sessão.' });
     }
+  };
+
+  const handleUpdateSessionDate = (sessionId: number | string, newDate: string) => {
+    // Aviso (não bloqueio): remarcar uma sessão para outro dia da semana desalinha
+    // o padrão do pacote — as próximas renovações vão herdar esse novo dia.
+    const diaSemanaPreferido = getDiaSemanaPreferido(pack, sessions);
+    const novoDiaSemana = new Date(`${newDate}T12:00:00`).getDay();
+    if (diaSemanaPreferido !== null && novoDiaSemana !== diaSemanaPreferido) {
+      setConfirmacao({
+        visivel: true,
+        acao: 'cancelar',
+        mensagem: `Esse pacote é sempre em ${NOMES_DIA_SEMANA[diaSemanaPreferido]}. A nova data cai em ${NOMES_DIA_SEMANA[novoDiaSemana]} e as próximas renovações vão passar a seguir esse novo dia. Deseja continuar mesmo assim?`,
+        callback: () => {
+          salvarNovaDataSessao(sessionId, newDate);
+          setConfirmacao({ visivel: false, acao: null, mensagem: '' });
+        }
+      });
+      return;
+    }
+    salvarNovaDataSessao(sessionId, newDate);
   };
 
   const triggerCancelPack = () => {
@@ -382,9 +403,10 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
       
       if (updateErr) throw updateErr;
 
-      // 3. Intervalo derivado da frequência do pacote (4 sessões = semanal, 2 sessões = quinzenal).
-      // Não usar a distância observada entre a 1ª e a 2ª sessão: remarcações manuais corrompem esse cálculo.
-      const intervalDays = pack.qtd_sessoes === 4 ? 7 : pack.qtd_sessoes === 2 ? 14 : 7;
+      // 3. Intervalo e dia da semana fixados na criação do pacote (fallback pela 1ª sessão
+      // para pacotes antigos que ainda não têm esses campos preenchidos).
+      const intervalDays = getIntervaloDias(pack);
+      const diaSemanaPreferido = getDiaSemanaPreferido(pack, sessions);
 
       const lastSession = sessions[sessions.length - 1];
       const newCiclo = (Number(pack.ciclo_renovacao) || 1) + 1;
@@ -404,7 +426,9 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
         renovacao_automatica: true,
         status: 'ATIVO',
         pacote_anterior_id: pack.id,
-        ciclo_renovacao: newCiclo
+        ciclo_renovacao: newCiclo,
+        intervalo_dias: intervalDays,
+        dia_semana_preferido: diaSemanaPreferido
       };
 
       const { data: newPack, error: pErr } = await supabaseClient
@@ -414,14 +438,15 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
 
       if (pErr) throw pErr;
 
-      // 5. Gerar as novas sessões
+      // 5. Gerar as novas sessões — sempre realinhadas ao dia da semana original do
+      // pacote, mesmo que a última sessão tenha sido remarcada manualmente.
       const newApptsPayload = [];
-      let nextDate = new Date(lastSession.data_agendamento + 'T12:00:00');
-      
+      let cursorDate = lastSession.data_agendamento;
+
       for (let i = 1; i <= pack.qtd_sessoes; i++) {
-        nextDate.setDate(nextDate.getDate() + intervalDays);
-        const dateStr = nextDate.toISOString().split('T')[0];
-        
+        cursorDate = proximaDataSessao(cursorDate, intervalDays, diaSemanaPreferido);
+        const dateStr = cursorDate;
+
         newApptsPayload.push({
           pet_id: pack.pet_id,
           cliente_id: clientId, // Adicionado cliente_id para redundância segura

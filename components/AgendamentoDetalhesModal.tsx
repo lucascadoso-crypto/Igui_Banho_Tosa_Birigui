@@ -170,7 +170,9 @@ const AgendamentoDetalhesModal: React.FC<AgendamentoDetalhesModalProps> = ({
         status: 'ATIVO',
         pago: shouldUseCredit,
         forma_pagamento: shouldUseCredit ? (appt.forma_pagamento || 'Crédito de agendamento') : null,
-        data_pagamento: shouldUseCredit ? new Date().toISOString().split('T')[0] : null
+        data_pagamento: shouldUseCredit ? new Date().toISOString().split('T')[0] : null,
+        intervalo_dias: packageIntervalDays,
+        dia_semana_preferido: new Date(`${appt.data_agendamento}T12:00:00`).getDay()
       };
 
       const { data: pack, error: packError } = await supabaseClient

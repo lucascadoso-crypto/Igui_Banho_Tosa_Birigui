@@ -232,6 +232,12 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
       const nomeAutomatico = `Pacote ${freqText} - ${petName}`;
       const valorPacoteComDesconto = Math.max(0, packageTotalValue - valorDesconto);
 
+      // Intervalo e dia da semana são fixados aqui e não devem ser re-adivinhados depois:
+      // é o que trava a recorrência do pacote (ex.: sempre sexta-feira) nas renovações futuras.
+      const stepDias = interval === 'Weekly' ? 7 : 14;
+      const primeiraData = generatedDates[0] || startDate;
+      const diaSemanaPreferido = new Date(primeiraData + 'T12:00:00').getDay();
+
       if (editingPackageId) {
         // Lógica de UPDATE
         const finalTotal = valorPacoteComDesconto + (isPetTaxi ? valorTransportePacote : 0);
@@ -247,7 +253,9 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
             qtd_sessoes: sessionCount,
             valor_total: finalTotal,
             valor_transporte: taxiVal,
-            valor_desconto: valorDesconto
+            valor_desconto: valorDesconto,
+            intervalo_dias: stepDias,
+            dia_semana_preferido: diaSemanaPreferido
           })
           .eq('id', editingPackageId);
 
@@ -403,7 +411,9 @@ const PacoteFormModal: React.FC<PacoteFormModalProps> = ({ unit, supabaseClient,
             valor_desconto: valorDesconto,
             catalogo_pacote_id: selectedCatalogId || null,
             ativo: true,
-            renovacao_automatica: true
+            renovacao_automatica: true,
+            intervalo_dias: stepDias,
+            dia_semana_preferido: diaSemanaPreferido
           }])
           .select().single();
 
