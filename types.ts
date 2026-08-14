@@ -64,7 +64,7 @@ export interface Package {
   ciclo_renovacao?: number;
 }
 
-export type SubView = 'Agendamento' | 'Clientes' | 'Pacotes' | 'Financeiro' | 'Gastos' | 'Auditoria';
+export type SubView = 'Agendamento' | 'Clientes' | 'Pacotes' | 'Financeiro' | 'Gastos' | 'Auditoria' | 'Marketing';
 export type GlobalView = 'Dashboard' | 'Financeiro Geral' | 'Rentabilidade' | 'Configurações' | 'Equipe' | 'Meu Perfil';
 
 export interface NavigationState {

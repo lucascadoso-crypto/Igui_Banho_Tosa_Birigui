@@ -21,6 +21,7 @@ import ReciboView from './components/ReciboView';
 import Login from './components/Login';
 import Perfil from './components/Perfil';
 import Auditoria from './components/Auditoria';
+import MarketingFidelizacao from './components/MarketingFidelizacao';
 import CadastroPublico from './components/CadastroPublico';
 import TermosServico from './components/TermosServico';
 
@@ -110,6 +111,8 @@ const AppContent: React.FC = () => {
         return activeUnit ? <Gastos unit={activeUnit} units={units} supabaseClient={supabase} userProfile={effectiveUserProfile} /> : <div>Selecione uma unidade</div>;
       case 'Auditoria':
         return activeUnit ? <Auditoria unit={activeUnit} supabaseClient={supabase} userProfile={effectiveUserProfile} /> : <div>Selecione uma unidade</div>;
+      case 'Marketing':
+        return activeUnit ? <MarketingFidelizacao unit={activeUnit} supabaseClient={supabase} userProfile={effectiveUserProfile} /> : <div>Selecione uma unidade</div>;
       default:
         return <div className="text-center py-20 font-bold text-slate-400 uppercase">Modulo Indisponivel</div>;
     }

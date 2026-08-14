@@ -105,7 +105,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
     { label: 'Pacotes', roles: ['master', 'financeiro', 'administrador', 'gerente', 'comum'] },
     { label: 'Financeiro', roles: ['master', 'financeiro', 'administrador', 'gerente', 'comum'] },
     { label: 'Gastos', roles: ['master', 'financeiro', 'administrador', 'gerente', 'comum'] },
-    { label: 'Auditoria', roles: ['master', 'financeiro'] }
+    { label: 'Auditoria', roles: ['master', 'financeiro'] },
+    { label: 'Marketing', roles: ['master', 'admin_unidade', 'gerente'] }
   ];
 
   const filteredGlobalMenus = globalMenus.filter(menu => menu.roles.includes(userRole));
@@ -147,6 +148,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
       case 'Financeiro': return 'fa-dollar-sign';
       case 'Gastos': return 'fa-chart-column';
       case 'Auditoria': return 'fa-shield-halved';
+      case 'Marketing': return 'fa-bullhorn';
       default: return 'fa-circle';
     }
   };
@@ -159,6 +161,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
       case 'Financeiro': return 'text-violet-600 bg-violet-50';
       case 'Gastos': return 'text-amber-600 bg-amber-50';
       case 'Auditoria': return 'text-sky-600 bg-sky-50';
+      case 'Marketing': return 'text-pink-600 bg-pink-50';
       default: return 'text-slate-500 bg-slate-100';
     }
   };
