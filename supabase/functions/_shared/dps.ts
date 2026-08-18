@@ -152,8 +152,8 @@ export function montarDpsXml(input: DpsInput): DpsMontada {
     const cpf = apenasDigitos(input.tomador.cpf);
     // Erro real de schema (E1235): sem CNPJ/CPF/NIF, o elemento cNaoNIF e
     // obrigatorio antes de xNome (o choice nao pode simplesmente ser
-    // omitido). cNaoNIF=2 = "Outros" (cliente sem identificacao fiscal
-    // informada, ex.: dispensa por valor baixo).
+    // omitido). cNaoNIF=2 = "Outros" - usado sempre que o cliente nao tem
+    // CPF cadastrado, sem limite de valor (nao ha exigencia legal disso).
     toma =
       `<toma>` +
       (cpf ? `<CPF>${cpf.padStart(11, "0").slice(-11)}</CPF>` : `<cNaoNIF>2</cNaoNIF>`) +

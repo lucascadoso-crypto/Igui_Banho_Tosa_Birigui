@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Unit, UserProfile } from '../types';
-import { avaliarChecklistFiscal, montarLinkCadastroWhatsapp, LIMITE_VALOR_SEM_DADOS_CLIENTE } from '../services/fiscalValidation';
+import { avaliarChecklistFiscal } from '../services/fiscalValidation';
 
 interface FiscalDraftModalProps {
   supabaseClient: any;
@@ -211,11 +211,6 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
     valorFiscal: serviceValue
   }), [configFiscal, taxItems, client, serviceValue]);
 
-  const handleEnviarLinkCadastro = () => {
-    const { whatsappUrl } = montarLinkCadastroWhatsapp(unit.id, client?.telefone, client?.nome);
-    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-  };
-
   const createDraft = async () => {
     if (!sourceData || !checklist.podeEmitir) return;
     setSaving(true);
@@ -325,22 +320,14 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
                 <ul className="text-xs font-bold text-rose-600 list-disc list-inside space-y-1">
                   {checklist.pendencias.map(pendencia => <li key={pendencia}>{pendencia}</li>)}
                 </ul>
-                {(!checklist.clienteCpfOk || !checklist.clienteEnderecoOk) && (
-                  <button
-                    onClick={handleEnviarLinkCadastro}
-                    className="px-5 py-3 rounded-2xl bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center gap-2"
-                  >
-                    <i className="fa-brands fa-whatsapp"></i> Enviar link de cadastro para o cliente
-                  </button>
-                )}
               </div>
             ) : (
               <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4 text-sm font-bold text-amber-800">
                 Rascunho fiscal criado. A emissao oficial ainda nao esta configurada.
-                {checklist.dadosClienteDispensados && (
+                {!client?.cpf && (
                   <p className="mt-2 text-xs font-bold text-amber-700">
                     <i className="fa-solid fa-circle-info mr-1"></i>
-                    Valor ate R$ {LIMITE_VALOR_SEM_DADOS_CLIENTE.toFixed(2)} - CPF e endereco do cliente dispensados.
+                    Cliente sem CPF cadastrado - a nota sera emitida mesmo assim, sem identificacao do tomador.
                   </p>
                 )}
               </div>

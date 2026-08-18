@@ -1,10 +1,15 @@
 // Checklist minimo antes de qualquer rascunho/emissao de NFS-e: dados da
-// empresa preenchidos, servico com configuracao fiscal ativa e cliente com
-// CPF + endereco validos (exigencia da nota fiscal de servico) - exceto
-// quando o valor fiscal e ate R$100, caso em que o Sistema Nacional NFS-e
-// nao exige identificacao do tomador (toma e opcional no leiaute da DPS).
-
-export const LIMITE_VALOR_SEM_DADOS_CLIENTE = 100;
+// empresa preenchidos e servico com configuracao fiscal ativa.
+//
+// CPF e endereco do tomador sao sempre opcionais, independente do valor da
+// nota: nenhum dos dois e exigido pelo leiaute da DPS para emissao via API
+// (toma e toma/end sao opcionais no XSD oficial; sem CPF, a DPS usa
+// cNaoNIF - "Dispensado do NIF"/"Nao exigencia do NIF" - mecanismo
+// confirmado no manual do Emissor Publico Nacional, sem limite de valor
+// associado). Endereco nem chega a ser enviado na DPS.
+//
+// Se o cadastro do cliente ja tiver CPF/endereco, eles sao usados
+// normalmente - isso so afeta o que BLOQUEIA a criacao do rascunho.
 
 export interface ChecklistFiscalInput {
   configFiscal?: any | null;
@@ -18,51 +23,31 @@ export interface ChecklistFiscalResultado {
   servicoOk: boolean;
   clienteCpfOk: boolean;
   clienteEnderecoOk: boolean;
-  dadosClienteDispensados: boolean;
   podeEmitir: boolean;
   pendencias: string[];
 }
 
-export const avaliarChecklistFiscal = ({ configFiscal, servicosFiscais, cliente, valorFiscal }: ChecklistFiscalInput): ChecklistFiscalResultado => {
+export const avaliarChecklistFiscal = ({ configFiscal, servicosFiscais }: ChecklistFiscalInput): ChecklistFiscalResultado => {
   const empresaOk = !!(configFiscal?.cnpj && configFiscal?.inscricao_municipal && configFiscal?.regime_tributario);
 
   const servicoOk = (servicosFiscais || []).length > 0
     && servicosFiscais.every(sf => !!(sf?.codigo_servico_municipal && sf?.codigo_nbs));
 
-  const dadosClienteDispensados = Number(valorFiscal || 0) > 0 && Number(valorFiscal || 0) <= LIMITE_VALOR_SEM_DADOS_CLIENTE;
-
-  const clienteCpfOk = dadosClienteDispensados || !!(cliente?.cpf && cliente.cpf.replace(/\D/g, '').length === 11);
-
-  const clienteEnderecoOk = dadosClienteDispensados || !!(
-    cliente?.logradouro && cliente?.numero && cliente?.cidade && cliente?.estado && cliente?.cep
-  );
+  // CPF e endereco nunca bloqueiam mais a emissao - so informam se o
+  // cadastro ja tiver.
+  const clienteCpfOk = true;
+  const clienteEnderecoOk = true;
 
   const pendencias: string[] = [];
   if (!empresaOk) pendencias.push('Cadastro da empresa incompleto (CNPJ, inscrição municipal ou regime tributário).');
   if (!servicoOk) pendencias.push('Um ou mais serviços deste atendimento ainda não têm configuração fiscal ativa.');
-  if (!clienteCpfOk) pendencias.push('Cliente sem CPF válido cadastrado.');
-  if (!clienteEnderecoOk) pendencias.push('Cliente sem endereço completo cadastrado.');
 
   return {
     empresaOk,
     servicoOk,
     clienteCpfOk,
     clienteEnderecoOk,
-    dadosClienteDispensados,
-    podeEmitir: empresaOk && servicoOk && clienteCpfOk && clienteEnderecoOk,
+    podeEmitir: empresaOk && servicoOk,
     pendencias
   };
-};
-
-// Monta o link de auto-cadastro (mesma rota publica de App.tsx) e um texto
-// pronto para enviar por WhatsApp, reaproveitando o merge automatico da
-// Frente 1 quando o cliente preencher os dados que faltam.
-export const montarLinkCadastroWhatsapp = (unidadeId: number | string, telefone?: string | null, nomeCliente?: string) => {
-  const link = `${window.location.origin}/cadastro?unidade=${unidadeId}`;
-  const texto = `Olá${nomeCliente ? ` ${nomeCliente}` : ''}! Para emitirmos sua nota fiscal, precisamos completar seu cadastro (CPF e endereço). Por favor, preencha por este link: ${link}`;
-  const digits = (telefone || '').replace(/\D/g, '');
-  const whatsappUrl = digits
-    ? `https://wa.me/55${digits}?text=${encodeURIComponent(texto)}`
-    : `https://wa.me/?text=${encodeURIComponent(texto)}`;
-  return { link, whatsappUrl };
 };

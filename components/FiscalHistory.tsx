@@ -19,13 +19,28 @@ const statusClasses: Record<string, string> = {
   CANCELADA: 'bg-zinc-200 text-zinc-600'
 };
 
+// Data de hoje no fuso de Birigui/SP, formato YYYY-MM-DD (mesmo padrao do
+// getTodayBR() usado em Financeiro.tsx).
+const getTodayBR = () => {
+  const dataLocalBR = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  const [dia, mes, ano] = dataLocalBR.split('/');
+  return `${ano}-${mes}-${dia}`;
+};
+
+const getPrimeiroDiaDoMesBR = () => {
+  const hoje = getTodayBR();
+  const [ano, mes] = hoje.split('-');
+  return `${ano}-${mes}-01`;
+};
+
 const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, clientId, compact = false, userProfile }) => {
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
-  const [periodStart, setPeriodStart] = useState('');
-  const [periodEnd, setPeriodEnd] = useState('');
+  // Padrao: do dia 1 do mes atual ate hoje - o usuario pode trocar manualmente.
+  const [periodStart, setPeriodStart] = useState(getPrimeiroDiaDoMesBR());
+  const [periodEnd, setPeriodEnd] = useState(getTodayBR());
   const [selectedNote, setSelectedNote] = useState<any | null>(null);
 
   const canManageNotes = ['master', 'financeiro'].includes(userProfile?.cargo || '');
