@@ -26,6 +26,7 @@ import {
   AgendamentosCards,
   ProximoAgendamento,
   getDefaultPeriodo,
+  getTodayBR,
   calcularVariacao,
   fetchDashboardKpis,
   fetchFaturamentoPeriodo,
@@ -72,11 +73,14 @@ const FORMA_PAGAMENTO_COR: Record<string, string> = {
 
 const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabaseClient }) => {
   const { setNavState } = useNavigation();
+  // Padrao do Painel de Gestao: do dia 1 do mes atual ate hoje (nao ate o
+  // fim do mes, como getDefaultPeriodo() faz para as outras telas que
+  // reaproveitam essa mesma funcao). O usuario pode trocar manualmente.
   const defaultPeriodo = getDefaultPeriodo();
   const [filtros, setFiltros] = useState<DashboardFiltros>({
     unidadeId: units.length === 1 ? units[0].id : null,
     dataInicio: defaultPeriodo.dataInicio,
-    dataFim: defaultPeriodo.dataFim,
+    dataFim: getTodayBR(),
     transporte: 'todos'
   });
   const [granularidade, setGranularidade] = useState<Granularidade>('dia');
