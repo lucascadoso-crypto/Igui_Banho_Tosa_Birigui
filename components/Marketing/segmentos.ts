@@ -26,7 +26,7 @@ export const SEGMENTOS: SegmentoDef[] = [
   {
     id: 'vip',
     titulo: 'VIP / mais fiéis',
-    descricao: '4+ banhos finalizados nos últimos 12 meses',
+    descricao: 'Pacote ativo + 2 ou mais pacotes já concluídos',
     icon: 'fa-crown',
     corBg: 'bg-amber-50',
     corTexto: 'text-amber-600',
@@ -36,7 +36,7 @@ export const SEGMENTOS: SegmentoDef[] = [
   {
     id: 'pagam_em_dia',
     titulo: 'Pagam em dia',
-    descricao: 'Pacote ativo totalmente pago',
+    descricao: 'Pacote ativo, sempre pago até o 2º banho',
     icon: 'fa-circle-check',
     corBg: 'bg-emerald-50',
     corTexto: 'text-emerald-600',

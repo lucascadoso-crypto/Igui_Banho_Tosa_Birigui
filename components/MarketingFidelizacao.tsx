@@ -11,7 +11,7 @@ interface MarketingFidelizacaoProps {
   userProfile?: UserProfile;
 }
 
-// Espelha public.marketing_segmentos_clientes (ver supabase/migrations/0052_marketing_fidelizacao_views.sql).
+// Espelha public.marketing_segmentos_clientes (ver supabase/migrations/0053_marketing_criterios_vip_pagam_em_dia.sql).
 interface ClienteMetricaRow {
   cliente_id: number | string;
   unidade_id: number | string;
@@ -21,9 +21,11 @@ interface ClienteMetricaRow {
   avulsos_finalizados: number;
   dias_desde_ultimo_finalizado: number | null;
   total_pacotes: number;
+  pacotes_concluidos: number;
   tem_pacote_ativo: boolean;
   pacote_vencido_recente: boolean;
   pacotes_ativos_pagos: boolean | null;
+  pagamentos_sempre_no_prazo: boolean | null;
   valor_ultimo_pacote_vencido: number | null;
   ultimo_agendamento_id: number | string | null;
   seg_vip: boolean;
@@ -103,7 +105,7 @@ const MarketingFidelizacao: React.FC<MarketingFidelizacaoProps> = ({ unit, supab
     });
 
     return {
-      vip: clientes.filter(c => c.seg_vip).map(c => toCliente(c, `${c.banhos_12m} banhos em 12m`)),
+      vip: clientes.filter(c => c.seg_vip).map(c => toCliente(c, `${c.pacotes_concluidos} pacotes concluídos`)),
       pagam_em_dia: clientes.filter(c => c.seg_pagam_em_dia).map(c => toCliente(c)),
       avulso_recorrente: clientes.filter(c => c.seg_avulso_recorrente).map(c => toCliente(c, `${c.avulsos_finalizados} avulsos`)),
       nao_renovaram: clientes.filter(c => c.seg_nao_renovaram).map(c => toCliente(c)),
