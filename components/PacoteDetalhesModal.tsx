@@ -849,7 +849,7 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
             <button onClick={triggerCancelPack} className="w-full md:w-auto px-4 py-3 md:px-10 md:py-4 bg-white text-rose-500 rounded-2xl font-black text-[10px] md:text-xs uppercase border-2 border-rose-100 hover:bg-rose-50 transition-all flex items-center justify-center">
                 <i className="fa-solid fa-ban mr-2 md:mr-3"></i> CANCELAR
             </button>
-            <button onClick={() => onEdit(pack)} className="w-full md:w-auto px-4 py-3 md:px-10 md:py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] md:text-xs uppercase border-2 border-slate-200 hover:bg-slate-200 transition-all flex items-center justify-center">
+            <button onClick={() => onEdit({ ...pack, agendamentos: sessions })} className="w-full md:w-auto px-4 py-3 md:px-10 md:py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] md:text-xs uppercase border-2 border-slate-200 hover:bg-slate-200 transition-all flex items-center justify-center">
                 <i className="fa-solid fa-pencil mr-2 md:mr-3"></i> EDITAR PACOTE
             </button>
            </div>
