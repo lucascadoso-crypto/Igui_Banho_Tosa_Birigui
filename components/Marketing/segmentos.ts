@@ -65,13 +65,13 @@ export const SEGMENTOS: SegmentoDef[] = [
   },
   {
     id: 'inativos',
-    titulo: 'Inativos',
-    descricao: 'Sem banho finalizado há mais de 60 dias',
+    titulo: 'Inativo Avulso',
+    descricao: 'Nunca fechou pacote, já teve serviço concluído, sem voltar há 60+ dias',
     icon: 'fa-moon',
     corBg: 'bg-slate-100',
     corTexto: 'text-slate-500',
-    mensagemPadrao: 'Oi {nome}! 🐾 Sentimos sua falta por aqui! Vamos marcar um banho para o seu pet?',
-    brindePadrao: 'Cupom de volta com desconto no próximo banho'
+    mensagemPadrao: 'Oi {nome}! 🐾 Sentimos sua falta por aqui! Que tal voltar e já aproveitar pra fechar um pacote com condição especial?',
+    brindePadrao: 'Desconto especial no primeiro pacote de volta'
   },
   {
     id: 'aniversariantes',
