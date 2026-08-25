@@ -9,6 +9,12 @@ interface FiscalHistoryProps {
   userProfile?: UserProfile;
 }
 
+// Aliquota do Simples Nacional para o servico desta unidade - usada so pra
+// estimativa visual do card de imposto (nao e um calculo fiscal oficial,
+// so ajuda a acompanhar quanto vai dar de imposto conforme as notas vao
+// sendo emitidas). Se a aliquota real mudar de faixa, ajustar aqui.
+const ALIQUOTA_IMPOSTO_ESTIMADO = 0.06;
+
 const statusClasses: Record<string, string> = {
   RASCUNHO: 'bg-slate-100 text-slate-600',
   AGUARDANDO_CONFIGURACAO: 'bg-amber-100 text-amber-700',
@@ -353,6 +359,15 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
           <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-5">
             <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Emitido no periodo filtrado</p>
             <p className="text-2xl font-black text-slate-900 mt-1">{formatCurrency(resumo.totalEmitido)}</p>
+          </div>
+        </div>
+      )}
+
+      {!compact && (
+        <div className="flex justify-center">
+          <div className="rounded-2xl bg-slate-50 border border-slate-100 px-6 py-4 text-center">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Imposto estimado ({(ALIQUOTA_IMPOSTO_ESTIMADO * 100).toFixed(0)}% sobre o emitido)</p>
+            <p className="text-lg font-black text-slate-700 mt-1">{formatCurrency(resumo.totalEmitido * ALIQUOTA_IMPOSTO_ESTIMADO)}</p>
           </div>
         </div>
       )}
