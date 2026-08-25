@@ -69,16 +69,22 @@ export async function garantirFinanceiroMovimento(params: {
   } = params;
 
   try {
+    // origem 'extras_agendamento' (adicionais/extras pagos a parte) nao conta
+    // como "ja tem lancamento" aqui - senao um extra pago antes do servico
+    // principal engana essa checagem e o pagamento principal nunca gera seu
+    // proprio financeiro_movimento (bug real: ver Appointments.tsx e o caso
+    // de agendamentos avulsos com "Promocao"/adicional pago separado).
     let existingQuery = supabaseClient
       .from('financeiro_movimentos')
       .select('id')
-      .eq('tipo', 'receita');
+      .eq('tipo', 'receita')
+      .neq('origem', 'extras_agendamento');
     existingQuery = agendamentoId
       ? existingQuery.eq('agendamento_id', agendamentoId)
       : existingQuery.eq('pacote_id', pacoteId);
 
-    const { data: existente } = await existingQuery.maybeSingle();
-    if (existente) return;
+    const { data: existentes } = await existingQuery.limit(1);
+    if (existentes && existentes.length > 0) return;
 
     const valorTotalPago = Number(valor1 || 0) + (metodo2 ? Number(valor2 || 0) : 0);
     if (valorTotalPago <= 0) return;

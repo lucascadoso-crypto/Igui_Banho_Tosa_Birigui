@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Unit, UserProfile } from '../types';
 import { registrarAtividade } from '../services/logger';
+import { registrarPagamentoPacote } from '../services/pacotePayments';
 import FiscalDraftModal from './FiscalDraftModal';
 import FiscalHistory from './FiscalHistory';
 
@@ -209,8 +210,14 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
           pDinheiro += totalM2.dinheiro;
           pCartao += totalM2.cartao;
 
-          // Processar lista de serviços com segurança
-          const listaServicos = a?.agendamento_itens?.map((it: any) => it?.servicos?.nome).filter(Boolean).join(', ') || 'Serviço não especificado';
+          // Processar lista de serviços com segurança - acima de 3, abrevia
+          // (senao o texto empurra o resto da linha pra fora da tela).
+          const nomesServicos = (a?.agendamento_itens?.map((it: any) => it?.servicos?.nome).filter(Boolean)) || [];
+          const listaServicos = nomesServicos.length === 0
+            ? 'Serviço não especificado'
+            : nomesServicos.length > 3
+              ? `${nomesServicos.slice(0, 3).join(', ')} e mais ${nomesServicos.length - 3}`
+              : nomesServicos.join(', ');
 
           const originalData = ajusteFinanceiro ? {
             ...a,
@@ -555,14 +562,27 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
         await saveAppointmentFinancialAdjustment(editingTransaction, originalData);
         targetTable = 'financeiro_movimentos';
       } else if (sourceTable === 'pacotes') {
-        updates = {
-          valor_total: editForm.valor,
-          forma_pagamento: editForm.metodo,
-          valor_pagamento_2: editForm.valor2,
-          forma_pagamento_2: editForm.metodo2,
-          pago: true,
-          data_pagamento: originalData.data_pagamento || selectedDate
-        };
+        // Mesma fonte unica de pagamento de pacote usada em Appointments.tsx
+        // (registrarPagamentoPacote) - cria/atualiza tambem o
+        // financeiro_movimento, que o update direto em "pacotes" abaixo nao
+        // fazia (mesmo bug corrigido no handleQuickReceive).
+        await registrarPagamentoPacote({
+          supabaseClient,
+          unitId: unit.id,
+          pacoteId: originalData.id,
+          nomePacote: editingTransaction.descricao,
+          petNome: originalData.pets?.nome,
+          metodo1: editForm.metodo,
+          valor1: editForm.valor,
+          dividirPagamento: editForm.valor2 > 0,
+          metodo2: editForm.metodo2,
+          valor2: editForm.valor2,
+          dataPagamento: originalData.data_pagamento || selectedDate,
+          userEmail: userProfile?.email,
+          userNome: userProfile?.nome,
+          userCargo: userProfile?.cargo
+        });
+        targetTable = 'pacotes';
       } else if (sourceTable === 'despesas') {
         updates = {
           valor_total: editForm.valor
@@ -577,8 +597,9 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
         };
       }
 
-      // Executar Atualização
-      if (sourceTable !== 'agendamentos') {
+      // Executar Atualização (agendamentos e pacotes ja foram tratados acima,
+      // com seus proprios lancamentos financeiros embutidos)
+      if (sourceTable !== 'agendamentos' && sourceTable !== 'pacotes') {
         const { error } = await supabaseClient
           .from(targetTable)
           .update(updates)
@@ -872,8 +893,8 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
                  ) : transactions.length > 0 ? (
                    <div className="divide-y divide-slate-50">
                       {transactions.map(t => (
-                        <div key={t.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50 transition-all group">
-                           <div className="flex items-center space-x-5">
+                        <div key={t.id} className="p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-slate-50/50 transition-all group">
+                           <div className="flex items-center space-x-5 min-w-0 lg:flex-1">
                               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg shrink-0 ${t.natureza === 'Saída' ? 'bg-rose-50 text-rose-500' : t.tipo.includes('Pacote') ? 'bg-indigo-50 text-indigo-500' : 'bg-amber-50 text-amber-500'}`}>
                                  <i className={`fa-solid ${t.natureza === 'Saída' ? 'fa-minus' : t.tipo.includes('Pacote') ? 'fa-box-archive' : 'fa-paw'}`}></i>
                               </div>
@@ -890,18 +911,18 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
                                  </div>
                               </div>
                            </div>
-                           <div className="flex items-center justify-between sm:justify-end sm:text-right shrink-0 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-50">
-                              <div className="sm:hidden">
+                           <div className="flex items-center justify-between lg:justify-end lg:text-right shrink-0 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-50">
+                              <div className="lg:hidden">
                                  <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${t.natureza === 'Saída' ? 'bg-rose-500 text-white' : t.tipo.includes('Pacote') ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
                                     {t.tipo}
                                  </span>
                               </div>
-                              <div>
+                              <div className="min-w-0">
                                  <p className={`text-lg font-black ${t.natureza === 'Saída' ? 'text-rose-500' : 'text-slate-800'}`}>
                                     {t.natureza === 'Saída' ? '-' : ''} R$ {t.valor.toFixed(2)}
                                  </p>
-                                 <div className="flex items-center justify-end space-x-2">
-                                    <span className={`hidden sm:inline-block text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${t.natureza === 'Saída' ? 'bg-rose-500 text-white' : t.tipo.includes('Pacote') ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                 <div className="flex items-center flex-wrap justify-end gap-2">
+                                    <span className={`hidden lg:inline-block text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${t.natureza === 'Saída' ? 'bg-rose-500 text-white' : t.tipo.includes('Pacote') ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
                                        {t.tipo}
                                     </span>
                                     {isMaster && (
@@ -948,7 +969,7 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
                                     {canShowFiscalDraftAction(t) && (
                                        <button
                                           onClick={() => setFiscalDraftTransaction(t)}
-                                          className={`h-8 px-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm group-hover:scale-105 font-black text-[9px] uppercase tracking-widest ${
+                                          className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center transition-all shadow-sm group-hover:scale-110 ${
                                              temRascunhoFiscal(t)
                                                 ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600'
                                                 : 'bg-orange-50 hover:bg-orange-100 text-orange-600'
@@ -956,7 +977,6 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
                                           title={temRascunhoFiscal(t) ? 'Rascunho fiscal ja criado' : 'Criar rascunho fiscal'}
                                        >
                                           <i className="fa-solid fa-file-invoice-dollar text-xs"></i>
-                                          <span className="hidden xl:inline">{temRascunhoFiscal(t) ? 'Rascunho criado' : 'Criar rascunho fiscal'}</span>
                                        </button>
                                     )}
                                  </div>

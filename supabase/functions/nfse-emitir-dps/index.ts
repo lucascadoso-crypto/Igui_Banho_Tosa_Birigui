@@ -334,7 +334,7 @@ serve(async (req) => {
       },
     };
 
-    const { xml: xmlSemAssinatura, idInfDps } = montarDpsXml(dpsInput);
+    const { xml: xmlSemAssinatura, idInfDps, cpfInvalidoIgnorado } = montarDpsXml(dpsInput);
 
     const keyPemB64 = Deno.env.get("NFSE_KEY_PEM_B64");
     const certPemB64 = Deno.env.get("NFSE_CERT_PEM_B64");
@@ -415,6 +415,7 @@ serve(async (req) => {
         resposta: proxyJson?.resposta ?? proxyJson,
         notaAtualizada,
         erroGravacao,
+        cpfInvalidoIgnorado,
         xmlAssinadoTrecho: xmlAssinado.slice(0, 600),
       },
       200,

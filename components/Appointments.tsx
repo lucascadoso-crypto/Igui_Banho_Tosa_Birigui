@@ -560,23 +560,38 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
 
       if (error) throw error;
 
-      // Se o agendamento pertence a um pacote, marca o pacote como pago e
-      // propaga pago=true para todos os outros agendamentos do mesmo pacote.
+      // Se o agendamento pertence a um pacote, usa a mesma fonte unica de
+      // pagamento de pacote (registrarPagamentoPacote) que a tela do Pacote
+      // usa - marca pago, propaga pro agendamento E cria o
+      // financeiro_movimento. Antes essa marcacao era duplicada aqui na mao
+      // sem criar o financeiro_movimento, o que deixava pacotes (sobretudo
+      // renovacoes automaticas, pagas pela primeira sessao) marcados como
+      // pagos sem nenhum lancamento financeiro real - bloqueando o rascunho
+      // fiscal depois ("Movimento financeiro confirmado nao encontrado").
       if (viewingAppt.pacote_id) {
-        await supabaseClient
-          .from('pacotes')
-          .update({ pago: true, forma_pagamento: data.method1, data_pagamento: viewingAppt.data_agendamento })
-          .eq('id', viewingAppt.pacote_id);
-        await supabaseClient
-          .from('agendamentos')
-          .update({ pago: true })
-          .eq('pacote_id', viewingAppt.pacote_id);
+        await registrarPagamentoPacote({
+          supabaseClient,
+          unitId: unit.id,
+          pacoteId: viewingAppt.pacote_id,
+          nomePacote: viewingAppt.pacotes?.nome_pacote || viewingAppt.pacotes?.nome,
+          petNome: viewingAppt.pets?.nome,
+          metodo1: data.method1,
+          valor1: data.val1,
+          dividirPagamento: Boolean(data.method2),
+          metodo2: data.method2,
+          valor2: data.val2,
+          dataPagamento: viewingAppt.data_agendamento,
+          userEmail: userProfile?.email,
+          userNome: userProfile?.nome,
+          userCargo: userProfile?.cargo
+        });
       }
 
       setShowPaymentSelector(false);
 
       // Nota fiscal manual (Fase 2) so vale para agendamento avulso
-      // (pacote_id nulo) - banho dentro de pacote nunca gera nota propria.
+      // (pacote_id nulo) - banho dentro de pacote nunca gera nota propria
+      // aqui (o financeiro_movimento do pacote ja foi criado acima).
       if (!viewingAppt.pacote_id) {
         await garantirFinanceiroMovimento({
           supabaseClient,

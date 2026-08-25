@@ -64,10 +64,31 @@ export interface DpsInput {
 export interface DpsMontada {
   xml: string;
   idInfDps: string;
+  cpfInvalidoIgnorado: boolean;
 }
 
 function apenasDigitos(valor: string | null | undefined): string {
   return (valor ?? "").replace(/\D/g, "");
+}
+
+// Mesmo algoritmo de digito verificador usado em public.cpf_valido (migration
+// 0029). Confirmado com um caso real rejeitado pela Sefin Nacional (erro
+// E0206 "CPF do tomador informado na DPS e invalido") - o cadastro tinha um
+// CPF com o digito verificador errado. Em vez de travar a nota inteira,
+// validamos aqui antes de montar o <toma> e caimos para cNaoNIF quando o
+// CPF cadastrado nao passa na validacao.
+function cpfValido(cpf: string): boolean {
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+
+  const digitos = cpf.split("").map(Number);
+  const calcularDigito = (fatorInicial: number, tamanho: number): number => {
+    let soma = 0;
+    for (let i = 0; i < tamanho; i++) soma += digitos[i] * (fatorInicial - i);
+    const resto = soma % 11;
+    return resto < 2 ? 0 : 11 - resto;
+  };
+
+  return calcularDigito(10, 9) === digitos[9] && calcularDigito(11, 10) === digitos[10];
 }
 
 function escaparXml(valor: string): string {
@@ -148,15 +169,24 @@ export function montarDpsXml(input: DpsInput): DpsMontada {
     `</prest>`;
 
   let toma = "";
+  let cpfInvalidoIgnorado = false;
   if (input.tomador?.nome) {
-    const cpf = apenasDigitos(input.tomador.cpf);
+    const cpfBruto = apenasDigitos(input.tomador.cpf);
     // Erro real de schema (E1235): sem CNPJ/CPF/NIF, o elemento cNaoNIF e
     // obrigatorio antes de xNome (o choice nao pode simplesmente ser
     // omitido). cNaoNIF=2 = "Outros" - usado sempre que o cliente nao tem
     // CPF cadastrado, sem limite de valor (nao ha exigencia legal disso).
+    //
+    // Erro real de negocio (E0206): CPF com digito verificador invalido e
+    // rejeitado pela Sefin Nacional. Em vez de travar a nota inteira por um
+    // erro de cadastro, validamos o digito aqui e caimos para cNaoNIF -
+    // evita bloquear uma emissao real por causa de um CPF digitado errado.
+    const cpf = cpfBruto.length === 11 && cpfValido(cpfBruto) ? cpfBruto : "";
+    cpfInvalidoIgnorado = cpfBruto.length > 0 && !cpf;
+
     toma =
       `<toma>` +
-      (cpf ? `<CPF>${cpf.padStart(11, "0").slice(-11)}</CPF>` : `<cNaoNIF>2</cNaoNIF>`) +
+      (cpf ? `<CPF>${cpf}</CPF>` : `<cNaoNIF>2</cNaoNIF>`) +
       `<xNome>${escaparXml(input.tomador.nome)}</xNome>` +
       (input.tomador.telefone ? `<fone>${apenasDigitos(input.tomador.telefone)}</fone>` : "") +
       (input.tomador.email ? `<email>${escaparXml(input.tomador.email)}</email>` : "") +
@@ -205,5 +235,5 @@ export function montarDpsXml(input: DpsInput): DpsMontada {
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?><DPS xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00">${infDps}</DPS>`;
 
-  return { xml, idInfDps };
+  return { xml, idInfDps, cpfInvalidoIgnorado };
 }
