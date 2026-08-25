@@ -20,12 +20,18 @@ export interface FinanceiroFiltros extends DashboardFiltros {
 
 export const FORMAS_PAGAMENTO_OPCOES = ['Pix', 'Dinheiro', 'Débito', 'Crédito', 'Transferência', 'Outro', 'Não informado'];
 
+// Padrao do Financeiro Geral: do dia 1 do mes atual ate HOJE (nao ate o fim
+// do mes, como getDefaultPeriodo() faz para outras telas). Mesmo motivo do
+// Dashboard Gerencial (DashboardGerencial.tsx): sem isso, o periodo padrao
+// inclui dias futuros do proprio mes, e qualquer lancamento com data futura
+// (ex.: pagamento antecipado ja registrado) entra como "projecao" na soma de
+// caixa. O usuario pode trocar o periodo manualmente depois.
 export const getFiltrosDefault = (unidadeIdInicial: number | null): FinanceiroFiltros => {
   const periodo = getDefaultPeriodo();
   return {
     unidadeId: unidadeIdInicial,
     dataInicio: periodo.dataInicio,
-    dataFim: periodo.dataFim,
+    dataFim: getTodayBR(),
     transporte: 'todos',
     formaPagamento: 'todas',
     linhaServico: 'todos'
