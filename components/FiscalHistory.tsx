@@ -65,6 +65,12 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
   const [apiEmittingNoteId, setApiEmittingNoteId] = useState<number | null>(null);
   const [apiEmitResult, setApiEmitResult] = useState<{ noteId: number; ok: boolean; mensagem: string; chaveAcesso?: string; erros?: { Codigo: string; Descricao: string; Complemento?: string }[] } | null>(null);
 
+  type EmissaoResultado = { noteId: number; ok: boolean; mensagem: string; chaveAcesso?: string };
+  const [confirmingBulk, setConfirmingBulk] = useState(false);
+  const [bulkEmitting, setBulkEmitting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ atual: 0, total: 0 });
+  const [bulkResults, setBulkResults] = useState<EmissaoResultado[] | null>(null);
+
   useEffect(() => {
     fetchNotes();
   }, [unit?.id, clientId, statusFilter, periodStart, periodEnd]);
@@ -162,9 +168,16 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
     }
   };
 
-  const handleEmitirViaApi = async (note: any) => {
-    setApiEmittingNoteId(note.id);
-    setApiEmitResult(null);
+  // Chamada crua de emissao via API, sem mexer em nenhum estado de UI - usada
+  // tanto pelo fluxo de nota unica (handleEmitirViaApi) quanto pelo fluxo em
+  // massa (handleEmitirEmMassa), que precisa rodar isso nota por nota sem
+  // disparar re-render/alert por item.
+  const emitirNotaViaApi = async (note: any): Promise<{
+    ok: boolean;
+    mensagem: string;
+    chaveAcesso?: string;
+    erros?: { Codigo: string; Descricao: string; Complemento?: string }[];
+  }> => {
     try {
       const { data, error } = await supabaseClient.functions.invoke('nfse-emitir-dps', {
         body: { notaFiscalId: note.id }
@@ -172,28 +185,25 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
       if (error) throw error;
 
       if (data?.ok && data?.notaAtualizada) {
-        setApiEmitResult({
-          noteId: note.id,
+        return {
           ok: true,
-          mensagem: `NFS-e emitida com sucesso (numero ${data.notaAtualizada.numero_nota}).`,
+          mensagem: `NFS-e emitida com sucesso (numero ${data.notaAtualizada.numero_nota}).` +
+            (data.cpfInvalidoIgnorado ? ' Atencao: o CPF cadastrado do cliente e invalido (digito verificador errado) e foi ignorado - a nota saiu sem identificacao do tomador. Vale corrigir o cadastro.' : ''),
           chaveAcesso: data.notaAtualizada.chave_acesso
-        });
-        await fetchNotes();
-      } else if (data?.ok && data?.erroGravacao) {
-        setApiEmitResult({
-          noteId: note.id,
+        };
+      }
+      if (data?.ok && data?.erroGravacao) {
+        return {
           ok: false,
           mensagem: `A NFS-e foi emitida na Sefin Nacional (chave ${data.resposta?.chaveAcesso || '-'}), mas nao foi possivel salvar aqui: ${data.erroGravacao}. Anote a chave antes de tentar de novo.`,
           chaveAcesso: data.resposta?.chaveAcesso
-        });
-      } else {
-        setApiEmitResult({
-          noteId: note.id,
-          ok: false,
-          mensagem: data?.erro || 'A Sefin Nacional rejeitou a DPS.',
-          erros: data?.resposta?.erros
-        });
+        };
       }
+      return {
+        ok: false,
+        mensagem: data?.erro || 'A Sefin Nacional rejeitou a DPS.',
+        erros: data?.resposta?.erros
+      };
     } catch (err: any) {
       console.error('Erro ao emitir NFS-e via API:', err);
       // Quando a Edge Function responde com status != 2xx (ex.: validacao
@@ -207,10 +217,47 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
       } catch (_) {
         // corpo nao veio em JSON ou context nao existe - mantem a mensagem generica
       }
-      setApiEmitResult({ noteId: note.id, ok: false, mensagem });
-    } finally {
-      setApiEmittingNoteId(null);
+      return { ok: false, mensagem };
     }
+  };
+
+  const handleEmitirViaApi = async (note: any) => {
+    setApiEmittingNoteId(note.id);
+    setApiEmitResult(null);
+    const resultado = await emitirNotaViaApi(note);
+    setApiEmitResult({ noteId: note.id, ...resultado });
+    if (resultado.ok) await fetchNotes();
+    setApiEmittingNoteId(null);
+  };
+
+  const rascunhosParaEmissaoEmMassa = useMemo(
+    () => filteredNotes.filter(note => note.status === 'RASCUNHO'),
+    [filteredNotes]
+  );
+
+  const handleEmitirEmMassa = async () => {
+    const alvos = rascunhosParaEmissaoEmMassa;
+    if (alvos.length === 0) return;
+    setConfirmingBulk(false);
+    setBulkEmitting(true);
+    setBulkResults(null);
+    setBulkProgress({ atual: 0, total: alvos.length });
+
+    const resultados: EmissaoResultado[] = [];
+    for (let i = 0; i < alvos.length; i++) {
+      const note = alvos[i];
+      const resultado = await emitirNotaViaApi(note);
+      resultados.push({ noteId: note.id, ...resultado });
+      setBulkProgress({ atual: i + 1, total: alvos.length });
+      // Pequena pausa entre chamadas - nao e um requisito tecnico da API do
+      // Sistema Nacional, e so pra nao rajar dezenas de emissoes reais em
+      // sequencia imediata contra um sistema de terceiro (governo).
+      if (i < alvos.length - 1) await new Promise(resolve => setTimeout(resolve, 400));
+    }
+
+    setBulkEmitting(false);
+    setBulkResults(resultados);
+    await fetchNotes();
   };
 
   const openCancelModal = (note: any) => {
@@ -307,6 +354,24 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
             <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Emitido no periodo filtrado</p>
             <p className="text-2xl font-black text-slate-900 mt-1">{formatCurrency(resumo.totalEmitido)}</p>
           </div>
+        </div>
+      )}
+
+      {!compact && canManageNotes && rascunhosParaEmissaoEmMassa.length > 0 && (
+        <div className="rounded-2xl bg-teal-50 border border-teal-100 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-black text-teal-800">
+              {rascunhosParaEmissaoEmMassa.length} rascunho{rascunhosParaEmissaoEmMassa.length > 1 ? 's' : ''} pronto{rascunhosParaEmissaoEmMassa.length > 1 ? 's' : ''} para emitir nesse filtro
+            </p>
+            <p className="text-xs font-bold text-teal-600 mt-0.5">{formatCurrency(resumo.totalRascunho)} no total - envia via Sistema Nacional NFS-e, um por um</p>
+          </div>
+          <button
+            onClick={() => setConfirmingBulk(true)}
+            className="px-5 py-3 rounded-2xl bg-teal-600 text-white font-black text-[11px] uppercase tracking-widest shadow-lg shadow-teal-500/20 whitespace-nowrap"
+          >
+            <i className="fa-solid fa-layer-group mr-2"></i>
+            Emitir rascunhos em massa
+          </button>
         </div>
       )}
 
@@ -573,6 +638,89 @@ const FiscalHistory: React.FC<FiscalHistoryProps> = ({ supabaseClient, unit, cli
                 </div>
               )}
               <button onClick={() => setApiEmitResult(null)} className="w-full py-4 rounded-2xl bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest">
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmingBulk && (
+        <div className="app-modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="app-modal-panel w-full max-w-lg bg-white rounded-[2rem] shadow-2xl">
+            <div className="p-6 space-y-4">
+              <h3 className="text-lg font-black text-slate-900">
+                <i className="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>
+                Emitir {rascunhosParaEmissaoEmMassa.length} nota{rascunhosParaEmissaoEmMassa.length > 1 ? 's' : ''} fiscal{rascunhosParaEmissaoEmMassa.length > 1 ? 'is' : ''}?
+              </h3>
+              <p className="text-sm font-bold text-slate-500">
+                Vai enviar {rascunhosParaEmissaoEmMassa.length} DPS reais para o Sistema Nacional NFS-e (homologacao), uma por uma, totalizando {formatCurrency(resumo.totalRascunho)}.
+                Cada envio bem-sucedido vira nota emitida de verdade - nao da pra simplesmente apagar depois, so cancelar. Notas com dado fiscal incompleto vao falhar e ficam como rascunho, sem problema.
+              </p>
+              <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 max-h-40 overflow-y-auto space-y-1">
+                {rascunhosParaEmissaoEmMassa.map(note => (
+                  <div key={note.id} className="flex justify-between text-xs font-bold text-slate-500">
+                    <span className="truncate pr-2">#{note.id} - {note.tomador_nome || note.clientes?.nome || 'Cliente nao informado'}</span>
+                    <span className="text-slate-800 shrink-0">{formatCurrency(note.valor_total)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-col-reverse md:flex-row gap-3 pt-2">
+                <button onClick={() => setConfirmingBulk(false)} className="w-full md:flex-1 py-4 rounded-2xl bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest">
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleEmitirEmMassa}
+                  className="w-full md:flex-[2] py-4 rounded-2xl bg-teal-600 text-white font-black text-[10px] uppercase tracking-widest shadow-xl shadow-teal-500/20"
+                >
+                  Confirmar e emitir todas
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkEmitting && (
+        <div className="app-modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="app-modal-panel w-full max-w-md bg-white rounded-[2rem] shadow-2xl">
+            <div className="p-8 space-y-4 text-center">
+              <i className="fa-solid fa-circle-notch fa-spin text-3xl text-teal-600"></i>
+              <p className="font-black text-slate-900">Emitindo nota {bulkProgress.atual} de {bulkProgress.total}...</p>
+              <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className="h-full bg-teal-600 transition-all"
+                  style={{ width: `${bulkProgress.total ? (bulkProgress.atual / bulkProgress.total) * 100 : 0}%` }}
+                />
+              </div>
+              <p className="text-xs font-bold text-slate-400">Nao feche esta tela ate terminar.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkResults && (
+        <div className="app-modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="app-modal-panel w-full max-w-lg bg-white rounded-[2rem] shadow-2xl max-h-[calc(100dvh-24px)] overflow-y-auto">
+            <header className="sticky top-0 bg-white p-6 border-b border-slate-100 flex items-start justify-between gap-4 rounded-t-[2rem]">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Emissao em massa concluida</h3>
+                <p className="text-xs font-bold text-slate-400 mt-1">
+                  {bulkResults.filter(r => r.ok).length} emitida{bulkResults.filter(r => r.ok).length !== 1 ? 's' : ''} - {bulkResults.filter(r => !r.ok).length} falhou{bulkResults.filter(r => !r.ok).length !== 1 ? 'aram' : ''}
+                </p>
+              </div>
+              <button onClick={() => setBulkResults(null)} className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-500 shrink-0">
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </header>
+            <div className="p-6 space-y-2">
+              {bulkResults.map(r => (
+                <div key={r.noteId} className={`rounded-2xl border p-4 text-sm font-bold ${r.ok ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`}>
+                  <p className="font-black">Nota #{r.noteId}</p>
+                  <p className="mt-1">{r.mensagem}</p>
+                </div>
+              ))}
+              <button onClick={() => setBulkResults(null)} className="w-full py-4 mt-2 rounded-2xl bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest">
                 Fechar
               </button>
             </div>

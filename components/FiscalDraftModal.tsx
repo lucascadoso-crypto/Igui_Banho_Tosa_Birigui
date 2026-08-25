@@ -69,7 +69,7 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
 
         if (fetchError) throw fetchError;
         setSourceData(data);
-        setCompetenceDate('');
+        setCompetenceDate(data.data_pagamento || new Date().toISOString().slice(0, 10));
         setDescription(buildPackageDescription(data));
         const pacoteServiceId = data.servico_id || data.servicos?.id;
         if (pacoteServiceId) {
@@ -289,7 +289,7 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data de competencia</label>
                 <input type="date" value={competenceDate} onChange={(e) => setCompetenceDate(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" />
                 {transaction.sourceTable === 'pacotes' && (
-                  <p className="text-[10px] font-bold text-slate-400">Para pacote pago antes das sessoes, deixe vazio ate haver competencia real.</p>
+                  <p className="text-[10px] font-bold text-slate-400">Pacote e regime de caixa: a competencia e sempre a data em que o cliente pagou, mesmo que as sessoes aconteçam depois.</p>
                 )}
               </div>
               <div className="md:col-span-2 space-y-2">
