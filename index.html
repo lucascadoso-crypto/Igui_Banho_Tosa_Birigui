@@ -3,6 +3,18 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <script>
+      // Aplica o tema escuro antes do primeiro paint (evita flash de tela
+      // clara ao carregar). O hook useTheme (hooks/useTheme.ts) so sincroniza
+      // o estado do React com o que ja foi decidido aqui.
+      (function () {
+        try {
+          if (localStorage.getItem('igui-theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#00BFA5">
     <meta name="mobile-web-app-capable" content="yes">
@@ -14,6 +26,9 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = { darkMode: 'class' };
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -146,6 +161,76 @@
                 max-width: 100% !important;
             }
         }
+
+        /* ===== Modo escuro =====
+           O app inteiro usa classes Tailwind utilitarias fixas (bg-white,
+           text-slate-800 etc.) espalhadas em dezenas de componentes, sem
+           variantes dark: - reescrever cada componente pra usar dark: seria
+           um trabalho enorme. Em vez disso, essas regras reaproveitam as
+           MESMAS classes ja usadas no app e trocam a cor quando <html> tem a
+           classe "dark" (alternada por hooks/useTheme.ts). Cobre superficies
+           (fundo/card/borda/texto) e os selos coloridos (bg-cor-50/100 +
+           text-cor-600/700) que aparecem em status, KPIs e icones. Botoes
+           solidos (bg-cor-500/600 com texto branco) nao precisam de ajuste -
+           ja tem contraste bom em fundo claro ou escuro. */
+        html.dark body { background-color: #0f172a; color: #e2e8f0; }
+
+        html.dark [class~="bg-slate-50"] { background-color: #0f172a !important; }
+        html.dark [class~="bg-white"] { background-color: #1e293b !important; }
+        html.dark [class~="bg-slate-100"] { background-color: #334155 !important; }
+        html.dark [class~="bg-slate-200"] { background-color: #475569 !important; }
+        html.dark [class~="bg-gray-50"] { background-color: #0f172a !important; }
+        html.dark [class~="bg-zinc-200"] { background-color: #3f3f46 !important; }
+
+        html.dark [class~="border-slate-50"],
+        html.dark [class~="border-slate-100"],
+        html.dark [class~="border-slate-200"],
+        html.dark [class~="border-slate-300"],
+        html.dark [class~="divide-slate-50"],
+        html.dark [class~="divide-slate-100"],
+        html.dark [class~="border-gray-100"],
+        html.dark [class~="border-gray-300"] { border-color: #334155 !important; }
+
+        html.dark [class~="text-slate-900"],
+        html.dark [class~="text-slate-800"],
+        html.dark [class~="text-gray-800"] { color: #f1f5f9 !important; }
+        html.dark [class~="text-slate-700"],
+        html.dark [class~="text-slate-600"] { color: #cbd5e1 !important; }
+        html.dark [class~="text-slate-500"] { color: #94a3b8 !important; }
+        html.dark [class~="text-zinc-600"] { color: #a1a1aa !important; }
+
+        /* Selos/cartoes pastel (bg-cor-50 ou bg-cor-100 + text-cor-600/700):
+           vira um fundo translucido na mesma cor + texto mais claro, em vez
+           de um retangulo bem claro brilhando contra o fundo escuro. */
+        html.dark [class~="bg-rose-50"], html.dark [class~="bg-rose-100"] { background-color: rgba(244,63,94,0.16) !important; }
+        html.dark [class~="text-rose-600"], html.dark [class~="text-rose-700"] { color: #fda4af !important; }
+        html.dark [class~="bg-emerald-50"], html.dark [class~="bg-emerald-100"] { background-color: rgba(16,185,129,0.16) !important; }
+        html.dark [class~="text-emerald-600"], html.dark [class~="text-emerald-700"] { color: #6ee7b7 !important; }
+        html.dark [class~="bg-teal-50"], html.dark [class~="bg-teal-100"] { background-color: rgba(20,184,166,0.16) !important; }
+        html.dark [class~="text-teal-600"], html.dark [class~="text-teal-700"], html.dark [class~="text-teal-800"], html.dark [class~="text-teal-900"] { color: #5eead4 !important; }
+        html.dark [class~="bg-amber-50"], html.dark [class~="bg-amber-100"] { background-color: rgba(245,158,11,0.16) !important; }
+        html.dark [class~="text-amber-600"], html.dark [class~="text-amber-700"], html.dark [class~="text-amber-800"] { color: #fcd34d !important; }
+        html.dark [class~="bg-indigo-50"], html.dark [class~="bg-indigo-100"] { background-color: rgba(99,102,241,0.18) !important; }
+        html.dark [class~="text-indigo-600"], html.dark [class~="text-indigo-700"], html.dark [class~="text-indigo-800"], html.dark [class~="text-indigo-900"] { color: #a5b4fc !important; }
+        html.dark [class~="bg-violet-50"] { background-color: rgba(139,92,246,0.18) !important; }
+        html.dark [class~="text-violet-600"], html.dark [class~="text-violet-700"] { color: #c4b5fd !important; }
+        html.dark [class~="bg-sky-50"] { background-color: rgba(14,165,233,0.16) !important; }
+        html.dark [class~="text-sky-600"], html.dark [class~="text-sky-700"] { color: #7dd3fc !important; }
+        html.dark [class~="bg-orange-50"], html.dark [class~="bg-orange-100"] { background-color: rgba(249,115,22,0.16) !important; }
+        html.dark [class~="text-orange-600"], html.dark [class~="text-orange-700"] { color: #fdba74 !important; }
+        html.dark [class~="bg-blue-50"] { background-color: rgba(59,130,246,0.16) !important; }
+        html.dark [class~="text-blue-600"], html.dark [class~="text-blue-700"] { color: #93c5fd !important; }
+        html.dark [class~="bg-purple-50"] { background-color: rgba(168,85,247,0.16) !important; }
+        html.dark [class~="text-purple-600"], html.dark [class~="text-purple-700"] { color: #d8b4fe !important; }
+        html.dark [class~="bg-pink-50"] { background-color: rgba(236,72,153,0.16) !important; }
+        html.dark [class~="text-pink-600"], html.dark [class~="text-pink-700"] { color: #f9a8d4 !important; }
+        html.dark [class~="bg-green-50"], html.dark [class~="bg-green-100"] { background-color: rgba(34,197,94,0.16) !important; }
+        html.dark [class~="text-green-600"], html.dark [class~="text-green-700"] { color: #86efac !important; }
+        html.dark [class~="bg-yellow-100"] { background-color: rgba(234,179,8,0.16) !important; }
+        html.dark [class~="text-yellow-700"], html.dark [class~="text-yellow-800"] { color: #fde047 !important; }
+
+        html.dark input, html.dark select, html.dark textarea { color-scheme: dark; }
+        html.dark ::placeholder { color: #64748b; }
     </style>
 <script type="importmap">
 {

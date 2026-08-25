@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Unit, NavigationState, SubView, GlobalView, UserRole, UserProfile } from '../types';
+import { useTheme } from '../hooks/useTheme';
 
 interface SidebarProps {
   units: Unit[];
@@ -14,6 +15,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, supabaseClient, userProfile, isOpen, onClose }) => {
+  const { theme, toggleTheme } = useTheme();
   const [expandedUnit, setExpandedUnit] = useState<string | null>(null);
   const [empresa, setEmpresa] = useState({ nome: 'IGUI BANHO E TOSA', logo_url: '' });
   const [listaUnidades, setListaUnidades] = useState<Unit[]>([]);
@@ -335,6 +337,20 @@ const Sidebar: React.FC<SidebarProps> = ({ currentNav, onNavigate, userRole, sup
               <span className={`text-[9px] md:text-[8px] font-bold mt-1 uppercase block ${
                 currentNav.view === 'Meu Perfil' ? 'text-teal-600/80' : 'text-slate-400'
               }`}>Configurações</span>
+            </span>
+          </button>
+
+          <button
+            onClick={toggleTheme}
+            className="w-full flex items-center justify-between gap-3 px-4 md:px-3 py-2.5 md:py-2 rounded-[1rem] text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+            title="Alternar tema"
+          >
+            <span className="flex items-center gap-3">
+              <i className={`fa-solid ${theme === 'dark' ? 'fa-moon' : 'fa-sun'} w-8 text-center`}></i>
+              <span className="text-xs md:text-[11px] font-black uppercase tracking-widest">Modo escuro</span>
+            </span>
+            <span className={`relative w-10 h-6 rounded-full shrink-0 transition-colors ${theme === 'dark' ? 'bg-teal-600' : 'bg-slate-200'}`}>
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${theme === 'dark' ? 'translate-x-4' : ''}`}></span>
             </span>
           </button>
 
