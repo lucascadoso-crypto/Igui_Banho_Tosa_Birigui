@@ -121,21 +121,21 @@ const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClie
         </div>
       )}
 
-      {/* Linha: KPIs (somente valores já recebidos) */}
+      {/* Linha: KPIs (regime de caixa — o que entrou/saiu de fato no período selecionado) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
         <FinanceKpiCard
-          label="Faturamento"
+          label="Entradas"
           value={formatCurrencyBR(kpis?.recebidoAtual ?? 0)}
-          subtext="Valores já recebidos"
+          subtext="Recebido dentro do período selecionado"
           icon="fa-hand-holding-dollar"
           barColor="green"
           loading={kpisLoading}
           trend={kpis ? trendFrom(kpis.recebidoAtual, kpis.recebidoAnterior) : undefined}
         />
         <FinanceKpiCard
-          label="Custos"
+          label="Saídas"
           value={formatCurrencyBR(kpis?.custosAtual ?? 0)}
-          subtext="Despesas operacionais"
+          subtext="Despesas do período selecionado"
           subtextTone="red"
           icon="fa-file-invoice-dollar"
           barColor="red"
@@ -143,9 +143,10 @@ const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClie
           loading={kpisLoading}
         />
         <FinanceKpiCard
-          label="Lucro"
+          label="Caixa"
           value={formatCurrencyBR(kpis?.lucroAtual ?? 0)}
-          icon="fa-chart-line"
+          subtext="Entradas - Saídas do período"
+          icon="fa-vault"
           barColor="green"
           valueTone="green"
           loading={kpisLoading}
