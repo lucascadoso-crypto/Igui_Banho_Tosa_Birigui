@@ -36,6 +36,7 @@ const PetFormModal: React.FC<PetFormModalProps> = ({
   const [newPet, setNewPet] = useState({
     id: pet?.id || '',
     nome: pet?.nome || '',
+    especie: pet?.especie || 'Cachorro',
     raca: pet?.raca || '',
     genero: pet?.genero || 'Macho',
     porte: pet?.porte || 'Médio',
@@ -111,7 +112,7 @@ const PetFormModal: React.FC<PetFormModalProps> = ({
         data_nascimento: newPet.data_nascimento || null,
         notas_internas: newPet.notas_internas,
         foto_url: newPet.foto_url || null,
-        especie: pet?.especie || 'Cachorro'
+        especie: newPet.especie
       };
 
       let savedPet: Pet;
@@ -273,7 +274,19 @@ const PetFormModal: React.FC<PetFormModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Espécie</label>
+                  <select
+                    value={newPet.especie}
+                    onChange={(e) => setNewPet({ ...newPet, especie: e.target.value })}
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-[#00BFA5] transition-all"
+                  >
+                    <option value="Cachorro">Cachorro</option>
+                    <option value="Gato">Gato</option>
+                    <option value="Outro">Outro</option>
+                  </select>
+                </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Sexo</label>
                   <select
