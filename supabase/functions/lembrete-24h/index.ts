@@ -359,14 +359,23 @@ function appointmentSelect() {
   `;
 }
 
-async function alreadySent(supabase: any, agendamentoId: number, logTipo: string) {
-  const { data, error } = await supabase
+// R4: a deduplicacao precisa ser por (agendamento_id, tipo, DATA), nao so
+// (agendamento_id, tipo) - senao uma sessao remarcada pra outro dia fica
+// "travada" por um aviso que já foi enviado pra data antiga e nunca recebe
+// o aviso da data nova. dataAgendamento e o valor ATUAL de
+// agendamentos.data_agendamento, comparado com o que foi gravado em
+// whatsapp_mensagens.data_referencia no momento de cada envio anterior.
+async function alreadySent(supabase: any, agendamentoId: number, logTipo: string, dataAgendamento?: string | null) {
+  let query = supabase
     .from("whatsapp_mensagens")
     .select("id")
     .eq("agendamento_id", agendamentoId)
     .eq("tipo_agendamento", logTipo)
-    .eq("status", "SUCESSO")
-    .limit(1);
+    .eq("status", "SUCESSO");
+
+  query = dataAgendamento ? query.eq("data_referencia", dataAgendamento) : query.is("data_referencia", null);
+
+  const { data, error } = await query.limit(1);
 
   if (error) throw error;
   return Boolean(data && data.length > 0);
@@ -401,6 +410,7 @@ async function sendAndLogMessage(
     cliente_id: cliente?.id ?? agendamento.cliente_id ?? null,
     pet_id: pet?.id ?? agendamento.pet_id ?? null,
     agendamento_id: agendamento.id,
+    data_referencia: agendamento.data_agendamento ?? null,
     telefone,
     nome_cliente: cliente?.nome || "Cliente",
     nome_pet: pet?.nome || "Pet",
@@ -461,7 +471,7 @@ async function processAutomatic(supabase: any, janelaInput: unknown, origem: unk
         continue;
       }
 
-      if (await alreadySent(supabase, Number(agendamento.id), logTipo)) {
+      if (await alreadySent(supabase, Number(agendamento.id), logTipo, agendamento.data_agendamento)) {
         ignorados += 1;
         continue;
       }
@@ -533,7 +543,7 @@ async function processManual(supabase: any, req: Request, body: any, agendamento
 
   const mensagem = String(body?.mensagem || "").trim() || await buildManualMessage(supabase, agendamento, tipo);
 
-  if (shouldPreventDuplicate(logTipo) && await alreadySent(supabase, Number(agendamento.id), logTipo)) {
+  if (shouldPreventDuplicate(logTipo) && await alreadySent(supabase, Number(agendamento.id), logTipo, agendamento.data_agendamento)) {
     return jsonResponse({
       ok: true,
       tipo,
