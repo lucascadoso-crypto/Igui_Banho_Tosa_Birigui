@@ -332,6 +332,15 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
         .eq('id', sessionId);
 
       if (error) throw error;
+
+      // Avisa o cliente da nova data por WhatsApp - antes disso, remarcar a
+      // sessao so atualizava o banco e ninguem era notificado da mudanca de
+      // dia (mesma mensagem/logica do botao manual "Enviar lembrete").
+      const idx = sessions.findIndex(sess => sess.id === sessionId);
+      if (idx !== -1) {
+        handleSendReminder({ ...sessions[idx], data_agendamento: newDate }, idx);
+      }
+
       fetchSessionDetails();
       onRefresh();
     } catch (err) {
