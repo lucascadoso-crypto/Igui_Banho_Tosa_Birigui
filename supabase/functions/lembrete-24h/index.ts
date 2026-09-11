@@ -1,6 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Global disponibilizado pelo runtime de Edge Functions da Supabase (nao e
+// Deno padrao) - deixa uma promise rodando em segundo plano depois que a
+// funcao ja respondeu. Usado no modo "automatico" abaixo: quem chama (o
+// cron via pg_net) tem um timeout curto e nao precisa esperar todos os
+// agendamentos do dia serem processados um por um.
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -600,7 +607,29 @@ serve(async (req) => {
 
   try {
     if (modo === "automatico") {
-      return await processAutomatic(supabase, janela, body?.origem, body?.tipo);
+      // Nao espera todos os agendamentos do dia serem enviados um por um
+      // antes de responder - quem chama (pg_net, via cron) tem um timeout
+      // curto (5s por padrao) e processar a fila inteira do dia facilmente
+      // passa disso, o que corta a execucao no meio e deixa quem esta mais
+      // pra frente na fila sem lembrete nenhum. Responde "recebido" na hora
+      // e continua o envio de verdade em segundo plano via waitUntil.
+      const execucao = processAutomatic(supabase, janela, body?.origem, body?.tipo);
+
+      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+        EdgeRuntime.waitUntil(
+          execucao.catch((error) => {
+            console.error("[lembrete-24h] Falha no processamento automatico em background:", error);
+          }),
+        );
+        return jsonResponse({
+          ok: true,
+          modo: "automatico",
+          janela: janela === "amanha" ? "amanha" : "hoje",
+          processandoEmBackground: true,
+        });
+      }
+
+      return await execucao;
     }
 
     if (agendamentoId) {
