@@ -333,14 +333,10 @@ const PacoteDetalhesModal: React.FC<PacoteDetalhesModalProps> = ({ pack: initial
 
       if (error) throw error;
 
-      // Avisa o cliente da nova data por WhatsApp - antes disso, remarcar a
-      // sessao so atualizava o banco e ninguem era notificado da mudanca de
-      // dia (mesma mensagem/logica do botao manual "Enviar lembrete").
-      const idx = sessions.findIndex(sess => sess.id === sessionId);
-      if (idx !== -1) {
-        handleSendReminder({ ...sessions[idx], data_agendamento: newDate }, idx);
-      }
-
+      // Remarcar a sessao NAO avisa o cliente automaticamente - e uma
+      // mudanca interna (ajuste de agenda, correcao de dia etc.), nao um
+      // evento que o cliente precise ser notificado. Se for o caso, quem
+      // esta remarcando usa o botao manual "Enviar lembrete" pra avisar.
       fetchSessionDetails();
       onRefresh();
     } catch (err) {
