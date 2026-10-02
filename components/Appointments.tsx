@@ -2332,9 +2332,14 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                             if (e.target.value === 'novo') {
                               setIsQuickPetModalOpen(true);
                             } else {
-                              setSelectedPetId(e.target.value);
+                              // <select> sempre devolve string - sem converter pra
+                              // numero aqui, "456" !== 456 quebra toda comparacao
+                              // availablePets.find(p => p.id === selectedPetId) mais
+                              // abaixo (inclusive o disparo do WhatsApp de confirmacao),
+                              // silenciosamente, sem erro nenhum.
+                              setSelectedPetId(e.target.value ? Number(e.target.value) : '');
                             }
-                          }} 
+                          }}
                           className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 transition-all appearance-none"
                         >
                            <option value="">Selecione o pet...</option>
