@@ -102,7 +102,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       : 'border-l-sky-400 bg-sky-50/60 text-sky-600';
     // So pro bloco "Observacao do pet" do card avulso/pacote - mantem fundo e
     // cor do tom (teal/sky) como ja eram, so troca a borda neutra externa.
-    const neutralBorder = tone === 'pet' ? (isPacote ? 'border-[#d8c2fb]' : 'border-[#f3e1c7]') : 'border-slate-100';
+    const neutralBorder = tone === 'pet' ? (isPacote ? 'border-[#bfa0f2]' : 'border-[#f3e1c7]') : 'border-slate-100';
 
     return (
       <div className={`rounded-2xl border ${neutralBorder} border-l-4 ${toneClasses} px-4 py-3`} onClick={(e) => e.stopPropagation()}>
@@ -1939,7 +1939,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                      <div key={appt.id} className={`relative h-full ${(activeCardMenuId === appt.id || notaEditId === appt.id) ? 'z-[100]' : 'z-10'}`}>
                        <div className={`h-full rounded-[2rem] border hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative isolate z-10 p-6 group ${
                           isPacote
-                             ? 'bg-[#f1e8ff] border-[#d8c2fb] shadow-[0_6px_18px_rgba(124,58,237,0.16)]'
+                             ? 'bg-[#e4d7fb] border-[#bfa0f2] shadow-[0_6px_18px_rgba(124,58,237,0.16)]'
                              : 'bg-[#fffaf3] border-[#fde4c4] shadow-[0_6px_18px_rgba(245,158,11,0.10)]'
                        }`}>
 
@@ -1963,7 +1963,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                        <div className="relative z-[2] min-w-0 cursor-pointer" onClick={() => handleOpenDetail(appt)}>
                           <div className="flex items-start gap-4">
                              {/* Horário */}
-                             <div className={`text-center shrink-0 pr-4 border-r ${isPacote ? 'border-[#d8c2fb]' : 'border-[#f3e1c7]'}`}>
+                             <div className={`text-center shrink-0 pr-4 border-r ${isPacote ? 'border-[#bfa0f2]' : 'border-[#f3e1c7]'}`}>
                                 <p className="text-2xl font-black text-slate-800 tracking-tighter leading-none">{String(appt.horario_inicio).substring(0, 5)}</p>
                                 <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${
                                   appt.status === 'Em Andamento' ? 'text-amber-500' :
@@ -2138,7 +2138,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                       </div>
 
                       {/* Rodapé: Valor/Pagamento + Ações (mt-auto gruda no rodapé do card, pra todo card ficar do mesmo tamanho na mesma linha independente da quantidade de conteúdo) */}
-                      <div className={`relative z-[2] mt-auto pt-4 border-t flex flex-wrap items-center justify-between gap-3 ${isPacote ? 'border-[#d8c2fb]' : 'border-[#f3e1c7]'}`}>
+                      <div className={`relative z-[2] mt-auto pt-4 border-t flex flex-wrap items-center justify-between gap-3 ${isPacote ? 'border-[#bfa0f2]' : 'border-[#f3e1c7]'}`}>
                          <div className="min-w-0">
                             <p className="font-black text-xl text-slate-800 tracking-tighter leading-none">R$ {(parseFloat(appt.valor_total) || 0).toFixed(2)}</p>
                             <p className={`text-[9px] font-black uppercase tracking-widest mt-1.5 flex items-center ${(appt.pacote_id ? appt.pacotes?.pago : appt.pago) ? 'text-emerald-500' : 'text-rose-500'}`}>
@@ -2158,7 +2158,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                             <button
                                onClick={(e) => { e.stopPropagation(); handleRemindWhatsApp(appt); }}
                                title="Enviar lembrete via WhatsApp"
-                               className={`w-10 h-10 shrink-0 rounded-xl bg-white border text-slate-500 hover:text-emerald-500 hover:border-emerald-100 transition-all flex items-center justify-center ${isPacote ? 'border-[#d8c2fb]' : 'border-[#f3e1c7]'}`}
+                               className={`w-10 h-10 shrink-0 rounded-xl bg-white border text-slate-500 hover:text-emerald-500 hover:border-emerald-100 transition-all flex items-center justify-center ${isPacote ? 'border-[#bfa0f2]' : 'border-[#f3e1c7]'}`}
                             >
                                <i className="fa-brands fa-whatsapp"></i>
                             </button>
@@ -2177,7 +2177,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                className={`w-10 h-10 shrink-0 rounded-xl border transition-all flex items-center justify-center ${
                                   appt.nota_interna
                                      ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20'
-                                     : `bg-white text-slate-500 hover:text-amber-600 hover:border-amber-100 ${isPacote ? 'border-[#d8c2fb]' : 'border-[#f3e1c7]'}`
+                                     : `bg-white text-slate-500 hover:text-amber-600 hover:border-amber-100 ${isPacote ? 'border-[#bfa0f2]' : 'border-[#f3e1c7]'}`
                                }`}
                             >
                                <i className="fa-solid fa-note-sticky"></i>
@@ -2210,7 +2210,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                                   setActiveCardMenuId(activeCardMenuId === appt.id ? null : appt.id);
                                }}
                                title="Mais ações"
-                               className={`w-10 h-10 shrink-0 rounded-xl bg-white border text-slate-500 hover:text-slate-700 hover:border-slate-200 transition-all flex items-center justify-center ${isPacote ? 'border-[#d8c2fb]' : 'border-[#f3e1c7]'}`}
+                               className={`w-10 h-10 shrink-0 rounded-xl bg-white border text-slate-500 hover:text-slate-700 hover:border-slate-200 transition-all flex items-center justify-center ${isPacote ? 'border-[#bfa0f2]' : 'border-[#f3e1c7]'}`}
                             >
                                <i className="fa-solid fa-gear"></i>
                             </button>
