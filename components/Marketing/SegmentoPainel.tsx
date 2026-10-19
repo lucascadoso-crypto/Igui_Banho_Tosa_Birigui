@@ -32,6 +32,19 @@ const formatDataBR = (value?: string | null) => {
   return `${dia}/${mes}/${ano}`;
 };
 
+type ColunaOrdenavel = 'nome' | 'telefone' | 'ultimoBanho' | 'pacotes' | 'avulsos' | 'status';
+
+const getValorOrdenavel = (c: ClienteSegmento, resultado: EnvioResultado | undefined, coluna: ColunaOrdenavel) => {
+  switch (coluna) {
+    case 'nome': return (c.nome || '').toLowerCase();
+    case 'telefone': return c.telefone || '';
+    case 'ultimoBanho': return c.ultimoBanhoEm || '';
+    case 'pacotes': return c.totalPacotes || 0;
+    case 'avulsos': return c.avulsosFinalizados || 0;
+    case 'status': return resultado?.status || '';
+  }
+};
+
 const SegmentoPainel: React.FC<SegmentoPainelProps> = ({ segmento, clientes, unit, supabaseClient, userProfile, onClose }) => {
   const [mensagem, setMensagem] = useState(segmento.mensagemPadrao);
   const [brinde, setBrinde] = useState(segmento.brindePadrao);
@@ -44,6 +57,30 @@ const SegmentoPainel: React.FC<SegmentoPainelProps> = ({ segmento, clientes, uni
   const [enviandoImagem, setEnviandoImagem] = useState(false);
   const [erroImagem, setErroImagem] = useState('');
   const imagemInputRef = useRef<HTMLInputElement>(null);
+  const [ordenacao, setOrdenacao] = useState<{ coluna: ColunaOrdenavel; direcao: 'asc' | 'desc' } | null>(null);
+
+  const alternarOrdenacao = (coluna: ColunaOrdenavel) => {
+    setOrdenacao(prev => {
+      if (prev?.coluna === coluna) return { coluna, direcao: prev.direcao === 'asc' ? 'desc' : 'asc' };
+      return { coluna, direcao: 'asc' };
+    });
+  };
+
+  // So reordena a mesma lista ja recebida (sem nenhuma consulta nova) -
+  // puramente visual, igual clicar num cabecalho de planilha.
+  const clientesOrdenados = useMemo(() => {
+    if (!ordenacao) return clientes;
+    const { coluna, direcao } = ordenacao;
+    const copia = [...clientes];
+    copia.sort((a, b) => {
+      const va = getValorOrdenavel(a, resultados?.find(r => r.clienteId === a.clienteId), coluna);
+      const vb = getValorOrdenavel(b, resultados?.find(r => r.clienteId === b.clienteId), coluna);
+      if (va < vb) return direcao === 'asc' ? -1 : 1;
+      if (va > vb) return direcao === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return copia;
+  }, [clientes, resultados, ordenacao]);
 
   const handleImagemUpload = async (file?: File) => {
     if (!file) return;
@@ -137,7 +174,7 @@ const SegmentoPainel: React.FC<SegmentoPainelProps> = ({ segmento, clientes, uni
 
   return (
     <div className="app-modal-overlay fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 md:p-4 overflow-y-auto overflow-x-hidden">
-      <div className="app-modal-panel bg-gray-50 w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] mx-auto md:max-w-4xl md:w-full rounded-[2rem] shadow-2xl overflow-y-auto overflow-x-hidden md:overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100vh-24px)] md:max-h-[90vh]">
+      <div className="app-modal-panel bg-gray-50 w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] mx-auto md:max-w-6xl md:w-full rounded-[2rem] shadow-2xl overflow-y-auto overflow-x-hidden md:overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[calc(100vh-24px)] md:max-h-[90vh]">
         <div className="bg-white px-6 md:px-8 py-5 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{clientes.length} cliente(s)</p>
@@ -224,31 +261,45 @@ const SegmentoPainel: React.FC<SegmentoPainelProps> = ({ segmento, clientes, uni
               <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Destinatários</p>
               <p className="text-[11px] font-bold text-slate-400">{selecionados.size} selecionado(s)</p>
             </div>
-            <div className="max-h-72 overflow-auto">
+            <div className="max-h-80 overflow-y-auto overflow-x-hidden">
               {clientes.length === 0 && (
                 <p className="text-center text-sm font-bold text-slate-400 py-8">Nenhum cliente neste segmento.</p>
               )}
-              {clientes.length > 0 && (
-              <table className="w-full text-left border-collapse min-w-[720px]">
+              {clientes.length > 0 && (() => {
+                const cabecalho = (coluna: ColunaOrdenavel, label: string, largura: string) => (
+                  <th
+                    onClick={() => alternarOrdenacao(coluna)}
+                    className={`${largura} px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer select-none hover:text-slate-600 transition-colors`}
+                  >
+                    {label}
+                    <i className={`fa-solid ml-1 text-[9px] ${
+                      ordenacao?.coluna === coluna
+                        ? (ordenacao.direcao === 'asc' ? 'fa-sort-up text-teal-600' : 'fa-sort-down text-teal-600')
+                        : 'fa-sort text-slate-300'
+                    }`}></i>
+                  </th>
+                );
+                return (
+              <table className="w-full table-fixed text-left border-collapse">
                 <thead className="sticky top-0 bg-slate-50 z-10">
                   <tr>
-                    <th className="w-10 px-5 py-2.5"></th>
-                    <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome</th>
-                    <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Telefone</th>
-                    <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contexto</th>
-                    <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Último banho</th>
-                    <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pacotes</th>
-                    <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Avulsos</th>
-                    <th className="px-5 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                    <th className="w-[4%] px-5 py-2.5"></th>
+                    {cabecalho('nome', 'Nome', 'w-[18%]')}
+                    {cabecalho('telefone', 'Telefone', 'w-[15%]')}
+                    <th className="w-[16%] px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contexto</th>
+                    {cabecalho('ultimoBanho', 'Último banho', 'w-[13%]')}
+                    {cabecalho('pacotes', 'Pacotes', 'w-[13%]')}
+                    {cabecalho('avulsos', 'Avulsos', 'w-[10%]')}
+                    {cabecalho('status', 'Status', 'w-[11%]')}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-              {clientes.map(cliente => {
+              {clientesOrdenados.map(cliente => {
                 const resultado = resultados?.find(r => r.clienteId === cliente.clienteId);
                 const ultimoBanho = formatDataBR(cliente.ultimoBanhoEm);
                 return (
                   <tr key={cliente.clienteId} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="w-10 px-5 py-2.5">
+                    <td className="w-[4%] px-5 py-2.5">
                       <input
                         type="checkbox"
                         checked={selecionados.has(cliente.clienteId)}
@@ -287,7 +338,8 @@ const SegmentoPainel: React.FC<SegmentoPainelProps> = ({ segmento, clientes, uni
               })}
                 </tbody>
               </table>
-              )}
+                );
+              })()}
             </div>
           </div>
         </div>
