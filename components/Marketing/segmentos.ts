@@ -17,6 +17,15 @@ export interface ClienteSegmento {
   telefone?: string | null;
   subtitulo?: string;
   ultimoAgendamentoId?: number | string | null;
+  // Metricas cruas (ja calculadas em public.marketing_segmentos_clientes,
+  // ver supabase/migrations/0052 e 0053) - usadas pra montar um resumo mais
+  // detalhado de cada destinatario na campanha (data do ultimo banho,
+  // quantos pacotes/avulsos), nao so o subtitulo especifico do segmento.
+  ultimoBanhoEm?: string | null;
+  banhos12m?: number;
+  totalPacotes?: number;
+  pacotesConcluidos?: number;
+  avulsosFinalizados?: number;
 }
 
 // Copy inicial das mensagens/brindes por segmento. Texto editavel na tela

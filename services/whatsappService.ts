@@ -4,6 +4,7 @@ type WhatsAppOrigem = 'auto' | 'manual';
 interface EnviarNotificacaoWhatsAppParams {
   telefone?: string;
   mensagem?: string;
+  imagemUrl?: string;
   unidadeId?: number | string;
   supabaseClient: any;
   agendamentoId?: number | string;
@@ -23,6 +24,7 @@ interface EnviarNotificacaoWhatsAppParams {
 export async function enviarNotificacaoWhatsApp({
   telefone,
   mensagem,
+  imagemUrl,
   unidadeId,
   supabaseClient,
   agendamentoId,
@@ -38,6 +40,7 @@ export async function enviarNotificacaoWhatsApp({
         agendamento_id: agendamentoId,
         telefone,
         mensagem,
+        imagemUrl,
         unidadeId,
         unidade_id: unidadeId,
         tipo,

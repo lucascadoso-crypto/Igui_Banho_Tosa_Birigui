@@ -19,6 +19,7 @@ interface ClienteMetricaRow {
   telefone: string | null;
   banhos_12m: number;
   avulsos_finalizados: number;
+  ultimo_finalizado_em: string | null;
   dias_desde_ultimo_finalizado: number | null;
   total_pacotes: number;
   pacotes_concluidos: number;
@@ -85,8 +86,18 @@ const MarketingFidelizacao: React.FC<MarketingFidelizacaoProps> = ({ unit, supab
       nome: c.nome,
       telefone: c.telefone,
       subtitulo,
-      ultimoAgendamentoId: c.ultimo_agendamento_id
+      ultimoAgendamentoId: c.ultimo_agendamento_id,
+      ultimoBanhoEm: c.ultimo_finalizado_em,
+      banhos12m: c.banhos_12m,
+      totalPacotes: c.total_pacotes,
+      pacotesConcluidos: c.pacotes_concluidos,
+      avulsosFinalizados: c.avulsos_finalizados
     });
+
+    // Aniversariantes vem de outra view (marketing_aniversariantes), sem as
+    // metricas de banho/pacote - cruza por cliente_id com a lista que ja
+    // temos carregada (mesmo cliente, outra consulta) pra enriquecer tambem.
+    const metricasPorCliente = new Map<string, ClienteMetricaRow>(clientes.map(c => [String(c.cliente_id), c] as [string, ClienteMetricaRow]));
 
     const aniversariantesDedup = new Map<string, ClienteSegmento>();
     aniversariantes.forEach(a => {
@@ -94,12 +105,18 @@ const MarketingFidelizacao: React.FC<MarketingFidelizacaoProps> = ({ unit, supab
       const existente = aniversariantesDedup.get(key);
       const subtitulo = a.tipo_aniversariante === 'pet' ? `Pet: ${a.nome_aniversariante}` : 'Aniversário do tutor';
       if (!existente) {
+        const metrica = metricasPorCliente.get(key);
         aniversariantesDedup.set(key, {
           clienteId: a.cliente_id,
           nome: a.cliente_nome,
           telefone: a.telefone,
           subtitulo,
-          ultimoAgendamentoId: a.ultimo_agendamento_id
+          ultimoAgendamentoId: a.ultimo_agendamento_id,
+          ultimoBanhoEm: metrica?.ultimo_finalizado_em,
+          banhos12m: metrica?.banhos_12m,
+          totalPacotes: metrica?.total_pacotes,
+          pacotesConcluidos: metrica?.pacotes_concluidos,
+          avulsosFinalizados: metrica?.avulsos_finalizados
         });
       }
     });

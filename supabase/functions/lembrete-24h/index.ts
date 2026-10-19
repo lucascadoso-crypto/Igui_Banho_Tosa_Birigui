@@ -314,6 +314,52 @@ async function sendViaEvolution(unidade: any, telefone: string, mensagem: string
   };
 }
 
+// Envio de campanha com imagem (Marketing & Fidelizacao - SegmentoPainel.tsx).
+// Endpoint/payload da Evolution API para midia (sendMedia), diferente do
+// sendText usado no lembrete normal - "media" aceita uma URL publica direta
+// (a imagem ja foi subida pro ImgBB antes de chegar aqui), sem precisar
+// converter pra base64.
+async function sendMediaViaEvolution(unidade: any, telefone: string, imagemUrl: string, legenda: string) {
+  if (!hasValidWhatsAppConfig(unidade)) {
+    throw new Error("Configuracao de WhatsApp incompleta ou desativada para esta unidade.");
+  }
+
+  const baseUrl = String(unidade.whatsapp_url_servidor).trim().replace(/\/$/, "");
+  const instanceName = String(unidade.whatsapp_nome_instancia).trim();
+  const url = `${baseUrl}/message/sendMedia/${instanceName}`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: unidade.whatsapp_token,
+    },
+    body: JSON.stringify({
+      number: telefone,
+      mediatype: "image",
+      mimetype: "image/jpeg",
+      media: imagemUrl,
+      caption: legenda,
+      delay: 1200,
+    }),
+  });
+
+  const text = await response.text();
+  let parsed: any = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch (_) {
+    parsed = text;
+  }
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    detalhe: parsed || text || response.statusText,
+    providerMessageId: parsed?.key?.id || parsed?.messageId || parsed?.id || null,
+  };
+}
+
 async function logWhatsapp(supabase: any, payload: Record<string, unknown>) {
   await supabase.from("whatsapp_mensagens").insert({
     ...payload,
@@ -395,6 +441,7 @@ async function sendAndLogMessage(
   tipo: MessageTipo,
   logTipo: string,
   authUser: any = null,
+  imagemUrl?: string | null,
 ) {
   const { pet, cliente } = getAgendamentoParts(agendamento);
   const unidade = firstRelated(agendamento.unidades);
@@ -408,7 +455,9 @@ async function sendAndLogMessage(
     return { ok: false, ignored: true, reason: "Configuracao de WhatsApp incompleta ou desativada." };
   }
 
-  const sendResult = await sendViaEvolution(unidade, telefone, mensagem);
+  const sendResult = imagemUrl
+    ? await sendMediaViaEvolution(unidade, telefone, imagemUrl, mensagem)
+    : await sendViaEvolution(unidade, telefone, mensagem);
   const status = sendResult.ok ? "SUCESSO" : "ERRO";
   const detalhe = compactDetail(sendResult.detalhe);
 
@@ -561,7 +610,7 @@ async function processManual(supabase: any, req: Request, body: any, agendamento
     });
   }
 
-  const result = await sendAndLogMessage(supabase, agendamento, mensagem, tipo, logTipo, authUser);
+  const result = await sendAndLogMessage(supabase, agendamento, mensagem, tipo, logTipo, authUser, body?.imagemUrl || null);
 
   if (!result.ok) {
     return jsonResponse({
