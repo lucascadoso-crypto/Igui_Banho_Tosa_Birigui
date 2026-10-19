@@ -32,21 +32,6 @@ const formatDataBR = (value?: string | null) => {
   return `${dia}/${mes}/${ano}`;
 };
 
-// Linha com o retrato do cliente pra ajudar a montar tatica de campanha -
-// mesma informacao pra qualquer segmento, alem do subtitulo especifico dele.
-const buildDetalheCliente = (c: ClienteSegmento): string => {
-  const partes: string[] = [];
-  const ultimoBanho = formatDataBR(c.ultimoBanhoEm);
-  partes.push(ultimoBanho ? `Último banho: ${ultimoBanho}` : 'Nunca finalizou um banho');
-  if ((c.totalPacotes || 0) > 0) {
-    partes.push(`${c.totalPacotes} pacote${c.totalPacotes === 1 ? '' : 's'} (${c.pacotesConcluidos || 0} concluído${c.pacotesConcluidos === 1 ? '' : 's'})`);
-  }
-  if ((c.avulsosFinalizados || 0) > 0) {
-    partes.push(`${c.avulsosFinalizados} avulso${c.avulsosFinalizados === 1 ? '' : 's'}`);
-  }
-  return partes.join(' • ');
-};
-
 const SegmentoPainel: React.FC<SegmentoPainelProps> = ({ segmento, clientes, unit, supabaseClient, userProfile, onClose }) => {
   const [mensagem, setMensagem] = useState(segmento.mensagemPadrao);
   const [brinde, setBrinde] = useState(segmento.brindePadrao);
@@ -239,34 +224,53 @@ const SegmentoPainel: React.FC<SegmentoPainelProps> = ({ segmento, clientes, uni
               <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Destinatários</p>
               <p className="text-[11px] font-bold text-slate-400">{selecionados.size} selecionado(s)</p>
             </div>
-            <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
+            <div className="max-h-72 overflow-auto">
               {clientes.length === 0 && (
                 <p className="text-center text-sm font-bold text-slate-400 py-8">Nenhum cliente neste segmento.</p>
               )}
+              {clientes.length > 0 && (
+              <table className="w-full text-left border-collapse min-w-[720px]">
+                <thead className="sticky top-0 bg-slate-50 z-10">
+                  <tr>
+                    <th className="w-10 px-5 py-2.5"></th>
+                    <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome</th>
+                    <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Telefone</th>
+                    <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contexto</th>
+                    <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Último banho</th>
+                    <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pacotes</th>
+                    <th className="px-2 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Avulsos</th>
+                    <th className="px-5 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
               {clientes.map(cliente => {
                 const resultado = resultados?.find(r => r.clienteId === cliente.clienteId);
+                const ultimoBanho = formatDataBR(cliente.ultimoBanhoEm);
                 return (
-                  <div key={cliente.clienteId} className="flex items-center gap-3 px-5 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selecionados.has(cliente.clienteId)}
-                      onChange={() => toggleSelecionado(cliente.clienteId)}
-                      disabled={!cliente.telefone || disparando}
-                      className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-200"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-800 truncate">{cliente.nome}</p>
-                      <p className="text-[11px] font-semibold text-slate-400">
-                        {cliente.telefone || 'Sem telefone cadastrado'}
-                        {cliente.subtitulo ? ` • ${cliente.subtitulo}` : ''}
-                        {!cliente.ultimoAgendamentoId ? ' • sem agendamento para ancorar envio' : ''}
-                      </p>
-                      <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
-                        {buildDetalheCliente(cliente)}
-                      </p>
-                    </div>
+                  <tr key={cliente.clienteId} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="w-10 px-5 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={selecionados.has(cliente.clienteId)}
+                        onChange={() => toggleSelecionado(cliente.clienteId)}
+                        disabled={!cliente.telefone || disparando}
+                        className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-200"
+                      />
+                    </td>
+                    <td className="px-2 py-2.5 text-sm font-bold text-slate-800 whitespace-nowrap">{cliente.nome}</td>
+                    <td className="px-2 py-2.5 text-xs font-semibold text-slate-500 whitespace-nowrap">
+                      {cliente.telefone || 'Sem telefone'}
+                      {!cliente.ultimoAgendamentoId && <span className="block text-[10px] text-amber-600">sem agendamento p/ ancorar envio</span>}
+                    </td>
+                    <td className="px-2 py-2.5 text-xs font-semibold text-slate-500">{cliente.subtitulo || '—'}</td>
+                    <td className="px-2 py-2.5 text-xs font-semibold text-slate-500 whitespace-nowrap">{ultimoBanho || 'Nunca'}</td>
+                    <td className="px-2 py-2.5 text-xs font-semibold text-slate-500 whitespace-nowrap">
+                      {(cliente.totalPacotes || 0) > 0 ? `${cliente.totalPacotes} (${cliente.pacotesConcluidos || 0} concl.)` : '—'}
+                    </td>
+                    <td className="px-2 py-2.5 text-xs font-semibold text-slate-500 whitespace-nowrap">{cliente.avulsosFinalizados || 0}</td>
+                    <td className="px-5 py-2.5">
                     {resultado && (
-                      <span className={`text-[10px] font-black uppercase tracking-wide px-2.5 py-1 rounded-full shrink-0 ${
+                      <span className={`text-[10px] font-black uppercase tracking-wide px-2.5 py-1 rounded-full shrink-0 inline-block ${
                         resultado.status === 'enviado' ? 'bg-emerald-50 text-emerald-600'
                         : resultado.status === 'falha' ? 'bg-rose-50 text-rose-600'
                         : 'bg-amber-50 text-amber-600'
@@ -277,9 +281,13 @@ const SegmentoPainel: React.FC<SegmentoPainelProps> = ({ segmento, clientes, uni
                           : 'Sem agendamento'}
                       </span>
                     )}
-                  </div>
+                    </td>
+                  </tr>
                 );
               })}
+                </tbody>
+              </table>
+              )}
             </div>
           </div>
         </div>
