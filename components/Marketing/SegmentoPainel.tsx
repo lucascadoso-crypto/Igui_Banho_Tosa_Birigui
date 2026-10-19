@@ -308,7 +308,7 @@ const SegmentoPainel: React.FC<SegmentoPainelProps> = ({ segmento, clientes, uni
                         className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-200"
                       />
                     </td>
-                    <td className="px-2 py-2.5 text-sm font-bold text-slate-800 whitespace-nowrap">{cliente.nome}</td>
+                    <td className="px-2 py-2.5 text-sm font-bold text-slate-800 truncate" title={cliente.nome}>{cliente.nome}</td>
                     <td className="px-2 py-2.5 text-xs font-semibold text-slate-500 whitespace-nowrap">
                       {cliente.telefone || 'Sem telefone'}
                       {!cliente.ultimoAgendamentoId && <span className="block text-[10px] text-amber-600">sem agendamento p/ ancorar envio</span>}
