@@ -152,6 +152,14 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
     return Number(movement?.valor_total || transaction?.valor || 0);
   }, [sourceData, transaction]);
 
+  // Valor que a nota realmente leva: o que foi pago, sem transporte (mesma
+  // conta de expected_fiscal_total em criar_rascunho_fiscal_por_movimento).
+  // A nota sempre sai com o valor pago - desconto ja vem abatido.
+  const valorPago = useMemo(() => {
+    const transporte = Number(sourceData?.valor_transporte || 0);
+    return Math.max(totalValue - transporte, 0);
+  }, [sourceData, totalValue]);
+
   const taxItems = useMemo(() => {
     if (!sourceData) return [];
 
@@ -181,12 +189,12 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
       servico_id: pacoteServiceId,
       descricao: transaction.sourceTable === 'pacotes' ? 'Pacote de fidelidade banho e tosa' : 'Servico de banho e tosa',
       quantidade: 1,
-      valor_unitario: totalValue,
+      valor_unitario: valorPago,
       valor_desconto: 0,
-      valor_total: totalValue,
+      valor_total: valorPago,
       fiscal: fiscalForService(pacoteServiceId) || fiscalFallback
     }];
-  }, [sourceData, transaction, totalValue, fiscalServices]);
+  }, [sourceData, transaction, valorPago, fiscalServices]);
 
   const buildAddress = (c: any) => {
     if (!c) return null;
@@ -199,10 +207,18 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
     ].filter(Boolean).join(' - ') || null;
   };
 
-  const serviceValue = useMemo(() => {
-    const sum = taxItems.reduce((total: number, item: any) => total + Number(item.valor_total || 0), 0);
-    return Number(sum || totalValue || 0);
-  }, [taxItems, totalValue]);
+  const itensSomaTabela = useMemo(
+    () => taxItems.reduce((total: number, item: any) => total + Number(item.valor_total || 0), 0),
+    [taxItems]
+  );
+
+  // "Valor fiscal" = valor pago (e o que vai na nota), nao a soma dos
+  // precos de tabela dos itens.
+  const serviceValue = valorPago > 0 ? valorPago : Number(itensSomaTabela || totalValue || 0);
+
+  // Diferenca entre o preco de tabela dos itens e o valor pago (desconto ja
+  // abatido). Acrescimo (pago > tabela) nao entra aqui.
+  const descontoAbatido = Math.max(itensSomaTabela - serviceValue, 0);
 
   const checklist = useMemo(() => avaliarChecklistFiscal({
     configFiscal,
@@ -309,6 +325,12 @@ const FiscalDraftModal: React.FC<FiscalDraftModalProps> = ({ supabaseClient, uni
                   <p className="font-black text-slate-900">{formatCurrency(item.valor_total)}</p>
                 </div>
               ))}
+              {descontoAbatido > 0.009 && (
+                <p className="text-[11px] font-bold text-teal-700 px-1">
+                  <i className="fa-solid fa-circle-info mr-1"></i>
+                  Desconto de {formatCurrency(descontoAbatido)} ja abatido: a nota sai com o valor pago ({formatCurrency(serviceValue)}).
+                </p>
+              )}
             </div>
 
             {!checklist.podeEmitir ? (
