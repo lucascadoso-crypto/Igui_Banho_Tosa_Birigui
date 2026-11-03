@@ -328,9 +328,12 @@ serve(async (req) => {
         descricao: descricaoServico || (primeiroItem.descricao as string),
         codigoNbs: primeiroItem.codigo_nbs as string,
       },
+      // A nota sempre leva o valor efetivamente pago (valor_total = servicos
+      // - desconto), sem lancar o desconto separado na DPS (regra do dono do
+      // negocio: nao aparece preco cheio + desconto, so o valor cobrado).
       valores: {
-        valorServico: Number(nota.valor_servicos),
-        valorDescontoIncondicionado: Number(nota.valor_desconto ?? 0),
+        valorServico: Number(nota.valor_total),
+        valorDescontoIncondicionado: 0,
       },
     };
 
