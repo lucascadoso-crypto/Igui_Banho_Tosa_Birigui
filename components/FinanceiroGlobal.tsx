@@ -17,6 +17,8 @@ import {
   fetchFidelidade
 } from '../services/financeiroGeral';
 import FinanceStatusBar from './FinanceiroGeral/FinanceStatusBar';
+import BaixarRelatorioButton from './FinanceiroGeral/BaixarRelatorioButton';
+import { RelatorioFinanceiroEntrada } from '../services/financeiroRelatorio';
 import FinanceiroFiltersCard from './FinanceiroGeral/FinanceiroFiltersCard';
 import FinanceKpiCard from './FinanceiroGeral/FinanceKpiCard';
 import CashFlowLineChart from './FinanceiroGeral/CashFlowLineChart';
@@ -109,9 +111,28 @@ const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClie
     setTimeout(() => setSyncing(false), 600);
   };
 
+  const relatorioCarregando = kpisLoading || fluxoDiarioLoading || porLinhaLoading || formasPagamentoLoading || fidelidadeLoading;
+  const relatorioEntrada: RelatorioFinanceiroEntrada | null = kpis
+    ? {
+        unidadeNome: filtros.unidadeId
+          ? units.find((u) => u.id === filtros.unidadeId)?.name || 'Unidade selecionada'
+          : 'Todas as unidades',
+        filtros,
+        kpis,
+        fluxoDiario,
+        porLinha,
+        formasPagamento,
+        fidelidade
+      }
+    : null;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <FinanceStatusBar syncing={syncing} onSync={handleSync} />
+      <FinanceStatusBar
+        syncing={syncing}
+        onSync={handleSync}
+        actions={<BaixarRelatorioButton entrada={relatorioEntrada} carregando={relatorioCarregando} />}
+      />
 
       <FinanceiroFiltersCard units={units} filtros={filtros} onChangeFiltros={setFiltros} />
 
