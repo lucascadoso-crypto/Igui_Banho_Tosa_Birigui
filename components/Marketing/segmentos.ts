@@ -93,3 +93,31 @@ export const SEGMENTOS: SegmentoDef[] = [
     brindePadrao: 'Banho de aniversário com mimo especial'
   }
 ];
+
+// Linha de public.marketing_segmentos_clientes (ver 0052/0053/0054), só os
+// campos seg_* usados para montar os chips de segmento fora da tela de
+// Marketing (Clientes, Prontuário, painel do agendamento).
+export interface ClienteSegmentosFlags {
+  seg_vip?: boolean | null;
+  seg_pagam_em_dia?: boolean | null;
+  seg_avulso_recorrente?: boolean | null;
+  seg_nao_renovaram?: boolean | null;
+  seg_inativos?: boolean | null;
+}
+
+const SEGMENTO_FLAG_POR_ID: Record<string, keyof ClienteSegmentosFlags> = {
+  vip: 'seg_vip',
+  pagam_em_dia: 'seg_pagam_em_dia',
+  avulso_recorrente: 'seg_avulso_recorrente',
+  nao_renovaram: 'seg_nao_renovaram',
+  inativos: 'seg_inativos'
+};
+
+/** Retorna os SegmentoDef cujo seg_* esteja true para a linha informada (aniversariantes fica fora, pois não é uma coluna seg_* desta view). */
+export const getSegmentosAtivos = (cliente?: ClienteSegmentosFlags | null): SegmentoDef[] => {
+  if (!cliente) return [];
+  return SEGMENTOS.filter(s => {
+    const flag = SEGMENTO_FLAG_POR_ID[s.id];
+    return flag ? !!cliente[flag] : false;
+  });
+};

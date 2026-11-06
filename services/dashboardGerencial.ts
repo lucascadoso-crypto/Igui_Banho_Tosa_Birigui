@@ -305,3 +305,113 @@ export const fetchProximosAgendamentos = async (
     numeroSessao: a.numero_sessao ?? null
   }));
 };
+
+export interface DashboardKpisComplementares {
+  ticketMedioAtual: number;
+  ticketMedioAnterior: number;
+  totalAReceberAtual: number;
+  totalAReceberAnterior: number;
+}
+
+export const fetchDashboardKpisComplementares = async (
+  supabaseClient: any,
+  filtros: DashboardFiltros
+): Promise<DashboardKpisComplementares> => {
+  const { dataInicioAnterior, dataFimAnterior } = getPeriodoAnterior(filtros.dataInicio, filtros.dataFim);
+  const { data, error } = await supabaseClient.rpc('fn_dashboard_kpis_complementares', {
+    p_unidade_id: filtros.unidadeId,
+    p_data_inicio: filtros.dataInicio,
+    p_data_fim: filtros.dataFim,
+    p_data_inicio_ant: dataInicioAnterior,
+    p_data_fim_ant: dataFimAnterior,
+    p_transporte: filtros.transporte
+  });
+  if (error) throw error;
+  return {
+    ticketMedioAtual: toCurrencyNumber(data?.ticket_medio_atual),
+    ticketMedioAnterior: toCurrencyNumber(data?.ticket_medio_anterior),
+    totalAReceberAtual: toCurrencyNumber(data?.total_a_receber_atual),
+    totalAReceberAnterior: toCurrencyNumber(data?.total_a_receber_anterior)
+  };
+};
+
+export interface OcupacaoDiaSemana {
+  diaSemana: number;
+  capacidadeDia: number;
+  diasNoPeriodo: number;
+  capacidadeTotal: number;
+  agendados: number;
+  percentual: number;
+}
+
+export const fetchOcupacaoPeriodo = async (
+  supabaseClient: any,
+  unidadeId: number | null,
+  dataInicio: string,
+  dataFim: string
+): Promise<OcupacaoDiaSemana[]> => {
+  const { data, error } = await supabaseClient.rpc('fn_dashboard_ocupacao_periodo', {
+    p_unidade_id: unidadeId,
+    p_data_inicio: dataInicio,
+    p_data_fim: dataFim
+  });
+  if (error) throw error;
+  return (data || []).map((row: any) => ({
+    diaSemana: row.dia_semana,
+    capacidadeDia: toCurrencyNumber(row.capacidade_dia),
+    diasNoPeriodo: toCurrencyNumber(row.dias_no_periodo),
+    capacidadeTotal: toCurrencyNumber(row.capacidade_total),
+    agendados: toCurrencyNumber(row.agendados),
+    percentual: toCurrencyNumber(row.percentual)
+  }));
+};
+
+/** Faixa de ocupação: Ocioso (<50%), Normal (50-85%), Lotado (>85%). */
+export const faixaOcupacao = (percentual: number): 'ocioso' | 'normal' | 'lotado' => {
+  if (percentual > 85) return 'lotado';
+  if (percentual >= 50) return 'normal';
+  return 'ocioso';
+};
+
+export const resumoOcupacao = (linhas: OcupacaoDiaSemana[]) => {
+  const capacidadeTotal = linhas.reduce((s, l) => s + l.capacidadeTotal, 0);
+  const agendados = linhas.reduce((s, l) => s + l.agendados, 0);
+  const percentual = capacidadeTotal > 0 ? Math.round((agendados / capacidadeTotal) * 1000) / 10 : 0;
+  return { capacidadeTotal, agendados, disponivel: Math.max(0, capacidadeTotal - agendados), percentual };
+};
+
+export interface TopCliente { clienteId: number | string; clienteNome: string; qtdEventos: number; faturamento: number; }
+
+export const fetchTopClientes = async (
+  supabaseClient: any,
+  filtros: DashboardFiltros,
+  limite = 10
+): Promise<TopCliente[]> => {
+  const { data, error } = await supabaseClient.rpc('fn_dashboard_top_clientes', {
+    p_unidade_id: filtros.unidadeId,
+    p_data_inicio: filtros.dataInicio,
+    p_data_fim: filtros.dataFim,
+    p_transporte: filtros.transporte,
+    p_limite: limite
+  });
+  if (error) throw error;
+  return (data || []).map((row: any) => ({
+    clienteId: row.cliente_id,
+    clienteNome: row.cliente_nome,
+    qtdEventos: toCurrencyNumber(row.qtd_eventos),
+    faturamento: toCurrencyNumber(row.faturamento)
+  }));
+};
+
+export interface TopRaca { raca: string; qtd: number; }
+
+export const fetchTopRacas = async (supabaseClient: any, filtros: DashboardFiltros, limite = 10): Promise<TopRaca[]> => {
+  const { data, error } = await supabaseClient.rpc('fn_dashboard_top_racas', {
+    p_unidade_id: filtros.unidadeId,
+    p_data_inicio: filtros.dataInicio,
+    p_data_fim: filtros.dataFim,
+    p_limite: limite
+  });
+  if (error) throw error;
+  return (data || []).map((row: any) => ({ raca: row.raca, qtd: toCurrencyNumber(row.qtd) }));
+};

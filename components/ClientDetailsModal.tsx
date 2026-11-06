@@ -3,8 +3,47 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Client, Pet, UiId, UserProfile } from '../types';
 import ClienteModal from './ClienteModal';
 import PetFormModal from './PetFormModal';
+import PetProfilePanel from './PetProfilePanel';
 import { registrarAtividade } from '../services/logger';
 import FiscalHistory from './FiscalHistory';
+import { getSegmentosAtivos, ClienteSegmentosFlags } from './Marketing/segmentos';
+import { formatCurrencyBR } from '../services/appointmentTotals';
+import { buildWhatsAppLink, buildMapsLink } from '../services/clientLinks';
+
+// Linha de public.crm_cliente_valor (ver supabase/migrations/0064_crm_cliente_valor_view.sql).
+interface CrmClienteValorRow {
+  cliente_id: number | string;
+  unidade_id: number | string;
+  total_gasto_12m: number;
+  ticket_medio: number | null;
+  total_atendimentos: number;
+  cliente_desde: string | null;
+}
+
+// Linha de public.marketing_pacotes_status (ver 0052/0053), só os campos usados no progresso de pacote.
+interface MarketingPacoteStatusRow {
+  id: number | string;
+  nome_pacote: string | null;
+  nome: string | null;
+  qtd_sessoes: number;
+  usados: number;
+  saldo_calculado: number;
+  pacote_ativo: boolean;
+}
+
+// Linha de public.fn_financeiro_eventos_pendentes (ver 0034_financeiro_geral.sql).
+interface FinanceiroEventoPendente {
+  origem: string;
+  categoria: string;
+  referencia_id: number | string;
+  unidade_id: number | string;
+  cliente_id: number | string;
+  cliente_nome: string;
+  descricao: string;
+  data_referencia: string;
+  valor: number;
+  vencido: boolean;
+}
 
 interface ClientDetailsModalProps {
   client: Client;
@@ -36,9 +75,17 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
   // Estados para Edição
   const [isEditClientModalOpen, setIsEditClientModalOpen] = useState(false);
   const [petSelecionado, setPetSelecionado] = useState<Pet | null>(null);
+  const [selectedPetProfile, setSelectedPetProfile] = useState<Pet | null>(null);
   const [currentClient, setCurrentClient] = useState<Client>(client);
   const canViewFiscal = ['master', 'financeiro', 'gerente', 'admin_unidade', 'administrador'].includes(userProfile?.cargo);
   const hasFocusedPet = useRef(false);
+
+  // Resumo do Prontuário: KPIs de valor, segmentos, pacotes ativos e pendências.
+  const [valorCliente, setValorCliente] = useState<CrmClienteValorRow | null>(null);
+  const [segmentos, setSegmentos] = useState<ClienteSegmentosFlags | null>(null);
+  const [pacotesAtivos, setPacotesAtivos] = useState<MarketingPacoteStatusRow[]>([]);
+  const [pendencias, setPendencias] = useState<FinanceiroEventoPendente[]>([]);
+  const [loadingResumo, setLoadingResumo] = useState(false);
 
   useEffect(() => {
     setCurrentClient(client);
@@ -48,6 +95,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
 
   useEffect(() => {
     fetchPets();
+    fetchResumo();
   }, [client.id]);
 
   useEffect(() => {
@@ -60,9 +108,45 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
     const target = pets.find(p => String(p.id) === String(focusPetId));
     if (target) {
       hasFocusedPet.current = true;
-      handleOpenEditPet(target);
+      setSelectedPetProfile(target);
     }
   }, [focusPetId, pets, loadingPets]);
+
+  const fetchResumo = async () => {
+    setLoadingResumo(true);
+    try {
+      const dataFimAmpla = new Date();
+      dataFimAmpla.setFullYear(dataFimAmpla.getFullYear() + 2);
+
+      const [valorRes, segRes, pacotesRes, pendRes] = await Promise.all([
+        supabaseClient.from('crm_cliente_valor').select('*').eq('cliente_id', client.id).maybeSingle(),
+        supabaseClient.from('marketing_segmentos_clientes').select('*').eq('cliente_id', client.id).maybeSingle(),
+        supabaseClient.from('marketing_pacotes_status').select('*').eq('cliente_id', client.id).eq('pacote_ativo', true),
+        supabaseClient.rpc('fn_financeiro_eventos_pendentes', {
+          p_unidade_id: unitId,
+          p_data_inicio: '2015-01-01',
+          p_data_fim: dataFimAmpla.toISOString().substring(0, 10),
+          p_transporte: 'todos',
+          p_categoria: 'todos',
+          p_forma_pagamento: 'todas'
+        })
+      ]);
+
+      if (valorRes.error) throw valorRes.error;
+      if (segRes.error) throw segRes.error;
+      if (pacotesRes.error) throw pacotesRes.error;
+      if (pendRes.error) throw pendRes.error;
+
+      setValorCliente(valorRes.data || null);
+      setSegmentos(segRes.data || null);
+      setPacotesAtivos(pacotesRes.data || []);
+      setPendencias((pendRes.data || []).filter((p: FinanceiroEventoPendente) => String(p.cliente_id) === String(client.id)));
+    } catch (err) {
+      console.error('Erro ao buscar resumo do cliente:', err);
+    } finally {
+      setLoadingResumo(false);
+    }
+  };
 
   const fetchPets = async () => {
     setLoadingPets(true);
@@ -199,11 +283,6 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
     fetchPets();
   };
 
-  const handleOpenEditPet = (pet: Pet) => {
-    setPetSelecionado(pet);
-    setIsNewPetModalOpen(true);
-  };
-
   const handleArchivePet = async () => {
     if (!petToDelete) return;
     setDeletingPet(true);
@@ -306,8 +385,95 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
         <div className="app-modal-body flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-10 custom-scrollbar">
           
           {activeTab === 'details' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              
+            <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+              {/* Resumo: KPIs de valor + segmentos + pendências + pacotes ativos */}
+              <div className="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6">
+                {loadingResumo ? (
+                  <div className="py-6 text-center"><i className="fa-solid fa-circle-notch fa-spin text-[#00BFA5]"></i></div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                      <div className="bg-slate-50 rounded-2xl p-4">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Gasto 12m</p>
+                        <p className="text-sm md:text-base font-black text-slate-800 mt-1">{formatCurrencyBR(valorCliente?.total_gasto_12m || 0)}</p>
+                      </div>
+                      <div className="bg-slate-50 rounded-2xl p-4">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Ticket Médio</p>
+                        <p className="text-sm md:text-base font-black text-slate-800 mt-1">{valorCliente?.ticket_medio != null ? formatCurrencyBR(valorCliente.ticket_medio) : '-'}</p>
+                      </div>
+                      <div className="bg-slate-50 rounded-2xl p-4">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Atendimentos</p>
+                        <p className="text-sm md:text-base font-black text-slate-800 mt-1">{valorCliente?.total_atendimentos ?? 0}</p>
+                      </div>
+                      <div className="bg-slate-50 rounded-2xl p-4">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Cliente Desde</p>
+                        <p className="text-sm md:text-base font-black text-slate-800 mt-1">{formatDate(valorCliente?.cliente_desde || currentClient.created_at)}</p>
+                      </div>
+                      <div className="bg-slate-50 rounded-2xl p-4">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Último Atendimento</p>
+                        <p className="text-sm md:text-base font-black text-slate-800 mt-1">{history[0] ? formatDate(history[0].dataExibicao) : '-'}</p>
+                      </div>
+                    </div>
+
+                    {getSegmentosAtivos(segmentos).length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {getSegmentosAtivos(segmentos).map(seg => (
+                          <span key={seg.id} className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${seg.corBg} ${seg.corTexto}`}>
+                            <i className={`fa-solid ${seg.icon}`}></i>{seg.titulo}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {pendencias.length > 0 && (
+                      <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl space-y-2">
+                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">
+                          <i className="fa-solid fa-triangle-exclamation mr-1.5"></i>
+                          {pendencias.length} Pendência(s) Financeira(s)
+                        </p>
+                        <div className="space-y-1.5">
+                          {pendencias.slice(0, 5).map(p => (
+                            <div key={`${p.origem}-${p.referencia_id}`} className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-amber-700 truncate pr-2">{p.descricao}{p.vencido ? ' · vencido' : ''}</span>
+                              <span className="font-black text-amber-700 shrink-0">{formatCurrencyBR(p.valor)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {pacotesAtivos.length > 0 && (
+                      <div className="space-y-2">
+                        {pacotesAtivos.map(pac => {
+                          const alerta = pac.saldo_calculado <= 2;
+                          return (
+                            <div key={pac.id} className={`p-4 rounded-2xl border ${alerta ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                              <div className="flex items-center justify-between">
+                                <span className={`text-xs font-black ${alerta ? 'text-rose-700' : 'text-emerald-700'}`}>
+                                  {pac.nome_pacote || pac.nome || 'Pacote'}
+                                </span>
+                                <span className={`text-xs font-black ${alerta ? 'text-rose-700' : 'text-emerald-700'}`}>
+                                  {pac.usados} de {pac.qtd_sessoes}
+                                </span>
+                              </div>
+                              {alerta && (
+                                <p className="text-[10px] font-bold text-rose-500 mt-1">
+                                  <i className="fa-solid fa-circle-exclamation mr-1"></i>
+                                  Restam só {pac.saldo_calculado} sessão(ões) — hora de oferecer renovação.
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-10">
+
               {/* Coluna Esquerda: Info Pessoal */}
               <div className="lg:col-span-5 space-y-6 md:space-y-8 min-w-0">
                 <div className="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center text-center relative group/client overflow-hidden">
@@ -340,15 +506,39 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                         <i className="fa-brands fa-whatsapp text-emerald-500 text-xl mr-3"></i>
                         <span className="font-bold text-slate-700 break-all">{currentClient.telefone}</span>
                       </div>
-                      <button className="w-full md:w-auto text-[10px] font-black uppercase tracking-tighter text-emerald-600 bg-white px-3 py-2 md:py-1.5 rounded-lg shadow-sm border border-emerald-100 hover:bg-emerald-500 hover:text-white transition-all">
-                        WhatsApp Logs
-                      </button>
+                      <div className="flex items-center gap-2 w-full md:w-auto">
+                        {buildWhatsAppLink(currentClient.telefone) && (
+                          <a
+                            href={buildWhatsAppLink(currentClient.telefone)!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 md:flex-none text-center text-[10px] font-black uppercase tracking-tighter text-white bg-emerald-500 px-3 py-2 md:py-1.5 rounded-lg shadow-sm hover:bg-emerald-600 transition-all"
+                          >
+                            Abrir WhatsApp
+                          </a>
+                        )}
+                        <button className="flex-1 md:flex-none text-[10px] font-black uppercase tracking-tighter text-emerald-600 bg-white px-3 py-2 md:py-1.5 rounded-lg shadow-sm border border-emerald-100 hover:bg-emerald-500 hover:text-white transition-all">
+                          WhatsApp Logs
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-white p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6 overflow-hidden">
-                   <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Endereço de Cobrança</h4>
+                   <div className="flex items-center justify-between">
+                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Endereço de Cobrança</h4>
+                     {buildMapsLink(currentClient) && (
+                       <a
+                         href={buildMapsLink(currentClient)!}
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         className="text-[10px] font-black uppercase tracking-widest text-[#00BFA5] hover:underline"
+                       >
+                         <i className="fa-solid fa-map-location-dot mr-1"></i>Ver no Maps
+                       </a>
+                     )}
+                   </div>
                    {currentClient.logradouro ? (
                      <div className="flex items-start gap-4">
                         <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-[#00BFA5] shrink-0">
@@ -386,9 +576,9 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                       </div>
                     ) : pets.length > 0 ? (
                       pets.filter(pet => pet.ativo !== false).map(pet => (
-                        <div 
-                          key={pet.id} 
-                          onClick={() => handleOpenEditPet(pet)}
+                        <div
+                          key={pet.id}
+                          onClick={() => setSelectedPetProfile(pet)}
                           className="group p-4 bg-slate-50 rounded-3xl border border-transparent hover:border-[#00BFA5]/20 hover:bg-white hover:shadow-xl hover:shadow-[#00BFA5]/5 transition-all cursor-pointer"
                         >
                           <div className="flex items-center gap-4">
@@ -449,6 +639,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
                 </div>
               </div>
 
+            </div>
             </div>
           )}
 
@@ -583,6 +774,23 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ client, supabas
           onClose={closePetModal}
           onSaved={handlePetSaved}
           showToast={showToast}
+          zBoost={40 + zBoost}
+        />
+      )}
+
+      {/* FICHA DO PET (somente leitura + atalho para editar) */}
+      {selectedPetProfile && (
+        <PetProfilePanel
+          pet={selectedPetProfile}
+          client={currentClient}
+          unitId={unitId}
+          supabaseClient={supabaseClient}
+          userProfile={userProfile}
+          onClose={() => setSelectedPetProfile(null)}
+          onChanged={() => {
+            fetchPets();
+            fetchResumo();
+          }}
           zBoost={40 + zBoost}
         />
       )}

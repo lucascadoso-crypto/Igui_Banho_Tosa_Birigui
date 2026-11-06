@@ -7,9 +7,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { formatarErroWhatsApp } from '../lib/errorParser';
 import FiscalSettings from './FiscalSettings';
 import CustosServicos from './CustosServicos';
+import CapacidadeUnidades from './CapacidadeUnidades';
 import { compareNomePtBr } from '../services/sorting';
 
-type SettingsTab = 'identity' | 'units' | 'services' | 'packages' | 'custos' | 'fiscal' | 'whatsapp_logs';
+type SettingsTab = 'identity' | 'units' | 'services' | 'packages' | 'custos' | 'capacidade' | 'fiscal' | 'whatsapp_logs';
 
 interface SettingsProps {
   supabaseClient: any;
@@ -586,6 +587,13 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
           <span>Custos dos Serviços</span>
         </button>
         <button
+          onClick={() => setActiveTab('capacidade')}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 ${activeTab === 'capacidade' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
+        >
+          <i className="fa-solid fa-calendar-week"></i>
+          <span>Capacidade</span>
+        </button>
+        <button
           onClick={() => setActiveTab('fiscal')}
           className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 ${activeTab === 'fiscal' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
         >
@@ -1104,6 +1112,10 @@ const Settings: React.FC<SettingsProps> = ({ supabaseClient, units, refreshUnits
 
       {activeTab === 'custos' && (
         <CustosServicos supabaseClient={supabaseClient} userProfile={userProfile} />
+      )}
+
+      {activeTab === 'capacidade' && (
+        <CapacidadeUnidades supabaseClient={supabaseClient} units={units} userProfile={userProfile} />
       )}
 
       {activeTab === 'fiscal' && (

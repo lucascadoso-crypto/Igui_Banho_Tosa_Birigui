@@ -12,6 +12,8 @@ import { calculateAppointmentTotals } from '../services/pricing';
 import { registrarPagamentoPacote, garantirFinanceiroMovimento } from '../services/pacotePayments';
 import { compareNomePtBr } from '../services/sorting';
 import { getIntervaloDias, getDiaSemanaPreferido, proximaDataSessao } from '../services/pacoteScheduling';
+import { fetchOcupacaoPeriodo } from '../services/dashboardGerencial';
+import OcupacaoBadge from './Dashboard/OcupacaoBadge';
 
 interface AppointmentsProps {
   unit: Unit;
@@ -277,7 +279,9 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   };
 
   const [selectedDate, setSelectedDate] = useState(getTodayBR());
-  const [viewMonth, setViewMonth] = useState<Date>(new Date()); 
+  const [viewMonth, setViewMonth] = useState<Date>(new Date());
+  const [ocupacaoDia, setOcupacaoDia] = useState<{ capacidade: number; agendados: number } | null>(null);
+  const [ocupacaoDiaLoading, setOcupacaoDiaLoading] = useState(true);
   
   const [clientSearch, setClientSearch] = useState('');
   const [clientResults, setClientResults] = useState<Client[]>([]);
@@ -329,6 +333,18 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
   useEffect(() => {
     fetchData();
   }, [unit.id, selectedDate]);
+
+  // Indicador "Cap · Disp · Ocup · %" do dia selecionado (somente leitura).
+  useEffect(() => {
+    setOcupacaoDiaLoading(true);
+    fetchOcupacaoPeriodo(supabaseClient, unit.id, selectedDate, selectedDate)
+      .then((linhas) => {
+        const linha = linhas[0];
+        setOcupacaoDia(linha ? { capacidade: linha.capacidadeTotal, agendados: linha.agendados } : { capacidade: 0, agendados: 0 });
+      })
+      .catch((err) => console.error('Erro ao carregar ocupação do dia:', err))
+      .finally(() => setOcupacaoDiaLoading(false));
+  }, [unit.id, selectedDate, supabaseClient]);
 
   useEffect(() => {
     const handleClickOutside = () => {
@@ -1644,6 +1660,9 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
                 {selectedDate.split('-').reverse().join('/')}
               </h2>
               <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">iG {unit.name}</p>
+              <div className="mt-2">
+                <OcupacaoBadge capacidade={ocupacaoDia?.capacidade ?? 0} agendados={ocupacaoDia?.agendados ?? 0} loading={ocupacaoDiaLoading} />
+              </div>
            </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">

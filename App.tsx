@@ -14,8 +14,10 @@ import Pacotes from './components/Pacotes';
 import Financeiro from './components/Financeiro';
 import Gastos from './components/Gastos';
 import DashboardGerencial from './components/DashboardGerencial';
+import Relatorios from './components/Relatorios';
 import FinanceiroGlobal from './components/FinanceiroGlobal';
 import Rentabilidade from './components/Rentabilidade';
+import Comissoes from './components/Comissoes';
 import Equipe from './components/Equipe';
 import ReciboView from './components/ReciboView';
 import Login from './components/Login';
@@ -88,10 +90,14 @@ const AppContent: React.FC = () => {
     switch (navState.view) {
       case 'Dashboard':
         return <DashboardGerencial units={units} supabaseClient={supabase} />;
+      case 'Relatórios':
+        return <Relatorios units={units} supabaseClient={supabase} />;
       case 'Financeiro Geral':
-        return <FinanceiroGlobal units={units} supabaseClient={supabase} />;
+        return <FinanceiroGlobal units={units} supabaseClient={supabase} userProfile={effectiveUserProfile} initialAba={navState.financeiroAbaInicial} />;
       case 'Rentabilidade':
         return <Rentabilidade units={units} supabaseClient={supabase} />;
+      case 'Comissões':
+        return <Comissoes units={units} supabaseClient={supabase} userProfile={effectiveUserProfile} />;
       case 'Equipe':
         return <Equipe units={units} supabaseClient={supabase} currentUserRole={effectiveUserRole} userProfile={effectiveUserProfile} />;
       case 'Meu Perfil':
@@ -100,7 +106,7 @@ const AppContent: React.FC = () => {
       case 'Configurações':
         return <Settings supabaseClient={supabase} units={units} refreshUnits={fetchUnits} userProfile={effectiveUserProfile} initialTab={navState.settingsTab} />;
       case 'Clientes':
-        return activeUnit ? <Clients unit={activeUnit} supabaseClient={supabase} userProfile={effectiveUserProfile} /> : <div>Selecione uma unidade</div>;
+        return activeUnit ? <Clients unit={activeUnit} supabaseClient={supabase} userProfile={effectiveUserProfile} initialFiltroRapido={navState.clientesFiltroInicial as any} /> : <div>Selecione uma unidade</div>;
       case 'Pacotes':
         return activeUnit ? <Pacotes unit={activeUnit} supabaseClient={supabase} userProfile={effectiveUserProfile} /> : <div>Selecione uma unidade</div>;
       case 'Agendamento':

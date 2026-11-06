@@ -3,6 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Pet, UiId, UserProfile } from '../types';
 import { registrarAtividade } from '../services/logger';
 import { getLastImgBBUploadError, uploadToImgBB } from '../services/imgbbService';
+import { COMPORTAMENTO_TAGS } from './petComportamentoTags';
 
 interface PetFormModalProps {
   pet?: Pet | null;
@@ -31,7 +32,9 @@ const PetFormModal: React.FC<PetFormModalProps> = ({
 }) => {
   const [savingPet, setSavingPet] = useState(false);
   const [uploadingPetPhoto, setUploadingPetPhoto] = useState(false);
+  const [uploadingTosaReferencia, setUploadingTosaReferencia] = useState(false);
   const petPhotoInputRef = useRef<HTMLInputElement>(null);
+  const tosaReferenciaInputRef = useRef<HTMLInputElement>(null);
 
   const [newPet, setNewPet] = useState({
     id: pet?.id || '',
@@ -42,8 +45,20 @@ const PetFormModal: React.FC<PetFormModalProps> = ({
     porte: pet?.porte || 'Médio',
     data_nascimento: pet?.data_nascimento || '',
     notas_internas: pet?.notas_internas || '',
-    foto_url: pet?.foto_url || ''
+    foto_url: pet?.foto_url || '',
+    comportamento_tags: pet?.comportamento_tags || [] as string[],
+    tosa_preferida: pet?.tosa_preferida || '',
+    tosa_referencia_url: pet?.tosa_referencia_url || ''
   });
+
+  const toggleComportamentoTag = (value: string) => {
+    setNewPet(prev => ({
+      ...prev,
+      comportamento_tags: prev.comportamento_tags.includes(value)
+        ? prev.comportamento_tags.filter(t => t !== value)
+        : [...prev.comportamento_tags, value]
+    }));
+  };
 
   const handlePetPhotoUpload = async (file?: File) => {
     if (!file) return;
@@ -90,6 +105,51 @@ const PetFormModal: React.FC<PetFormModalProps> = ({
     showToast('Foto removida. Salve as alterações para concluir.');
   };
 
+  const handleTosaReferenciaUpload = async (file?: File) => {
+    if (!file) return;
+
+    const allowedTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+    if (!allowedTypes.has(file.type)) {
+      showToast('Envie uma foto JPG, PNG ou WEBP.', 'error');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('A foto deve ter no máximo 5 MB.', 'error');
+      return;
+    }
+
+    const previousUrl = newPet.tosa_referencia_url;
+    const previewUrl = URL.createObjectURL(file);
+    setNewPet(prev => ({ ...prev, tosa_referencia_url: previewUrl }));
+    setUploadingTosaReferencia(true);
+
+    try {
+      const uploadedUrl = await uploadToImgBB(file);
+      if (!uploadedUrl) {
+        throw new Error(getLastImgBBUploadError() || 'Não foi possível enviar a foto de referência.');
+      }
+
+      setNewPet(prev => ({ ...prev, tosa_referencia_url: uploadedUrl }));
+      showToast('Foto de referência da tosa enviada com sucesso!');
+    } catch (err) {
+      console.error('Erro ao enviar foto de referência da tosa:', err);
+      setNewPet(prev => ({ ...prev, tosa_referencia_url: previousUrl || '' }));
+      showToast('Não foi possível enviar a foto de referência. Verifique sua conexão e tente novamente.', 'error');
+    } finally {
+      URL.revokeObjectURL(previewUrl);
+      setUploadingTosaReferencia(false);
+      if (tosaReferenciaInputRef.current) tosaReferenciaInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveTosaReferencia = () => {
+    if (!newPet.tosa_referencia_url) return;
+    if (!window.confirm('Remover a foto de referência da tosa?')) return;
+    setNewPet(prev => ({ ...prev, tosa_referencia_url: '' }));
+    showToast('Foto de referência removida. Salve as alterações para concluir.');
+  };
+
   const handleSavePet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPet.nome) return;
@@ -112,7 +172,10 @@ const PetFormModal: React.FC<PetFormModalProps> = ({
         data_nascimento: newPet.data_nascimento || null,
         notas_internas: newPet.notas_internas,
         foto_url: newPet.foto_url || null,
-        especie: newPet.especie
+        especie: newPet.especie,
+        comportamento_tags: newPet.comportamento_tags,
+        tosa_preferida: newPet.tosa_preferida || null,
+        tosa_referencia_url: newPet.tosa_referencia_url || null
       };
 
       let savedPet: Pet;
@@ -334,6 +397,91 @@ const PetFormModal: React.FC<PetFormModalProps> = ({
                 />
               </div>
 
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Etiquetas de Comportamento</label>
+                <div className="flex flex-wrap gap-2">
+                  {COMPORTAMENTO_TAGS.map(tag => {
+                    const active = newPet.comportamento_tags.includes(tag.value);
+                    return (
+                      <button
+                        key={tag.value}
+                        type="button"
+                        onClick={() => toggleComportamentoTag(tag.value)}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 ${
+                          active
+                            ? (tag.critica ? 'bg-rose-500 text-white border-rose-500' : 'bg-[#00BFA5] text-white border-[#00BFA5]')
+                            : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <i className={`fa-solid ${tag.icon} text-[11px]`}></i>
+                        {tag.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_200px] gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tosa Preferida</label>
+                  <input
+                    type="text"
+                    value={newPet.tosa_preferida}
+                    onChange={(e) => setNewPet({ ...newPet, tosa_preferida: e.target.value })}
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-[#00BFA5] transition-all"
+                    placeholder="Ex: Tosa higiênica, máquina 3 no corpo..."
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Foto de Referência</label>
+                  <input
+                    ref={tosaReferenciaInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => handleTosaReferenciaUpload(e.target.files?.[0])}
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => tosaReferenciaInputRef.current?.click()}
+                      disabled={uploadingTosaReferencia}
+                      className="relative w-14 h-14 shrink-0 rounded-xl border border-slate-200 bg-white overflow-hidden flex items-center justify-center text-slate-300"
+                    >
+                      {newPet.tosa_referencia_url ? (
+                        <img src={newPet.tosa_referencia_url} alt="Referência de tosa" className="w-full h-full object-cover" />
+                      ) : (
+                        <i className="fa-solid fa-scissors text-sm"></i>
+                      )}
+                      {uploadingTosaReferencia && (
+                        <div className="absolute inset-0 bg-slate-950/40 flex items-center justify-center">
+                          <i className="fa-solid fa-circle-notch fa-spin text-white text-xs"></i>
+                        </div>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => tosaReferenciaInputRef.current?.click()}
+                      disabled={uploadingTosaReferencia}
+                      className="text-[10px] font-black uppercase tracking-widest text-[#00BFA5] hover:underline"
+                    >
+                      {newPet.tosa_referencia_url ? 'Trocar' : 'Adicionar'}
+                    </button>
+                    {newPet.tosa_referencia_url && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveTosaReferencia}
+                        disabled={uploadingTosaReferencia}
+                        className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:underline"
+                      >
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-4 flex flex-col-reverse md:flex-row md:justify-end gap-3">
                 <button
                   type="button"
@@ -342,7 +490,7 @@ const PetFormModal: React.FC<PetFormModalProps> = ({
                 >Cancelar</button>
                 <button
                   type="submit"
-                  disabled={savingPet || uploadingPetPhoto}
+                  disabled={savingPet || uploadingPetPhoto || uploadingTosaReferencia}
                   className="w-full md:w-56 py-4 bg-[#00BFA5] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-[#00BFA5]/20 hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
                 >
                   {savingPet ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'SALVAR ALTERAÇÕES'}

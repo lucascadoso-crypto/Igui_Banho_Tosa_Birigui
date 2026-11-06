@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Unit } from '../types';
+import { Unit, UserProfile } from '../types';
 import { formatCurrencyBR } from '../services/appointmentTotals';
 import {
   FinanceiroFiltros,
@@ -27,11 +27,28 @@ import FidelidadeCard from './FinanceiroGeral/FidelidadeCard';
 import CardSkeleton from './Dashboard/CardSkeleton';
 import SectionTitle from './Dashboard/SectionTitle';
 import SimpleDonut from './Dashboard/SimpleDonut';
+import ContasReceberTab from './FinanceiroGeral/ContasReceberTab';
+import ContasPagarTab from './FinanceiroGeral/ContasPagarTab';
+import DreTab from './FinanceiroGeral/DreTab';
+import ProjecaoCaixaTab from './FinanceiroGeral/ProjecaoCaixaTab';
 
 interface FinanceiroGlobalProps {
   units: Unit[];
   supabaseClient: any;
+  userProfile?: UserProfile;
+  /** Aba inicial ao navegar já filtrado (ex: "Pendências a cobrar" do Dashboard). */
+  initialAba?: string;
 }
+
+type FinanceiroGlobalAba = 'visao_geral' | 'contas_a_receber' | 'contas_a_pagar' | 'dre' | 'projecao_caixa';
+
+const ABAS: { id: FinanceiroGlobalAba; label: string }[] = [
+  { id: 'visao_geral', label: 'Visão Geral' },
+  { id: 'contas_a_receber', label: 'Contas a Receber' },
+  { id: 'contas_a_pagar', label: 'Contas a Pagar' },
+  { id: 'dre', label: 'DRE Mensal' },
+  { id: 'projecao_caixa', label: 'Projeção de Caixa' }
+];
 
 const FORMA_PAGAMENTO_COR: Record<string, string> = {
   Pix: '#10B981',
@@ -48,9 +65,15 @@ const trendFrom = (atual: number, anterior: number) => ({
   direction: (atual >= anterior ? 'up' : 'down') as 'up' | 'down'
 });
 
-const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClient }) => {
+const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClient, userProfile, initialAba }) => {
   const [filtros, setFiltros] = useState<FinanceiroFiltros>(() => getFiltrosDefault(units.length === 1 ? units[0].id : null));
   const [syncing, setSyncing] = useState(false);
+  const [aba, setAba] = useState<FinanceiroGlobalAba>((initialAba as FinanceiroGlobalAba) || 'visao_geral');
+
+  useEffect(() => {
+    if (initialAba) setAba(initialAba as FinanceiroGlobalAba);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAba]);
 
   const [kpis, setKpis] = useState<FinanceiroKpis | null>(null);
   const [kpisLoading, setKpisLoading] = useState(true);
@@ -136,6 +159,33 @@ const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClie
 
       <FinanceiroFiltersCard units={units} filtros={filtros} onChangeFiltros={setFiltros} />
 
+      <div className="bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm flex flex-wrap gap-1">
+        {ABAS.map((a) => (
+          <button
+            key={a.id}
+            onClick={() => setAba(a.id)}
+            className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${aba === a.id ? 'bg-[#00BFA5] text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            {a.label}
+          </button>
+        ))}
+      </div>
+
+      {aba === 'contas_a_receber' && (
+        <ContasReceberTab unidadeId={filtros.unidadeId} supabaseClient={supabaseClient} userProfile={userProfile} />
+      )}
+      {aba === 'contas_a_pagar' && (
+        <ContasPagarTab unidadeId={filtros.unidadeId} supabaseClient={supabaseClient} />
+      )}
+      {aba === 'dre' && (
+        <DreTab unidadeId={filtros.unidadeId} supabaseClient={supabaseClient} />
+      )}
+      {aba === 'projecao_caixa' && (
+        <ProjecaoCaixaTab unidadeId={filtros.unidadeId} supabaseClient={supabaseClient} />
+      )}
+
+      {aba === 'visao_geral' && (
+      <>
       {kpisError && (
         <div className="bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold px-4 py-3 rounded-xl flex items-center gap-2">
           <i className="fa-solid fa-triangle-exclamation"></i> {kpisError}
@@ -213,6 +263,8 @@ const FinanceiroGlobal: React.FC<FinanceiroGlobalProps> = ({ units, supabaseClie
           </div>
         </div>
       </div>
+      </>
+      )}
 
     </div>
   );

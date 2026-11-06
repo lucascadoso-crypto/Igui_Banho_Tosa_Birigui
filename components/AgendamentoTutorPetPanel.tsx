@@ -1,10 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Client, Pet, UserProfile } from '../types';
 import ClienteModal from './ClienteModal';
 import ClientDetailsModal from './ClientDetailsModal';
 import PetFormModal from './PetFormModal';
 import PetSpeciesTag from './PetSpeciesTag';
+import { getTagsCriticas } from './petComportamentoTags';
+import { getSegmentosAtivos, ClienteSegmentosFlags } from './Marketing/segmentos';
 
 interface AgendamentoTutorPetPanelProps {
   appt: any;
@@ -33,6 +35,24 @@ const AgendamentoTutorPetPanel: React.FC<AgendamentoTutorPetPanelProps> = ({
   const [showEditarTutor, setShowEditarTutor] = useState(false);
   const [showVerPet, setShowVerPet] = useState(false);
   const [showEditarPet, setShowEditarPet] = useState(false);
+  const [segmentos, setSegmentos] = useState<ClienteSegmentosFlags | null>(null);
+
+  useEffect(() => {
+    if (!client?.id || !supabaseClient) {
+      setSegmentos(null);
+      return;
+    }
+    supabaseClient
+      .from('marketing_segmentos_clientes')
+      .select('seg_vip, seg_pagam_em_dia, seg_avulso_recorrente, seg_nao_renovaram, seg_inativos')
+      .eq('cliente_id', client.id)
+      .maybeSingle()
+      .then(({ data }: any) => setSegmentos(data || null))
+      .catch(() => setSegmentos(null));
+  }, [client?.id, supabaseClient]);
+
+  const segmentosAtivos = getSegmentosAtivos(segmentos);
+  const tagsCriticas = getTagsCriticas(pet?.comportamento_tags);
 
   const cargo = userProfile?.cargo;
   const canEditClientPet = ['master', 'gerente', 'admin_unidade', 'administrador'].includes(cargo);
@@ -136,7 +156,14 @@ const AgendamentoTutorPetPanel: React.FC<AgendamentoTutorPetPanelProps> = ({
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Tutor</label>
               <button onClick={() => setActiveTab('tutor')} className="w-full bg-slate-50 p-3 rounded-xl flex items-center justify-between hover:bg-slate-100 transition-all">
                 <div className="min-w-0 text-left">
-                  <p className="font-black text-slate-800 text-sm truncate">{client?.nome || 'Não identificado'}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="font-black text-slate-800 text-sm truncate">{client?.nome || 'Não identificado'}</p>
+                    {segmentosAtivos.slice(0, 1).map(seg => (
+                      <span key={seg.id} className={`shrink-0 text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${seg.corBg} ${seg.corTexto}`}>
+                        {seg.titulo}
+                      </span>
+                    ))}
+                  </div>
                   {!isTosador && <p className="text-[9px] font-bold text-slate-400 uppercase">{client?.telefone}</p>}
                 </div>
                 <i className="fa-solid fa-chevron-right text-slate-300 shrink-0"></i>
@@ -158,6 +185,16 @@ const AgendamentoTutorPetPanel: React.FC<AgendamentoTutorPetPanelProps> = ({
                 <i className="fa-solid fa-chevron-right text-slate-300 shrink-0"></i>
               </button>
             </div>
+
+            {tagsCriticas.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {tagsCriticas.map(tag => (
+                  <span key={tag.value} className="px-2.5 py-1 bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg flex items-center gap-1.5">
+                    <i className={`fa-solid ${tag.icon}`}></i>{tag.label}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {observacoesPet.length > 0 && (
               <div className="space-y-2">
@@ -237,6 +274,11 @@ const AgendamentoTutorPetPanel: React.FC<AgendamentoTutorPetPanelProps> = ({
                 <div className="flex items-center gap-1.5 flex-wrap mt-1">
                   <PetSpeciesTag especie={pet?.especie} raca={pet?.raca} />
                   <span className="bg-emerald-50 text-emerald-600 text-[8px] font-black px-1.5 py-0.5 rounded uppercase border border-emerald-100">Ativo</span>
+                  {tagsCriticas.map(tag => (
+                    <span key={tag.value} className="bg-rose-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase flex items-center gap-1">
+                      <i className={`fa-solid ${tag.icon}`}></i>{tag.label}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>

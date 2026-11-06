@@ -1,19 +1,36 @@
 
-import React, { useState, useEffect } from 'react';
-import { Unit, Client, UserProfile } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Unit, Client, Pet, UserProfile } from '../types';
 import CadastroPet from './CadastroPet';
 import ClientDetailsModal from './ClientDetailsModal';
 import ClienteModal from './ClienteModal';
 import ClientesViaLink from './ClientesViaLink';
 import { registrarAtividade } from '../services/logger';
+import { SEGMENTOS, SegmentoId, ClienteSegmentosFlags, getSegmentosAtivos } from './Marketing/segmentos';
+
+export type ClientesFiltroRapidoInicial = 'atrasados' | 'pacote_acabando' | 'aniversariantes' | 'pendencia' | 'nao_renovaram';
 
 interface ClientsProps {
   unit: Unit;
   supabaseClient: any;
   userProfile?: UserProfile;
+  /** Filtro rápido já ativo ao abrir (ex: "Ações do dia" do Dashboard). */
+  initialFiltroRapido?: ClientesFiltroRapidoInicial;
 }
 
-const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) => {
+// Linha de public.marketing_segmentos_clientes (ver 0052/0053/0054), só os campos usados aqui.
+interface SegmentoRow extends ClienteSegmentosFlags {
+  cliente_id: number | string;
+}
+
+const FILTROS_RAPIDOS_EXTRA: { id: 'atrasados' | 'pacote_acabando' | 'aniversariantes' | 'pendencia'; titulo: string; icon: string }[] = [
+  { id: 'atrasados', titulo: 'Pets atrasados', icon: 'fa-clock-rotate-left' },
+  { id: 'pacote_acabando', titulo: 'Pacote acabando', icon: 'fa-hourglass-half' },
+  { id: 'aniversariantes', titulo: 'Aniversariantes do mês', icon: 'fa-cake-candles' },
+  { id: 'pendencia', titulo: 'Com pendência', icon: 'fa-triangle-exclamation' }
+];
+
+const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile, initialFiltroRapido }) => {
   const isReadOnly = userProfile?.cargo === 'financeiro';
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
@@ -29,9 +46,86 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
   const [newPetClientData, setNewPetClientData] = useState<{id: number | string, nome: string} | null>(null);
   const [isViaLinkOpen, setIsViaLinkOpen] = useState(false);
 
+  // Dados de apoio para filtros rápidos, chip de segmento e mini avatares (CRM, Prompt 1).
+  const [segmentosPorCliente, setSegmentosPorCliente] = useState<Record<string, SegmentoRow>>({});
+  const [petsPorCliente, setPetsPorCliente] = useState<Record<string, Pet[]>>({});
+  const [clientesAtrasados, setClientesAtrasados] = useState<Set<string>>(new Set());
+  const [clientesPacoteAcabando, setClientesPacoteAcabando] = useState<Set<string>>(new Set());
+  const [clientesAniversariantes, setClientesAniversariantes] = useState<Set<string>>(new Set());
+  const [clientesComPendencia, setClientesComPendencia] = useState<Set<string>>(new Set());
+
+  const [segmentoFiltro, setSegmentoFiltro] = useState<Set<SegmentoId>>(new Set());
+  const [filtroAtrasados, setFiltroAtrasados] = useState(false);
+  const [filtroPacoteAcabando, setFiltroPacoteAcabando] = useState(false);
+  const [filtroAniversariantes, setFiltroAniversariantes] = useState(false);
+  const [filtroPendencia, setFiltroPendencia] = useState(false);
+
   useEffect(() => {
     fetchClients();
+    fetchDadosApoio();
   }, [unit.id]);
+
+  // Filtro rápido já ativo ao chegar via "Ações do dia" do Dashboard.
+  useEffect(() => {
+    if (!initialFiltroRapido) return;
+    if (initialFiltroRapido === 'atrasados') setFiltroAtrasados(true);
+    else if (initialFiltroRapido === 'pacote_acabando') setFiltroPacoteAcabando(true);
+    else if (initialFiltroRapido === 'aniversariantes') setFiltroAniversariantes(true);
+    else if (initialFiltroRapido === 'pendencia') setFiltroPendencia(true);
+    else if (initialFiltroRapido === 'nao_renovaram') setSegmentoFiltro(new Set(['nao_renovaram']));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFiltroRapido]);
+
+  const fetchDadosApoio = async () => {
+    if (!supabaseClient) return;
+    try {
+      const dataFimAmpla = new Date();
+      dataFimAmpla.setFullYear(dataFimAmpla.getFullYear() + 2);
+
+      const [segRes, petsRes, retornoRes, pacotesRes, anivRes, pendRes] = await Promise.all([
+        supabaseClient.from('marketing_segmentos_clientes').select('*').eq('unidade_id', unit.id),
+        supabaseClient.from('pets').select('id, nome, foto_url, cliente_id, ativo, comportamento_tags').eq('unidade_id', unit.id),
+        supabaseClient.from('crm_pet_retorno').select('cliente_id, status_retorno').eq('unidade_id', unit.id).eq('status_retorno', 'atrasado'),
+        supabaseClient.from('marketing_pacotes_status').select('cliente_id').eq('unidade_id', unit.id).eq('pacote_ativo', true).lte('saldo_calculado', 2),
+        supabaseClient.from('marketing_aniversariantes').select('cliente_id').eq('unidade_id', unit.id),
+        supabaseClient.rpc('fn_financeiro_eventos_pendentes', {
+          p_unidade_id: unit.id,
+          p_data_inicio: '2015-01-01',
+          p_data_fim: dataFimAmpla.toISOString().substring(0, 10),
+          p_transporte: 'todos',
+          p_categoria: 'todos',
+          p_forma_pagamento: 'todas'
+        })
+      ]);
+
+      const segMap: Record<string, SegmentoRow> = {};
+      (segRes.data || []).forEach((row: SegmentoRow) => { segMap[String(row.cliente_id)] = row; });
+      setSegmentosPorCliente(segMap);
+
+      const petsMap: Record<string, Pet[]> = {};
+      (petsRes.data || []).filter((p: Pet) => p.ativo !== false).forEach((pet: Pet) => {
+        const key = String(pet.cliente_id);
+        if (!petsMap[key]) petsMap[key] = [];
+        petsMap[key].push(pet);
+      });
+      setPetsPorCliente(petsMap);
+
+      setClientesAtrasados(new Set((retornoRes.data || []).map((r: any) => String(r.cliente_id))));
+      setClientesPacoteAcabando(new Set((pacotesRes.data || []).map((r: any) => String(r.cliente_id))));
+      setClientesAniversariantes(new Set((anivRes.data || []).map((r: any) => String(r.cliente_id))));
+      setClientesComPendencia(new Set((pendRes.data || []).map((r: any) => String(r.cliente_id))));
+    } catch (err) {
+      console.error('Erro ao buscar dados de apoio do CRM:', err);
+    }
+  };
+
+  const toggleSegmentoFiltro = (id: SegmentoId) => {
+    setSegmentoFiltro(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const handleClickOutside = () => setActiveMenuId(null);
@@ -102,7 +196,12 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
         "Complemento",
         "Cidade",
         "Estado",
-        "Data de Cadastro"
+        "Data de Cadastro",
+        "Segmentos",
+        "Pets",
+        "Pet Atrasado",
+        "Pacote Acabando",
+        "Com Pendência Financeira"
       ];
 
       const escapeValue = (val: any) => {
@@ -139,7 +238,12 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
           escapeValue(client.complemento),
           escapeValue(client.cidade),
           escapeValue(client.estado),
-          escapeValue(client.created_at ? new Date(client.created_at).toLocaleDateString('pt-BR') : '')
+          escapeValue(client.created_at ? new Date(client.created_at).toLocaleDateString('pt-BR') : ''),
+          escapeValue(getSegmentosAtivos(segmentosPorCliente[String(client.id)]).map(s => s.titulo).join(', ')),
+          escapeValue((petsPorCliente[String(client.id)] || []).map(p => p.nome).join(', ')),
+          clientesAtrasados.has(String(client.id)) ? 'Sim' : 'Não',
+          clientesPacoteAcabando.has(String(client.id)) ? 'Sim' : 'Não',
+          clientesComPendencia.has(String(client.id)) ? 'Sim' : 'Não'
         ];
         csvRows.push(row.join(';'));
       });
@@ -213,10 +317,40 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
   };
 
   const searchDigits = searchTerm.replace(/\D/g, '');
+  const temFiltroAtivo = segmentoFiltro.size > 0 || filtroAtrasados || filtroPacoteAcabando || filtroAniversariantes || filtroPendencia;
+
   const filteredClients = clients.filter(c => {
-    const matchNome = c.nome.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchTelefone = searchDigits.length > 0 && (c.telefone || '').replace(/\D/g, '').includes(searchDigits);
-    return matchNome || matchTelefone;
+    const clienteId = String(c.id);
+    const petsDoCliente = petsPorCliente[clienteId] || [];
+
+    const termoBusca = searchTerm.toLowerCase().trim();
+    if (termoBusca.length > 0) {
+      const matchNome = c.nome.toLowerCase().includes(termoBusca);
+      const matchTelefone = searchDigits.length > 0 && (c.telefone || '').replace(/\D/g, '').includes(searchDigits);
+      const matchPet = petsDoCliente.some(p => p.nome.toLowerCase().includes(termoBusca));
+      if (!matchNome && !matchTelefone && !matchPet) return false;
+    }
+
+    if (segmentoFiltro.size > 0) {
+      const seg = segmentosPorCliente[clienteId];
+      const algumSegmentoAtivo = Array.from(segmentoFiltro).some(id => {
+        if (!seg) return false;
+        if (id === 'vip') return !!seg.seg_vip;
+        if (id === 'pagam_em_dia') return !!seg.seg_pagam_em_dia;
+        if (id === 'avulso_recorrente') return !!seg.seg_avulso_recorrente;
+        if (id === 'nao_renovaram') return !!seg.seg_nao_renovaram;
+        if (id === 'inativos') return !!seg.seg_inativos;
+        return false;
+      });
+      if (!algumSegmentoAtivo) return false;
+    }
+
+    if (filtroAtrasados && !clientesAtrasados.has(clienteId)) return false;
+    if (filtroPacoteAcabando && !clientesPacoteAcabando.has(clienteId)) return false;
+    if (filtroAniversariantes && !clientesAniversariantes.has(clienteId)) return false;
+    if (filtroPendencia && !clientesComPendencia.has(clienteId)) return false;
+
+    return true;
   });
 
   const groupedClients = filteredClients.reduce((groups, client) => {
@@ -280,13 +414,69 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
             <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
             <input 
               type="text" 
-              placeholder="Buscar por nome ou telefone..."
+              placeholder="Buscar por nome, telefone ou pet..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-[#00BFA5] outline-none transition-all text-sm"
             />
           </div>
         </div>
+      </div>
+
+      {/* Filtros Rápidos */}
+      <div className="flex flex-wrap items-center gap-2 bg-white px-6 py-4 rounded-3xl border border-slate-100 shadow-sm">
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-1">Filtros:</span>
+        {SEGMENTOS.filter(s => s.id !== 'aniversariantes').map(seg => {
+          const ativo = segmentoFiltro.has(seg.id);
+          return (
+            <button
+              key={seg.id}
+              onClick={() => toggleSegmentoFiltro(seg.id)}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black flex items-center gap-1.5 border transition-all ${
+                ativo ? `${seg.corBg} ${seg.corTexto} border-current` : 'bg-slate-50 text-slate-400 border-slate-100 hover:bg-slate-100'
+              }`}
+            >
+              <i className={`fa-solid ${seg.icon}`}></i>{seg.titulo}
+            </button>
+          );
+        })}
+        {FILTROS_RAPIDOS_EXTRA.map(f => {
+          const ativo = f.id === 'atrasados' ? filtroAtrasados
+            : f.id === 'pacote_acabando' ? filtroPacoteAcabando
+            : f.id === 'aniversariantes' ? filtroAniversariantes
+            : filtroPendencia;
+          const toggle = () => {
+            if (f.id === 'atrasados') setFiltroAtrasados(v => !v);
+            else if (f.id === 'pacote_acabando') setFiltroPacoteAcabando(v => !v);
+            else if (f.id === 'aniversariantes') setFiltroAniversariantes(v => !v);
+            else setFiltroPendencia(v => !v);
+          };
+          return (
+            <button
+              key={f.id}
+              onClick={toggle}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black flex items-center gap-1.5 border transition-all ${
+                ativo ? 'bg-[#00BFA5]/10 text-[#00BFA5] border-[#00BFA5]/30' : 'bg-slate-50 text-slate-400 border-slate-100 hover:bg-slate-100'
+              }`}
+            >
+              <i className={`fa-solid ${f.icon}`}></i>{f.titulo}
+            </button>
+          );
+        })}
+        {temFiltroAtivo && (
+          <button
+            onClick={() => {
+              setSegmentoFiltro(new Set());
+              setFiltroAtrasados(false);
+              setFiltroPacoteAcabando(false);
+              setFiltroAniversariantes(false);
+              setFiltroPendencia(false);
+            }}
+            className="px-3 py-1.5 rounded-xl text-[11px] font-black text-rose-500 hover:bg-rose-50 transition-all"
+          >
+            Limpar filtros
+          </button>
+        )}
       </div>
 
       {/* Lista Estilo Agenda Telefônica */}
@@ -327,6 +517,11 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
                                 <i className="fa-solid fa-link mr-1"></i>Via Link
                               </span>
                             )}
+                            {getSegmentosAtivos(segmentosPorCliente[String(client.id)]).slice(0, 1).map(seg => (
+                              <span key={seg.id} title={seg.titulo} className={`shrink-0 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-tighter border border-current ${seg.corBg} ${seg.corTexto}`}>
+                                <i className={`fa-solid ${seg.icon} mr-1`}></i>{seg.titulo}
+                              </span>
+                            ))}
                           </div>
                           <div className="flex items-center space-x-4 mt-1">
                             <span className="text-sm text-slate-500 font-medium flex items-center">
@@ -334,6 +529,19 @@ const Clients: React.FC<ClientsProps> = ({ unit, supabaseClient, userProfile }) 
                               {client.telefone}
                             </span>
                           </div>
+                          {(petsPorCliente[String(client.id)] || []).length > 0 && (
+                            <div className="flex items-center -space-x-2 mt-2">
+                              {(petsPorCliente[String(client.id)] || []).slice(0, 5).map(pet => (
+                                <div key={pet.id} title={pet.nome} className="w-7 h-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-slate-300 overflow-hidden shrink-0">
+                                  {pet.foto_url ? (
+                                    <img src={pet.foto_url} alt={pet.nome} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <i className="fa-solid fa-paw text-[10px]"></i>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
 

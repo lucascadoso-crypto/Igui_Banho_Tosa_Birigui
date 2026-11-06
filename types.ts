@@ -65,7 +65,7 @@ export interface Package {
 }
 
 export type SubView = 'Agendamento' | 'Clientes' | 'Pacotes' | 'Financeiro' | 'Gastos' | 'Auditoria' | 'Marketing';
-export type GlobalView = 'Dashboard' | 'Financeiro Geral' | 'Rentabilidade' | 'Configurações' | 'Equipe' | 'Meu Perfil';
+export type GlobalView = 'Dashboard' | 'Relatórios' | 'Financeiro Geral' | 'Rentabilidade' | 'Comissões' | 'Configurações' | 'Equipe' | 'Meu Perfil';
 
 export interface NavigationState {
   mode: 'global' | 'unit';
@@ -74,6 +74,10 @@ export interface NavigationState {
   unitName?: string;
   /** Aba inicial ao navegar para 'Configurações' (ex: 'custos' vindo do botão de custos do Dashboard). */
   settingsTab?: string;
+  /** Filtro rápido inicial ao navegar para 'Clientes' vindo de "Ações do dia" do Dashboard. */
+  clientesFiltroInicial?: string;
+  /** Aba inicial ao navegar para 'Financeiro Geral' vindo de "Ações do dia" do Dashboard. */
+  financeiroAbaInicial?: string;
 }
 
 export interface Client { 
@@ -144,10 +148,14 @@ export interface Pet {
   raca?: string;
   porte?: string; 
   comportamento?: string;
+  comportamento_tags?: string[] | null;
+  tosa_preferida?: string | null;
+  tosa_referencia_url?: string | null;
   notas_internas?: string;
   restricoes?: string;
   foto_url?: string | null;
   created_at?: string;
+  ativo?: boolean;
 }
 
 export interface Employee { id: BusinessId; name: string; role: string; unitId: BusinessId; }

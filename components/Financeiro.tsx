@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Unit, UserProfile } from '../types';
 import { registrarAtividade } from '../services/logger';
 import { registrarPagamentoPacote } from '../services/pacotePayments';
+import { CaixaFechamento, fetchCaixaFechamento, salvarCaixaFechamento } from '../services/caixaFechamento';
 import FiscalDraftModal from './FiscalDraftModal';
 import FiscalHistory from './FiscalHistory';
 
@@ -49,8 +50,17 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
     gastos: 0,
     pix: 0,
     dinheiro: 0,
-    cartao: 0
+    cartao: 0,
+    debito: 0,
+    credito: 0
   });
+
+  // Fechamento de caixa do dia (resumo adicional por forma de pagamento -
+  // nao altera a Conferencia/Balanco de Auditoria acima).
+  const [fechamentoExistente, setFechamentoExistente] = useState<CaixaFechamento | null>(null);
+  const [conferido, setConferido] = useState({ pix: 0, dinheiro: 0, debito: 0, credito: 0 });
+  const [observacaoFechamento, setObservacaoFechamento] = useState('');
+  const [savingFechamento, setSavingFechamento] = useState(false);
 
   const toNumber = (value: any) => Number.parseFloat(String(value ?? 0)) || 0;
 
@@ -71,10 +81,12 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
 
   const addPaymentToTotals = (method: string, value: number) => {
     const normalized = normalizePaymentMethod(method);
-    if (normalized === 'pix') return { pix: value, dinheiro: 0, cartao: 0 };
-    if (normalized === 'dinheiro') return { pix: 0, dinheiro: value, cartao: 0 };
-    if (normalized) return { pix: 0, dinheiro: 0, cartao: value };
-    return { pix: 0, dinheiro: 0, cartao: 0 };
+    if (normalized === 'pix') return { pix: value, dinheiro: 0, cartao: 0, debito: 0, credito: 0 };
+    if (normalized === 'dinheiro') return { pix: 0, dinheiro: value, cartao: 0, debito: 0, credito: 0 };
+    if (normalized === 'debito') return { pix: 0, dinheiro: 0, cartao: value, debito: value, credito: 0 };
+    if (normalized === 'credito') return { pix: 0, dinheiro: 0, cartao: value, debito: 0, credito: value };
+    if (normalized) return { pix: 0, dinheiro: 0, cartao: value, debito: 0, credito: 0 };
+    return { pix: 0, dinheiro: 0, cartao: 0, debito: 0, credito: 0 };
   };
 
   const canCreateFiscalDraft = ['master', 'financeiro', 'gerente', 'admin_unidade', 'administrador'].includes(userProfile?.cargo);
@@ -98,6 +110,70 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
   useEffect(() => {
     fetchFinancialData();
   }, [unit.id, selectedDate]);
+
+  useEffect(() => {
+    fetchCaixaFechamento(supabaseClient, unit.id, selectedDate)
+      .then((existente) => {
+        setFechamentoExistente(existente);
+        if (existente) {
+          setConferido({
+            pix: existente.pixConferido,
+            dinheiro: existente.dinheiroConferido,
+            debito: existente.debitoConferido,
+            credito: existente.creditoConferido
+          });
+          setObservacaoFechamento(existente.observacao || '');
+        } else {
+          setConferido({ pix: 0, dinheiro: 0, debito: 0, credito: 0 });
+          setObservacaoFechamento('');
+        }
+      })
+      .catch((err) => console.error('Erro ao carregar fechamento de caixa:', err));
+  }, [supabaseClient, unit.id, selectedDate]);
+
+  const handleFecharCaixa = async () => {
+    setSavingFechamento(true);
+    try {
+      const diferencaTotal =
+        (conferido.pix - totals.pix) +
+        (conferido.dinheiro - totals.dinheiro) +
+        (conferido.debito - totals.debito) +
+        (conferido.credito - totals.credito);
+
+      await salvarCaixaFechamento(supabaseClient, {
+        unidadeId: unit.id,
+        dataFechamento: selectedDate,
+        pixEsperado: totals.pix,
+        pixConferido: conferido.pix,
+        dinheiroEsperado: totals.dinheiro,
+        dinheiroConferido: conferido.dinheiro,
+        debitoEsperado: totals.debito,
+        debitoConferido: conferido.debito,
+        creditoEsperado: totals.credito,
+        creditoConferido: conferido.credito,
+        diferencaTotal,
+        observacao: observacaoFechamento,
+        fechadoPorNome: userProfile?.nome || userProfile?.email || 'Usuário'
+      });
+
+      await registrarAtividade(
+        unit.id,
+        userProfile?.email || 'sistema',
+        'Fechamento de Caixa',
+        `Fechou o caixa do dia ${formatDateBR(selectedDate)}. Diferença total: R$ ${diferencaTotal.toFixed(2)}`,
+        userProfile?.nome,
+        userProfile?.cargo
+      );
+
+      const atualizado = await fetchCaixaFechamento(supabaseClient, unit.id, selectedDate);
+      setFechamentoExistente(atualizado);
+      alert('Caixa do dia fechado com sucesso.');
+    } catch (err: any) {
+      alert('Erro ao fechar caixa: ' + (err.message || ''));
+    } finally {
+      setSavingFechamento(false);
+    }
+  };
 
   const fetchFinancialData = async () => {
     setLoading(true);
@@ -166,6 +242,8 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
       let pPix = 0;
       let pDinheiro = 0;
       let pCartao = 0;
+      let pDebito = 0;
+      let pCredito = 0;
 
       const adjustedMovementByAppointment = new Map<number, any>();
       financialMovements?.forEach((movement: any) => {
@@ -203,12 +281,16 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
           pPix += totalM1.pix;
           pDinheiro += totalM1.dinheiro;
           pCartao += totalM1.cartao;
+          pDebito += totalM1.debito;
+          pCredito += totalM1.credito;
 
           // Contabilizar Valor 2
           const totalM2 = addPaymentToTotals(m2, v2);
           pPix += totalM2.pix;
           pDinheiro += totalM2.dinheiro;
           pCartao += totalM2.cartao;
+          pDebito += totalM2.debito;
+          pCredito += totalM2.credito;
 
           // Processar lista de serviços com segurança - acima de 3, abrevia
           // (senao o texto empurra o resto da linha pra fora da tela).
@@ -262,11 +344,15 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
           if (m1 === 'pix') pPix += v1;
           else if (m1 === 'dinheiro') pDinheiro += v1;
           else if (m1) pCartao += v1;
+          if (m1 === 'debito' || m1 === 'débito') pDebito += v1;
+          else if (m1 === 'credito' || m1 === 'crédito') pCredito += v1;
 
           // Contabilizar Valor 2
           if (m2 === 'pix') pPix += v2;
           else if (m2 === 'dinheiro') pDinheiro += v2;
           else if (m2) pCartao += v2;
+          if (m2 === 'debito' || m2 === 'débito') pDebito += v2;
+          else if (m2 === 'credito' || m2 === 'crédito') pCredito += v2;
 
           combined.push({
             id: p?.id || Math.random().toString(36).substr(2, 9),
@@ -315,6 +401,8 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
           if (metodo === 'pix') pPix += val;
           else if (metodo === 'dinheiro') pDinheiro += val;
           else if (metodo !== 'n/a') pCartao += val;
+          if (metodo === 'debito' || metodo === 'débito') pDebito += val;
+          else if (metodo === 'credito' || metodo === 'crédito') pCredito += val;
 
           combined.push({
             id: `extra-${ex.id}`,
@@ -345,7 +433,9 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
         gastos: sumGastos,
         pix: pPix,
         dinheiro: pDinheiro,
-        cartao: pCartao
+        cartao: pCartao,
+        debito: pDebito,
+        credito: pCredito
       });
 
     } catch (err) {
@@ -1059,6 +1149,82 @@ const Financeiro: React.FC<FinanceiroProps> = ({ unit, supabaseClient, userProfi
                        Confirmar Balanço de Caixa
                     </button>
                     <p className="mt-6 text-[9px] text-slate-600 font-bold uppercase">Esta ação gera um registro permanente na auditoria de rede.</p>
+                 </div>
+
+                 {/* Fechamento de Caixa por Forma de Pagamento - resumo adicional, nao substitui a conferencia/balanco acima. */}
+                 <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                    <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+                       <div>
+                          <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Fechamento de Caixa do Dia</h4>
+                          <p className="text-[11px] text-slate-400 font-bold">Confira o valor contado em caixa por forma de pagamento</p>
+                       </div>
+                       {fechamentoExistente && (
+                          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full uppercase tracking-wide">
+                             Fechado por {fechamentoExistente.fechadoPorNome || 'Usuário'}
+                          </span>
+                       )}
+                    </div>
+
+                    <div className="overflow-x-auto">
+                       <table className="w-full text-sm">
+                          <thead>
+                             <tr className="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                <th className="text-left py-2">Forma</th>
+                                <th className="text-right py-2">Esperado</th>
+                                <th className="text-right py-2">Conferido</th>
+                                <th className="text-right py-2">Diferença</th>
+                             </tr>
+                          </thead>
+                          <tbody>
+                             {([
+                                { key: 'pix', label: 'Pix' },
+                                { key: 'dinheiro', label: 'Dinheiro' },
+                                { key: 'debito', label: 'Débito' },
+                                { key: 'credito', label: 'Crédito' }
+                             ] as const).map(({ key, label }) => {
+                                const esperado = totals[key];
+                                const diferenca = conferido[key] - esperado;
+                                return (
+                                   <tr key={key} className="border-b border-slate-50">
+                                      <td className="py-3 font-bold text-slate-600">{label}</td>
+                                      <td className="py-3 text-right font-bold text-slate-500">R$ {esperado.toFixed(2)}</td>
+                                      <td className="py-3 text-right">
+                                         <input
+                                            type="number"
+                                            step="0.01"
+                                            value={conferido[key]}
+                                            onChange={(e) => setConferido((c) => ({ ...c, [key]: Number.parseFloat(e.target.value) || 0 }))}
+                                            className="w-28 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-right text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                                         />
+                                      </td>
+                                      <td className={`py-3 text-right font-black ${Math.abs(diferenca) < 0.01 ? 'text-slate-400' : diferenca > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                         R$ {diferenca.toFixed(2)}
+                                      </td>
+                                   </tr>
+                                );
+                             })}
+                          </tbody>
+                       </table>
+                    </div>
+
+                    <div className="mt-6 space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Observação (opcional)</label>
+                       <input
+                          type="text"
+                          value={observacaoFechamento}
+                          onChange={(e) => setObservacaoFechamento(e.target.value)}
+                          placeholder="Ex: Diferença de troco, sangria realizada..."
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none"
+                       />
+                    </div>
+
+                    <button
+                       onClick={handleFecharCaixa}
+                       disabled={savingFechamento}
+                       className="mt-6 w-full py-4 bg-[#1E1E1E] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-black transition-all disabled:opacity-50"
+                    >
+                       {savingFechamento ? 'Salvando...' : fechamentoExistente ? 'Atualizar Fechamento de Caixa' : 'Fechar Caixa do Dia'}
+                    </button>
                  </div>
               </div>
             )}

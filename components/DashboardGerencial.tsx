@@ -11,11 +11,14 @@ import CardSkeleton from './Dashboard/CardSkeleton';
 import SectionTitle from './Dashboard/SectionTitle';
 import SimpleDonut from './Dashboard/SimpleDonut';
 import StatTile from './Dashboard/StatTile';
+import OcupacaoChart from './Dashboard/OcupacaoChart';
+import OcupacaoBadge from './Dashboard/OcupacaoBadge';
 import { thClass, thClassRight } from './Dashboard/tableClasses';
 import {
   DashboardFiltros,
   Granularidade,
   DashboardKpis,
+  DashboardKpisComplementares,
   FaturamentoPontoPeriodo,
   FaturamentoCategoria,
   FaturamentoUnidade,
@@ -25,10 +28,15 @@ import {
   TopAdicional,
   AgendamentosCards,
   ProximoAgendamento,
+  OcupacaoDiaSemana,
+  TopCliente,
+  TopRaca,
   getDefaultPeriodo,
   getTodayBR,
+  getPeriodoAnterior,
   calcularVariacao,
   fetchDashboardKpis,
+  fetchDashboardKpisComplementares,
   fetchFaturamentoPeriodo,
   fetchFaturamentoCategoria,
   fetchFaturamentoUnidade,
@@ -37,8 +45,13 @@ import {
   fetchTransporteResumo,
   fetchTopAdicionais,
   fetchAgendamentosCards,
-  fetchProximosAgendamentos
+  fetchProximosAgendamentos,
+  fetchOcupacaoPeriodo,
+  resumoOcupacao,
+  fetchTopClientes,
+  fetchTopRacas
 } from '../services/dashboardGerencial';
+import { fetchAcoesDoDia, AcoesDoDia } from '../services/acoesDoDia';
 
 interface DashboardGerencialProps {
   units: Unit[];
@@ -116,61 +129,127 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
   const [proximosAgendamentos, setProximosAgendamentos] = useState<ProximoAgendamento[]>([]);
   const [proximosLoading, setProximosLoading] = useState(true);
 
+  const [kpisComplementares, setKpisComplementares] = useState<DashboardKpisComplementares | null>(null);
+  const [kpisComplementaresLoading, setKpisComplementaresLoading] = useState(true);
+
+  const [agendamentosCardsAnterior, setAgendamentosCardsAnterior] = useState<AgendamentosCards | null>(null);
+
+  const [ocupacaoAtual, setOcupacaoAtual] = useState<OcupacaoDiaSemana[]>([]);
+  const [ocupacaoAnterior, setOcupacaoAnterior] = useState<OcupacaoDiaSemana[]>([]);
+  const [ocupacaoLoading, setOcupacaoLoading] = useState(true);
+
+  const [acoesDoDia, setAcoesDoDia] = useState<AcoesDoDia | null>(null);
+  const [acoesDoDiaLoading, setAcoesDoDiaLoading] = useState(true);
+
+  const [topClientes, setTopClientes] = useState<TopCliente[]>([]);
+  const [topClientesLoading, setTopClientesLoading] = useState(true);
+
+  const [topRacas, setTopRacas] = useState<TopRaca[]>([]);
+  const [topRacasLoading, setTopRacasLoading] = useState(true);
+
+  // Carrega em 2 ondas: a 1ª onda é exatamente o conjunto de consultas que o
+  // Dashboard já disparava antes deste prompt (sem mudar sua concorrência).
+  // A 2ª onda (KPIs/seções novas deste prompt) só dispara depois que a 1ª
+  // onda termina — rodar tudo junto (~20 consultas simultâneas) esgotava o
+  // pool de conexões e estourava o statement_timeout de 8s do role
+  // "authenticated" (afetando até consultas antigas, como fn_dashboard_kpis).
   const carregarTudo = useCallback(() => {
     setKpisLoading(true);
     setKpisError(null);
-    fetchDashboardKpis(supabaseClient, filtros)
+    const p1 = fetchDashboardKpis(supabaseClient, filtros)
       .then(setKpis)
       .catch((err) => { console.error('Erro ao carregar KPIs do dashboard:', err); setKpisError(err?.message || 'Falha ao carregar KPIs.'); })
       .finally(() => setKpisLoading(false));
 
     setFaturamentoCategoriaLoading(true);
-    fetchFaturamentoCategoria(supabaseClient, filtros)
+    const p2 = fetchFaturamentoCategoria(supabaseClient, filtros)
       .then(setFaturamentoCategoria)
       .catch((err) => console.error('Erro ao carregar faturamento por categoria:', err))
       .finally(() => setFaturamentoCategoriaLoading(false));
 
     setFaturamentoUnidadeLoading(true);
-    fetchFaturamentoUnidade(supabaseClient, filtros)
+    const p3 = fetchFaturamentoUnidade(supabaseClient, filtros)
       .then(setFaturamentoUnidade)
       .catch((err) => console.error('Erro ao carregar faturamento por unidade:', err))
       .finally(() => setFaturamentoUnidadeLoading(false));
 
     setFormasPagamentoLoading(true);
-    fetchFormasPagamento(supabaseClient, filtros)
+    const p4 = fetchFormasPagamento(supabaseClient, filtros)
       .then(setFormasPagamento)
       .catch((err) => console.error('Erro ao carregar formas de pagamento:', err))
       .finally(() => setFormasPagamentoLoading(false));
 
     setCustosPacotesLoading(true);
-    fetchCustosPacotes(supabaseClient, filtros)
+    const p5 = fetchCustosPacotes(supabaseClient, filtros)
       .then(setCustosPacotes)
       .catch((err) => console.error('Erro ao carregar custos de pacotes:', err))
       .finally(() => setCustosPacotesLoading(false));
 
     setTransporteLoading(true);
-    fetchTransporteResumo(supabaseClient, filtros)
+    const p6 = fetchTransporteResumo(supabaseClient, filtros)
       .then(setTransporteResumo)
       .catch((err) => console.error('Erro ao carregar resumo de transporte:', err))
       .finally(() => setTransporteLoading(false));
 
     setTopAdicionaisLoading(true);
-    fetchTopAdicionais(supabaseClient, filtros)
+    const p7 = fetchTopAdicionais(supabaseClient, filtros)
       .then(setTopAdicionais)
       .catch((err) => console.error('Erro ao carregar top adicionais:', err))
       .finally(() => setTopAdicionaisLoading(false));
 
     setAgendamentosCardsLoading(true);
-    fetchAgendamentosCards(supabaseClient, filtros)
+    const p8 = fetchAgendamentosCards(supabaseClient, filtros)
       .then(setAgendamentosCards)
       .catch((err) => console.error('Erro ao carregar cards de agendamentos:', err))
       .finally(() => setAgendamentosCardsLoading(false));
 
     setProximosLoading(true);
-    fetchProximosAgendamentos(supabaseClient, filtros)
+    const p9 = fetchProximosAgendamentos(supabaseClient, filtros)
       .then(setProximosAgendamentos)
       .catch((err) => console.error('Erro ao carregar próximos agendamentos:', err))
       .finally(() => setProximosLoading(false));
+
+    setKpisComplementaresLoading(true);
+    setOcupacaoLoading(true);
+    setAcoesDoDiaLoading(true);
+    setTopClientesLoading(true);
+    setTopRacasLoading(true);
+
+    Promise.allSettled([p1, p2, p3, p4, p5, p6, p7, p8, p9]).then(() => {
+      const { dataInicioAnterior, dataFimAnterior } = getPeriodoAnterior(filtros.dataInicio, filtros.dataFim);
+
+      fetchDashboardKpisComplementares(supabaseClient, filtros)
+        .then(setKpisComplementares)
+        .catch((err) => console.error('Erro ao carregar KPIs complementares:', err))
+        .finally(() => setKpisComplementaresLoading(false));
+
+      fetchAgendamentosCards(supabaseClient, { ...filtros, dataInicio: dataInicioAnterior, dataFim: dataFimAnterior })
+        .then(setAgendamentosCardsAnterior)
+        .catch((err) => console.error('Erro ao carregar agendamentos do período anterior:', err));
+
+      Promise.all([
+        fetchOcupacaoPeriodo(supabaseClient, filtros.unidadeId, filtros.dataInicio, filtros.dataFim),
+        fetchOcupacaoPeriodo(supabaseClient, filtros.unidadeId, dataInicioAnterior, dataFimAnterior)
+      ])
+        .then(([atual, anterior]) => { setOcupacaoAtual(atual); setOcupacaoAnterior(anterior); })
+        .catch((err) => console.error('Erro ao carregar ocupação:', err))
+        .finally(() => setOcupacaoLoading(false));
+
+      fetchAcoesDoDia(supabaseClient, filtros.unidadeId, filtros.dataInicio, filtros.dataFim, getTodayBR())
+        .then(setAcoesDoDia)
+        .catch((err) => console.error('Erro ao carregar ações do dia:', err))
+        .finally(() => setAcoesDoDiaLoading(false));
+
+      fetchTopClientes(supabaseClient, filtros, 10)
+        .then(setTopClientes)
+        .catch((err) => console.error('Erro ao carregar top clientes:', err))
+        .finally(() => setTopClientesLoading(false));
+
+      fetchTopRacas(supabaseClient, filtros, 10)
+        .then(setTopRacas)
+        .catch((err) => console.error('Erro ao carregar top raças:', err))
+        .finally(() => setTopRacasLoading(false));
+    });
   }, [supabaseClient, filtros]);
 
   useEffect(() => {
@@ -187,6 +266,29 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
 
   const abrirConfigCustos = () => {
     setNavState({ mode: 'global', view: 'Configurações', settingsTab: 'custos' });
+  };
+
+  const abrirConfigCapacidade = () => {
+    setNavState({ mode: 'global', view: 'Configurações', settingsTab: 'capacidade' });
+  };
+
+  // Unidade de destino ao navegar por "Ações do dia": a selecionada no filtro
+  // do Dashboard, ou a primeira da lista quando "Todas as unidades".
+  const unidadeDestinoAcoes = () => {
+    if (filtros.unidadeId !== null) {
+      return units.find((u) => u.id === filtros.unidadeId) || units[0];
+    }
+    return units[0];
+  };
+
+  const irParaClientesFiltrado = (clientesFiltroInicial: string) => {
+    const unidade = unidadeDestinoAcoes();
+    if (!unidade) return;
+    setNavState({ mode: 'unit', view: 'Clientes', unitId: unidade.id, unitName: unidade.name, clientesFiltroInicial });
+  };
+
+  const irParaContasAReceber = () => {
+    setNavState({ mode: 'global', view: 'Financeiro Geral', financeiroAbaInicial: 'contas_a_receber' });
   };
 
   const trendFrom = (atual: number, anterior: number) => ({
@@ -208,6 +310,18 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
   const topCategoriaLabel = topCategoria ? (CATEGORIA_LABEL[topCategoria.categoria] || topCategoria.categoria) : null;
   const topUnidade = faturamentoUnidade.length > 0 ? [...faturamentoUnidade].sort((a, b) => b.valor - a.valor)[0] : null;
   const insightsLoading = kpisLoading || faturamentoCategoriaLoading || faturamentoUnidadeLoading;
+
+  const resumoOcupacaoAtual = resumoOcupacao(ocupacaoAtual);
+  const resumoOcupacaoAnterior = resumoOcupacao(ocupacaoAnterior);
+
+  const taxaCancelamentoAtual = agendamentosCards && agendamentosCards.agendados + agendamentosCards.concluidos + agendamentosCards.cancelados > 0
+    ? (agendamentosCards.cancelados / (agendamentosCards.agendados + agendamentosCards.concluidos + agendamentosCards.cancelados)) * 100
+    : 0;
+  const taxaCancelamentoAnterior = agendamentosCardsAnterior && agendamentosCardsAnterior.agendados + agendamentosCardsAnterior.concluidos + agendamentosCardsAnterior.cancelados > 0
+    ? (agendamentosCardsAnterior.cancelados / (agendamentosCardsAnterior.agendados + agendamentosCardsAnterior.concluidos + agendamentosCardsAnterior.cancelados)) * 100
+    : 0;
+
+  const kpisComplementaresLoadingTotal = kpisComplementaresLoading || agendamentosCardsLoading || ocupacaoLoading;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -260,6 +374,43 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
           color="emerald"
           loading={kpisLoading}
           trend={kpis ? trendFrom(kpis.novosClientesAtual, kpis.novosClientesAnterior) : undefined}
+        />
+      </div>
+
+      {/* Linha: KPIs complementares */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        <KPICard
+          label="Ticket médio"
+          value={formatCurrencyBR(kpisComplementares?.ticketMedioAtual ?? 0)}
+          icon="fa-ticket"
+          color="indigo"
+          loading={kpisComplementaresLoading}
+          trend={kpisComplementares ? trendFrom(kpisComplementares.ticketMedioAtual, kpisComplementares.ticketMedioAnterior) : undefined}
+        />
+        <KPICard
+          label="Taxa de ocupação"
+          value={`${formatDecimalBR(resumoOcupacaoAtual.percentual)}%`}
+          icon="fa-calendar-check"
+          color="blue"
+          loading={kpisComplementaresLoadingTotal}
+          trend={trendFrom(resumoOcupacaoAtual.percentual, resumoOcupacaoAnterior.percentual)}
+        />
+        <KPICard
+          label="Taxa de no-show/cancelamento"
+          value={`${formatDecimalBR(taxaCancelamentoAtual)}%`}
+          icon="fa-calendar-xmark"
+          color="rose"
+          loading={agendamentosCardsLoading}
+          trend={{ value: Math.abs(taxaCancelamentoAtual - taxaCancelamentoAnterior), direction: taxaCancelamentoAtual <= taxaCancelamentoAnterior ? 'up' : 'down', label: 'vs período anterior' }}
+        />
+        <KPICard
+          label="Total a receber"
+          value={formatCurrencyBR(kpisComplementares?.totalAReceberAtual ?? 0)}
+          icon="fa-hand-holding-dollar"
+          color="orange"
+          loading={kpisComplementaresLoading}
+          trend={kpisComplementares ? trendFrom(kpisComplementares.totalAReceberAtual, kpisComplementares.totalAReceberAnterior) : undefined}
+          onClick={irParaContasAReceber}
         />
       </div>
 
@@ -485,6 +636,149 @@ const DashboardGerencial: React.FC<DashboardGerencialProps> = ({ units, supabase
               </table>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Linha: Ocupação por dia da semana + Ações do dia */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+          <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
+            <SectionTitle title="Ocupação por Dia da Semana" subtitle="Agendados vs. capacidade configurada" />
+            <button
+              onClick={abrirConfigCapacidade}
+              className="px-3 py-1.5 rounded-full bg-slate-50 text-slate-500 hover:text-violet-600 text-[9px] font-black uppercase tracking-widest shrink-0"
+            >
+              <i className="fa-solid fa-gear mr-1.5"></i> Configurar capacidade
+            </button>
+          </div>
+          <div className="mt-4">
+            {ocupacaoLoading ? <CardSkeleton height={220} /> : <OcupacaoChart data={ocupacaoAtual} />}
+          </div>
+        </div>
+
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-4">
+          <SectionTitle title="Ações do Dia" subtitle="Pendências que valem uma ação agora" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              onClick={() => irParaClientesFiltrado('atrasados')}
+              className="text-left bg-rose-50 hover:bg-rose-100 transition-colors rounded-2xl p-4 flex items-center justify-between gap-3"
+            >
+              <div>
+                <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Pets atrasados</p>
+                <p className="text-2xl font-black text-rose-700">{acoesDoDiaLoading ? '—' : acoesDoDia?.petsAtrasados ?? 0}</p>
+              </div>
+              <i className="fa-solid fa-clock-rotate-left text-rose-300 text-xl"></i>
+            </button>
+
+            <button
+              onClick={() => irParaClientesFiltrado('pacote_acabando')}
+              className="text-left bg-amber-50 hover:bg-amber-100 transition-colors rounded-2xl p-4 flex items-center justify-between gap-3"
+            >
+              <div>
+                <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Pacotes acabando</p>
+                <p className="text-2xl font-black text-amber-700">{acoesDoDiaLoading ? '—' : acoesDoDia?.pacotesAcabando ?? 0}</p>
+              </div>
+              <i className="fa-solid fa-hourglass-half text-amber-300 text-xl"></i>
+            </button>
+
+            <button
+              onClick={() => irParaClientesFiltrado('nao_renovaram')}
+              className="text-left bg-orange-50 hover:bg-orange-100 transition-colors rounded-2xl p-4 flex items-center justify-between gap-3"
+            >
+              <div>
+                <p className="text-[9px] font-black text-orange-600 uppercase tracking-widest">Não renovaram</p>
+                <p className="text-2xl font-black text-orange-700">{acoesDoDiaLoading ? '—' : acoesDoDia?.clientesNaoRenovaram ?? 0}</p>
+              </div>
+              <i className="fa-solid fa-rotate-left text-orange-300 text-xl"></i>
+            </button>
+
+            <button
+              onClick={irParaContasAReceber}
+              className="text-left bg-violet-50 hover:bg-violet-100 transition-colors rounded-2xl p-4 flex items-center justify-between gap-3"
+            >
+              <div>
+                <p className="text-[9px] font-black text-violet-600 uppercase tracking-widest">Pendências a cobrar</p>
+                <p className="text-2xl font-black text-violet-700">{acoesDoDiaLoading ? '—' : acoesDoDia?.pendenciasACobrar.qtd ?? 0}</p>
+                <p className="text-[10px] font-bold text-violet-400">{acoesDoDiaLoading ? '' : formatCurrencyBR(acoesDoDia?.pendenciasACobrar.valor ?? 0)}</p>
+              </div>
+              <i className="fa-solid fa-sack-dollar text-violet-300 text-xl"></i>
+            </button>
+
+            <button
+              onClick={() => irParaClientesFiltrado('aniversariantes')}
+              className="text-left bg-purple-50 hover:bg-purple-100 transition-colors rounded-2xl p-4 flex items-center justify-between gap-3 sm:col-span-2"
+            >
+              <div>
+                <p className="text-[9px] font-black text-purple-600 uppercase tracking-widest">Aniversariantes da semana</p>
+                <p className="text-2xl font-black text-purple-700">{acoesDoDiaLoading ? '—' : acoesDoDia?.aniversariantesSemana ?? 0}</p>
+              </div>
+              <i className="fa-solid fa-cake-candles text-purple-300 text-xl"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Linha: Ranking de clientes + Top raças */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+          <SectionTitle title="Top 10 Clientes" subtitle="Maior faturamento no período" />
+          <div className="mt-4">
+            {topClientesLoading ? (
+              <CardSkeleton height={220} />
+            ) : topClientes.length === 0 ? (
+              <p className="text-center text-slate-300 font-bold italic py-8">Nenhum faturamento no período.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className={thClass}>#</th>
+                    <th className={thClass}>Cliente</th>
+                    <th className={thClassRight}>Atendimentos</th>
+                    <th className={thClassRight}>Faturamento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topClientes.map((c, idx) => (
+                    <tr key={c.clienteId} className="border-b border-slate-50">
+                      <td className="py-3 pr-2 font-black text-slate-300">{idx + 1}</td>
+                      <td className="py-3 pr-4 font-bold text-slate-700">{c.clienteNome}</td>
+                      <td className="py-3 pr-4 text-right font-bold text-slate-600">{c.qtdEventos}</td>
+                      <td className="py-3 text-right font-black text-emerald-600">{formatCurrencyBR(c.faturamento)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+          <SectionTitle title="Top Raças Atendidas" subtitle="Atendimentos finalizados no período" />
+          <div className="mt-4">
+            {topRacasLoading ? (
+              <CardSkeleton height={220} />
+            ) : topRacas.length === 0 ? (
+              <p className="text-center text-slate-300 font-bold italic py-8">Nenhum atendimento finalizado no período.</p>
+            ) : (
+              <div className="space-y-3">
+                {topRacas.map((r) => {
+                  const max = Math.max(...topRacas.map((x) => x.qtd), 1);
+                  const pct = Math.round((r.qtd / max) * 100);
+                  return (
+                    <div key={r.raca}>
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-600 mb-1">
+                        <span className="truncate">{r.raca}</span>
+                        <span className="text-slate-800 font-black">{r.qtd}</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-teal-500 rounded-full" style={{ width: `${pct}%` }}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
