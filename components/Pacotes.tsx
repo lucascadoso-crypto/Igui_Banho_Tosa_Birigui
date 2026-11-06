@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Unit, Package, UserProfile } from '../types';
 import PacoteDetalhesModal from './PacoteDetalhesModal';
 import PacoteFormModal from './PacoteFormModal';
+import BaixarRelatorioPacotesButton from './BaixarRelatorioPacotesButton';
 import { registrarAtividade } from '../services/logger';
 import { enviarNotificacaoWhatsApp } from '../services/whatsappService';
 
@@ -528,6 +529,10 @@ const Pacotes: React.FC<PacotesProps> = ({ unit, supabaseClient, userProfile }) 
               <p className="text-slate-400 text-[9px] font-bold uppercase tracking-[0.16em] truncate">Controle de Fidelidade Igui Birigui</p>
            </div>
         </div>
+        <BaixarRelatorioPacotesButton
+          entrada={{ unidadeNome: unit.name, pacotes: packages, hoje: today }}
+          carregando={loading && packages.length === 0}
+        />
         {!isReadOnly && (
           <button onClick={() => { setEditingPackageData(null); setIsModalOpen(true); }} className="order-2 md:order-3 shrink-0 bg-[#00897B] hover:bg-[#00796f] text-white px-5 md:px-7 py-3.5 rounded-2xl font-black shadow-lg shadow-teal-500/25 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
             <i className="fa-solid fa-plus"></i> <span>Novo pacote</span>
