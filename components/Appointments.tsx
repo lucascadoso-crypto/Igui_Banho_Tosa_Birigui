@@ -883,10 +883,32 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
       );
 
       if (appt.pacote_id && appt.pacotes) {
-        const isLastSession = appt.numero_sessao === appt.pacotes.qtd_sessoes;
+        // O ciclo termina quando NAO resta nenhuma sessao em aberto no pacote, e nao quando
+        // o numero da sessao finalizada bate com a quantidade (se uma sessao for remarcada
+        // para depois da "ultima", o numero deixa de refletir a ordem real: renovava cedo
+        // demais ou nunca renovava). Se nao der para consultar, cai na regra antiga.
+        let isLastSession = appt.numero_sessao === appt.pacotes.qtd_sessoes;
+        const { data: sessoesDoPacote, error: sessoesErr } = await supabaseClient
+          .from('agendamentos')
+          .select('id, status')
+          .eq('pacote_id', appt.pacote_id);
+        if (!sessoesErr && sessoesDoPacote && sessoesDoPacote.length > 0) {
+          const encerradas = ['finalizado', 'finalizada', 'concluido', 'concluida', 'cancelado', 'cancelada'];
+          isLastSession = !sessoesDoPacote.some((s: any) =>
+            s.id !== appt.id && !encerradas.includes(String(s.status || '').toLowerCase().trim())
+          );
+        }
 
         if (isLastSession) {
-          if (appt.pacotes.renovacao_automatica) {
+          // Trava contra renovar duas vezes o mesmo ciclo.
+          const { data: jaRenovado } = await supabaseClient
+            .from('pacotes')
+            .select('id')
+            .eq('pacote_anterior_id', appt.pacote_id)
+            .limit(1);
+          if (jaRenovado && jaRenovado.length > 0) {
+            await supabaseClient.from('pacotes').update({ status: 'FINALIZADO' }).eq('id', appt.pacote_id);
+          } else if (appt.pacotes.renovacao_automatica) {
             try {
               await renovarPacote(appt.pacotes);
               setConfirmacao({
@@ -896,6 +918,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ unit, supabaseClient, userP
               });
             } catch (renovError) {
               console.error('Erro na renovacao automatica:', renovError);
+              showToast('Atendimento concluido, mas a renovacao do pacote falhou. Renove o pacote manualmente.', 'erro');
             }
           } else {
             await supabaseClient.from('pacotes').update({ status: 'FINALIZADO' }).eq('id', appt.pacote_id);
