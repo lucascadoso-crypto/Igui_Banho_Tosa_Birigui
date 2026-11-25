@@ -20,6 +20,8 @@ interface KPICardProps {
   onClick?: () => void;
   loading?: boolean;
   fullWidth?: boolean;
+  /** Quando true, mostra "Indisponível" no lugar do valor (bloco de origem falhou ao carregar). */
+  error?: boolean;
 }
 
 const getValueFontSizeClass = (value: string | number) => {
@@ -50,7 +52,8 @@ const KPICard: React.FC<KPICardProps> = ({
   trend,
   onClick,
   loading = false,
-  fullWidth = false
+  fullWidth = false,
+  error = false
 }) => {
   const palette = colorClasses[color];
   const trendDirection = trend?.direction ?? (trend && trend.value > 0 ? 'up' : trend && trend.value < 0 ? 'down' : 'neutral');
@@ -73,11 +76,13 @@ const KPICard: React.FC<KPICardProps> = ({
 
       {loading ? (
         <div className="h-9 w-2/3 bg-slate-100 rounded-lg animate-pulse"></div>
+      ) : error ? (
+        <p className="font-black text-rose-400 tracking-tighter leading-tight text-xl">Indisponível</p>
       ) : (
         <p className={`font-black text-slate-900 tracking-tighter leading-tight break-words ${getValueFontSizeClass(value)}`}>{value}</p>
       )}
-      {subtext && !loading && <p className="text-xs font-bold text-slate-400 mt-2">{subtext}</p>}
-      {trend && !loading && (
+      {subtext && !loading && !error && <p className="text-xs font-bold text-slate-400 mt-2">{subtext}</p>}
+      {trend && !loading && !error && (
         <div className={`flex items-center gap-1.5 text-[11px] font-bold mt-3 ${trendColor}`}>
           <i className={`fa-solid ${trendIcon} text-[10px]`}></i>
           <span>{formatDecimalBR(Math.abs(trend.value))}%{trend.label ? ` ${trend.label}` : ''}</span>

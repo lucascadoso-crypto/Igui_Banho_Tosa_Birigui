@@ -1,4 +1,5 @@
 import { toCurrencyNumber } from './appointmentTotals';
+import { AcoesDoDia } from './acoesDoDia';
 
 export type TransporteFiltro = 'todos' | 'com' | 'sem';
 export type Granularidade = 'dia' | 'semana' | 'mes';
@@ -414,4 +415,178 @@ export const fetchTopRacas = async (supabaseClient: any, filtros: DashboardFiltr
   });
   if (error) throw error;
   return (data || []).map((row: any) => ({ raca: row.raca, qtd: toCurrencyNumber(row.qtd) }));
+};
+
+/**
+ * Bundles principal e complementar (migration 0073): consolidam em 1 único
+ * round-trip cada o conjunto de RPCs da 1ª e da 2ª onda do Dashboard
+ * Gerencial, respectivamente. O mapeamento de campos de cada sub-bloco é
+ * idêntico ao das funções fetch* individuais acima (mesma lógica, mesmos
+ * nomes de coluna) — aqui só desempacotamos o jsonb agregado.
+ */
+export interface DashboardBundlePrincipal {
+  kpis: DashboardKpis;
+  faturamentoCategoria: FaturamentoCategoria[];
+  faturamentoUnidade: FaturamentoUnidade[];
+  formasPagamento: FormaPagamento[];
+  custosPacotes: CustoServicoPacote[];
+  transporte: TransporteResumo;
+  topAdicionais: TopAdicional[];
+  agendamentosCards: AgendamentosCards;
+}
+
+export const fetchDashboardBundlePrincipal = async (
+  supabaseClient: any,
+  filtros: DashboardFiltros,
+  limiteAdicionais = 10
+): Promise<DashboardBundlePrincipal> => {
+  const { dataInicioAnterior, dataFimAnterior } = getPeriodoAnterior(filtros.dataInicio, filtros.dataFim);
+  const { data, error } = await supabaseClient.rpc('fn_dashboard_bundle_principal', {
+    p_unidade_id: filtros.unidadeId,
+    p_data_inicio: filtros.dataInicio,
+    p_data_fim: filtros.dataFim,
+    p_data_inicio_ant: dataInicioAnterior,
+    p_data_fim_ant: dataFimAnterior,
+    p_transporte: filtros.transporte,
+    p_limite_adicionais: limiteAdicionais
+  });
+  if (error) throw error;
+
+  const kpisRow = data?.kpis;
+  const transporteRow = data?.transporte;
+  const agendamentosCardsRow = data?.agendamentos_cards;
+
+  const agrupadoFormas = new Map<string, number>();
+  for (const row of data?.formas_pagamento || []) {
+    const forma = normalizarFormaPagamento(row.forma_pagamento);
+    agrupadoFormas.set(forma, (agrupadoFormas.get(forma) || 0) + toCurrencyNumber(row.valor));
+  }
+
+  return {
+    kpis: {
+      faturamentoAtual: toCurrencyNumber(kpisRow?.faturamento_atual),
+      faturamentoAnterior: toCurrencyNumber(kpisRow?.faturamento_anterior),
+      banhosAtual: toCurrencyNumber(kpisRow?.banhos_atual),
+      banhosAnterior: toCurrencyNumber(kpisRow?.banhos_anterior),
+      tosasAtual: toCurrencyNumber(kpisRow?.tosas_atual),
+      tosasAnterior: toCurrencyNumber(kpisRow?.tosas_anterior),
+      pacotesAtivosAtual: toCurrencyNumber(kpisRow?.pacotes_ativos_atual),
+      pacotesAtivosAnterior: toCurrencyNumber(kpisRow?.pacotes_ativos_anterior),
+      novosClientesAtual: toCurrencyNumber(kpisRow?.novos_clientes_atual),
+      novosClientesAnterior: toCurrencyNumber(kpisRow?.novos_clientes_anterior)
+    },
+    faturamentoCategoria: (data?.faturamento_categoria || []).map((row: any) => ({
+      categoria: row.categoria,
+      valor: toCurrencyNumber(row.valor)
+    })),
+    faturamentoUnidade: (data?.faturamento_unidade || []).map((row: any) => ({
+      unidadeId: row.unidade_id,
+      unidadeNome: row.unidade_nome,
+      valor: toCurrencyNumber(row.valor)
+    })),
+    formasPagamento: Array.from(agrupadoFormas.entries())
+      .map(([forma, valor]) => ({ forma, valor }))
+      .sort((a, b) => b.valor - a.valor),
+    custosPacotes: (data?.custos_pacotes || []).map((row: any) => ({
+      servico: row.servico,
+      qtd: toCurrencyNumber(row.qtd),
+      custoUnitario: toCurrencyNumber(row.custo_unitario),
+      custoTotal: toCurrencyNumber(row.custo_total)
+    })),
+    transporte: {
+      petsTransportados: toCurrencyNumber(transporteRow?.pets_transportados),
+      faturamentoTransporte: toCurrencyNumber(transporteRow?.faturamento_transporte)
+    },
+    topAdicionais: (data?.top_adicionais || []).map((row: any) => ({
+      servico: row.servico,
+      qtd: toCurrencyNumber(row.qtd),
+      faturamento: toCurrencyNumber(row.faturamento)
+    })),
+    agendamentosCards: {
+      agendados: toCurrencyNumber(agendamentosCardsRow?.agendados),
+      concluidos: toCurrencyNumber(agendamentosCardsRow?.concluidos),
+      cancelados: toCurrencyNumber(agendamentosCardsRow?.cancelados),
+      taxaConclusao: toCurrencyNumber(agendamentosCardsRow?.taxa_conclusao)
+    }
+  };
+};
+
+export interface DashboardBundleComplementar {
+  kpisComplementares: DashboardKpisComplementares;
+  agendamentosCardsAnterior: AgendamentosCards;
+  ocupacaoAtual: OcupacaoDiaSemana[];
+  ocupacaoAnterior: OcupacaoDiaSemana[];
+  acoesDoDia: AcoesDoDia | null;
+  topClientes: TopCliente[];
+  topRacas: TopRaca[];
+}
+
+const mapOcupacaoRows = (rows: any[] | null | undefined): OcupacaoDiaSemana[] =>
+  (rows || []).map((row: any) => ({
+    diaSemana: row.dia_semana,
+    capacidadeDia: toCurrencyNumber(row.capacidade_dia),
+    diasNoPeriodo: toCurrencyNumber(row.dias_no_periodo),
+    capacidadeTotal: toCurrencyNumber(row.capacidade_total),
+    agendados: toCurrencyNumber(row.agendados),
+    percentual: toCurrencyNumber(row.percentual)
+  }));
+
+export const fetchDashboardBundleComplementar = async (
+  supabaseClient: any,
+  filtros: DashboardFiltros,
+  hojeBR: string,
+  limiteTop = 10
+): Promise<DashboardBundleComplementar> => {
+  const { dataInicioAnterior, dataFimAnterior } = getPeriodoAnterior(filtros.dataInicio, filtros.dataFim);
+  const { data, error } = await supabaseClient.rpc('fn_dashboard_bundle_complementar', {
+    p_unidade_id: filtros.unidadeId,
+    p_data_inicio: filtros.dataInicio,
+    p_data_fim: filtros.dataFim,
+    p_data_inicio_ant: dataInicioAnterior,
+    p_data_fim_ant: dataFimAnterior,
+    p_transporte: filtros.transporte,
+    p_hoje: hojeBR,
+    p_limite_top: limiteTop
+  });
+  if (error) throw error;
+
+  const kpisCompRow = data?.kpis_complementares;
+  const agendCardsAntRow = data?.agendamentos_cards_anterior;
+  const acoesRow = data?.acoes_do_dia;
+
+  return {
+    kpisComplementares: {
+      ticketMedioAtual: toCurrencyNumber(kpisCompRow?.ticket_medio_atual),
+      ticketMedioAnterior: toCurrencyNumber(kpisCompRow?.ticket_medio_anterior),
+      totalAReceberAtual: toCurrencyNumber(kpisCompRow?.total_a_receber_atual),
+      totalAReceberAnterior: toCurrencyNumber(kpisCompRow?.total_a_receber_anterior)
+    },
+    agendamentosCardsAnterior: {
+      agendados: toCurrencyNumber(agendCardsAntRow?.agendados),
+      concluidos: toCurrencyNumber(agendCardsAntRow?.concluidos),
+      cancelados: toCurrencyNumber(agendCardsAntRow?.cancelados),
+      taxaConclusao: toCurrencyNumber(agendCardsAntRow?.taxa_conclusao)
+    },
+    ocupacaoAtual: mapOcupacaoRows(data?.ocupacao_atual),
+    ocupacaoAnterior: mapOcupacaoRows(data?.ocupacao_anterior),
+    acoesDoDia: acoesRow
+      ? {
+          petsAtrasados: toCurrencyNumber(acoesRow.pets_atrasados),
+          pacotesAcabando: toCurrencyNumber(acoesRow.pacotes_acabando),
+          clientesNaoRenovaram: toCurrencyNumber(acoesRow.clientes_nao_renovaram),
+          pendenciasACobrar: {
+            qtd: toCurrencyNumber(acoesRow.pendencias_qtd),
+            valor: toCurrencyNumber(acoesRow.pendencias_valor)
+          },
+          aniversariantesSemana: toCurrencyNumber(acoesRow.aniversariantes_semana)
+        }
+      : null,
+    topClientes: (data?.top_clientes || []).map((row: any) => ({
+      clienteId: row.cliente_id,
+      clienteNome: row.cliente_nome,
+      qtdEventos: toCurrencyNumber(row.qtd_eventos),
+      faturamento: toCurrencyNumber(row.faturamento)
+    })),
+    topRacas: (data?.top_racas || []).map((row: any) => ({ raca: row.raca, qtd: toCurrencyNumber(row.qtd) }))
+  };
 };

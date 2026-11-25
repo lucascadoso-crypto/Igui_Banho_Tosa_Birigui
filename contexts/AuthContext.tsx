@@ -184,8 +184,15 @@ const { data, error: profileError } = await supabase
 
     init();
 
-    // Escuta mudanças de auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Escuta mudanças de auth.
+    // IMPORTANTE: este callback NÃO pode fazer nem aguardar nenhuma chamada
+    // Supabase diretamente — o supabase-js processa eventos de auth com um
+    // lock interno, e um `await` aqui pode travar esse lock até o próximo
+    // evento nunca resolver (ex.: TOKEN_REFRESHED ao voltar de F5/segundo
+    // plano), deixando o app preso em "Sincronizando..." até o usuário
+    // deslogar manualmente. Por isso todo trabalho assíncrono é adiado com
+    // setTimeout(..., 0), fora do ciclo do próprio callback.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return;
 
       // Tratamento de erro de refresh token no evento
@@ -198,28 +205,36 @@ const { data, error: profileError } = await supabase
       }
 
       // Armadura contra disparos repetitivos de foco de aba
-      if ((event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && lastEmailRef.current === session?.user?.email && userProfile) {
+      if ((event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && lastEmailRef.current === newSession?.user?.email && userProfile) {
+        setSession(newSession);
         return;
       }
 
-      setSession(session);
+      setSession(newSession);
 
-      try {
-        if (session?.user?.email) {
-          // Só dispara inicialização se for um novo email ou se ainda não temos o perfil
-          if (lastEmailRef.current !== session.user.email || !userProfile) {
-            await initializeApp(session.user);
+      setTimeout(() => {
+        if (!mounted) return;
+        (async () => {
+          try {
+            if (newSession?.user?.email) {
+              // Só dispara inicialização se for um novo email ou se ainda não temos o perfil
+              if (lastEmailRef.current !== newSession.user.email || !userProfile) {
+                await initializeApp(newSession.user);
+              } else {
+                setLoading(false);
+              }
+            } else {
+              // Se não há sessão, limpa tudo (Logout)
+              lastEmailRef.current = null;
+              setUserProfile(null);
+              setLoading(false);
+            }
+          } catch (err) {
+            console.error("Erro no listener de auth:", err);
+            if (mounted) setLoading(false);
           }
-        } else {
-          // Se não há sessão, limpa tudo (Logout)
-          lastEmailRef.current = null;
-          setUserProfile(null);
-        }
-      } catch (err) {
-        console.error("Erro no listener de auth:", err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
+        })();
+      }, 0);
     });
 
     return () => {
@@ -227,6 +242,27 @@ const { data, error: profileError } = await supabase
       subscription.unsubscribe();
     };
   }, [initializeApp]);
+
+  // Celular: o navegador/SO pode suspender o app em segundo plano por mais
+  // de alguns minutos. Ao voltar ao primeiro plano, pedimos a sessão atual
+  // ao Supabase — se o token tiver sido renovado nesse meio tempo, isso
+  // dispara TOKEN_REFRESHED no listener acima, que já trata o caso sem
+  // re-sincronizar tudo. Não força logout nem navega; só revalida.
+  useEffect(() => {
+    const revalidateSession = () => {
+      if (document.visibilityState !== 'visible') return;
+      supabase.auth.getSession().catch((err) => {
+        console.error('Erro ao revalidar sessão ao voltar ao app:', err);
+      });
+    };
+
+    document.addEventListener('visibilitychange', revalidateSession);
+    window.addEventListener('focus', revalidateSession);
+    return () => {
+      document.removeEventListener('visibilitychange', revalidateSession);
+      window.removeEventListener('focus', revalidateSession);
+    };
+  }, []);
 
   // Extraído do App.tsx original. A query e o estado de mobileBrand vivem em
   // UnitsContext (fetchMobileBrand); este efeito só decide QUANDO chamar,
